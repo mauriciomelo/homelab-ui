@@ -17,7 +17,6 @@ const kustomizationSchema = z.object({
   kind: z.literal("Kustomization"),
   metadata: z.object({
     name: z.string(),
-    namespace: z.string(),
   }),
   namespace: z.string(),
   resources: z.array(z.string()),
