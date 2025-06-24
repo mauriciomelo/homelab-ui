@@ -191,6 +191,11 @@ export async function updateApp(spec: AppFormSchema) {
     onAuth: () => ({ username: getAppConfig().GITHUB_TOKEN }),
   });
 
+  await reconcileFluxGitRepository({
+    name: "flux-system",
+    namespace: "flux-system",
+  });
+
   return { success: true };
 }
 
@@ -256,4 +261,41 @@ function getAppsDir() {
 function getAppDir(appName: string) {
   const appsDir = getAppsDir();
   return path.join(appsDir, appName);
+}
+
+export async function reconcileFluxGitRepository({
+  name,
+  namespace,
+}: {
+  namespace: string;
+  name: string;
+}): Promise<void> {
+  const customObjectsApi = kc.makeApiClient(k8s.CustomObjectsApi);
+
+  const patch = [
+    {
+      op: "add",
+      path: "/metadata/annotations",
+      value: {
+        "reconcile.fluxcd.io/requestedAt": new Date().toISOString(),
+      },
+    },
+  ];
+
+  try {
+    await customObjectsApi.patchNamespacedCustomObject({
+      namespace,
+      group: "source.toolkit.fluxcd.io",
+      version: "v1",
+      plural: "gitrepositories",
+      name,
+      body: patch,
+    });
+
+    console.log(
+      `Successfully triggered reconciliation for GitRepository '${name}' in namespace '${namespace}'.`
+    );
+  } catch (err) {
+    console.error("Error triggering reconciliation:", err);
+  }
 }
