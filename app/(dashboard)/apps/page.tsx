@@ -1,11 +1,8 @@
-import git from "isomorphic-git";
-import fs from "fs";
 import {
   Table,
   TableBody,
   TableCaption,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -13,21 +10,10 @@ import {
 import Link from "next/link";
 import { getApps, APP_STATUS, AppStatus } from "@/app/api/applications";
 import { cn } from "@/lib/utils";
+import { ApplicationForm } from "./application-form";
 
 export default async function AppsPage() {
-  const projectDir = "../homelab-docker";
-  let commits = await git.log({
-    fs,
-    dir: projectDir,
-    depth: 5,
-    ref: "main",
-  });
-  console.log(
-    "Recent commits:",
-    commits.map((commit) => commit.commit.message)
-  );
-
-  const appList = await getApps(projectDir);
+  const appList = await getApps();
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
@@ -46,13 +32,13 @@ export default async function AppsPage() {
         </TableHeader>
         <TableBody>
           {appList.map((app) => (
-            <TableRow key={app.name}>
+            <TableRow key={app.spec.name}>
               <TableCell className="w-2">
                 <StatusIcon status={app.status} />
               </TableCell>
               <TableCell className="font-medium">
                 <Link target="_blank" href={app.link}>
-                  {app.name}
+                  {app.spec.name}
                 </Link>
               </TableCell>
 
@@ -61,6 +47,8 @@ export default async function AppsPage() {
           ))}
         </TableBody>
       </Table>
+
+      <ApplicationForm data={appList[0].spec} />
     </div>
   );
 }
