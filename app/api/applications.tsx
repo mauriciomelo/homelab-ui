@@ -1,6 +1,11 @@
 import fs from "fs";
 import YAML from "yaml";
 import * as z from "zod";
+import * as k8s from "@kubernetes/client-node";
+
+const kc = new k8s.KubeConfig();
+kc.loadFromDefault();
+const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 
 export async function getApps(projectDir: string) {
   const appDir = projectDir + "/clusters/homelab/my-applications";
@@ -54,6 +59,13 @@ const ingressSchema = z.object({
   }),
 });
 
+export const APP_STATUS = {
+  RUNNING: "Running",
+  UNKNOWN: "Unknown",
+} as const;
+
+export type AppStatus = (typeof APP_STATUS)[keyof typeof APP_STATUS];
+
 async function getApp({
   appDir,
   appName,
@@ -78,8 +90,28 @@ async function getApp({
 
   const ingressData = ingressSchema.parse(YAML.parse(ingressFile));
 
+  const podsRes = await k8sApi.listNamespacedPod({ namespace: "podinfo2" });
+
+  const pods = podsRes.items.map((pod) => ({
+    name: pod.metadata?.name,
+    status: pod.status?.phase,
+  }));
+
   return {
     name: kustomizationData.namespace,
+    pods,
+    status: getAggregatedStatus(
+      pods.map((pod) => pod.status || APP_STATUS.UNKNOWN)
+    ),
     link: `http://${ingressData.spec.rules[0].host}`,
   };
+}
+
+export function getAggregatedStatus(statuses: string[]) {
+  const running = statuses.every((status) => status === APP_STATUS.RUNNING);
+  if (running) {
+    return APP_STATUS.RUNNING;
+  }
+
+  return APP_STATUS.UNKNOWN;
 }
