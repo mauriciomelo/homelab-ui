@@ -11,7 +11,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Plus, Rocket, Trash2 } from "lucide-react";
+import { Loader2Icon, Plus, Rocket, Trash2 } from "lucide-react";
 import type { App } from "@/app/api/applications";
 import { appFormSchema } from "./formSchema";
 import { updateApp } from "./actions";
@@ -134,10 +134,17 @@ export function ApplicationForm(props: { data: App["spec"] }) {
           )}
         />
         <div className="flex gap-3 pt-4">
-          <Button type="submit" className="flex-1">
-            <Rocket className="h-4 w-4 mr-2" />
-            Deploy Application
-          </Button>
+          {form.formState.isSubmitting ? (
+            <Button type="submit" className="flex-1" disabled>
+              <Loader2Icon className="animate-spin" />
+              Updating...
+            </Button>
+          ) : (
+            <Button type="submit" className="flex-1">
+              <Rocket className="h-4 w-4 mr-2" />
+              Update
+            </Button>
+          )}
         </div>
       </form>
     </Form>

@@ -37,7 +37,12 @@ export function Apps() {
         </TableHeader>
         <TableBody>
           {apps.data?.map((app) => (
-            <TableRow key={app.spec.name}>
+            <TableRow
+              key={app.spec.name}
+              className={cn({
+                "animate-pulse": app.status === APP_STATUS.PENDING,
+              })}
+            >
               <TableCell className="w-2">
                 <StatusIcon status={app.status} />
               </TableCell>
