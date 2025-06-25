@@ -8,30 +8,38 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ApplicationForm } from "./application-form";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
 import { APP_STATUS, AppStatus } from "@/app/api/schemas";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { useState } from "react";
+import { App } from "@/app/api/applications";
 
 export function Apps() {
   const trpc = useTRPC();
   const apps = useQuery({ ...trpc.apps.queryOptions(), refetchInterval: 2000 });
-  const selectedApp = apps.data?.[0];
+  const [selectedApp, setSelectedApp] = useState<App | null>(null);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
       <h1 className="text-2xl font-bold">Apps</h1>
 
-      <Table className="table-fixed">
+      <Table className="table-fixed max-w-7xl">
         <TableCaption>A list of your installed Apps.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="w-2">
               <span className="sr-only">Status</span>
             </TableHead>
-            <TableHead>App</TableHead>
+            <TableHead className="w-[200px]">App</TableHead>
             <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
@@ -46,10 +54,11 @@ export function Apps() {
               <TableCell className="w-2">
                 <StatusIcon status={app.status} />
               </TableCell>
-              <TableCell className="font-medium">
-                <Link target="_blank" href={app.link}>
-                  {app.spec.name}
-                </Link>
+              <TableCell
+                className="font-medium cursor-pointer"
+                onClick={() => setSelectedApp(app)}
+              >
+                {app.spec.name}
               </TableCell>
 
               <TableCell className="font-medium">{app.status}</TableCell>
@@ -57,7 +66,24 @@ export function Apps() {
           ))}
         </TableBody>
       </Table>
-      {selectedApp && <ApplicationForm data={selectedApp.spec} />}
+      <Sheet
+        open={!!selectedApp}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedApp(null);
+          }
+        }}
+      >
+        <SheetContent className="w-[600px] sm:max-w-[600px] ">
+          <SheetHeader>
+            <SheetTitle>{selectedApp?.spec.name}</SheetTitle>
+            <SheetDescription>Edit the App's configuration.</SheetDescription>
+          </SheetHeader>
+          {selectedApp && (
+            <ApplicationForm className="p-4" data={selectedApp.spec} />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

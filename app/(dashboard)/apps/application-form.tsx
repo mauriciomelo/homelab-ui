@@ -6,19 +6,27 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2Icon, Plus, Rocket, Trash2 } from "lucide-react";
+import { Container, Loader2Icon, Plus, Rocket, Trash2 } from "lucide-react";
 import type { App } from "@/app/api/applications";
 import { appFormSchema } from "./formSchema";
 import { updateApp } from "./actions";
+import { Separator } from "@radix-ui/react-separator";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 type FormData = z.infer<typeof appFormSchema>;
 
-export function ApplicationForm(props: { data: App["spec"] }) {
+export function ApplicationForm(props: {
+  data: App["spec"];
+  className?: string;
+}) {
   const form = useForm<FormData>({
     resolver: zodResolver(appFormSchema),
     defaultValues: {
@@ -46,7 +54,7 @@ export function ApplicationForm(props: { data: App["spec"] }) {
   return (
     <Form {...form}>
       <form
-        className="space-y-4"
+        className={cn("space-y-4", props.className)}
         onSubmit={form.handleSubmit(async (data) => {
           const result = await updateApp(data);
           console.log(result);
@@ -57,6 +65,9 @@ export function ApplicationForm(props: { data: App["spec"] }) {
           name="name"
           render={({ field }) => (
             <FormItem>
+              <FormLabel className="text-base font-medium flex items-center gap-2">
+                App Name
+              </FormLabel>
               <FormControl>
                 <Input
                   placeholder="App Name"
@@ -69,6 +80,35 @@ export function ApplicationForm(props: { data: App["spec"] }) {
             </FormItem>
           )}
         />
+
+        <FormField
+          control={form.control}
+          name="image"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-base font-medium flex items-center gap-2">
+                Container Image
+              </FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="nginx:latest or registry.example.com/my-app:v1.0.0"
+                  className="text-base font-mono"
+                  {...field}
+                />
+              </FormControl>
+              <FormDescription>
+                Specify the Docker image to deploy. Include the full registry
+                path and tag.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Separator />
+
+        <div className="text-base font-medium">Environment Variables</div>
+
         <FormField
           control={form.control}
           name="envVariables"
