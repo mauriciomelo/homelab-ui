@@ -1,3 +1,4 @@
+import "server-only";
 import fs from "fs";
 import YAML from "yaml";
 import * as z from "zod";
@@ -8,10 +9,18 @@ import { AppFormSchema } from "../(dashboard)/apps/formSchema";
 import * as _ from "lodash";
 import git from "isomorphic-git";
 import http from "isomorphic-git/http/node";
+import {
+  APP_STATUS,
+  deploymentSchema,
+  ingressSchema,
+  kustomizationSchema,
+} from "./schemas";
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
-const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
+const coreApi = kc.makeApiClient(k8s.CoreV1Api);
+const customObjectsApi = kc.makeApiClient(k8s.CustomObjectsApi);
+const appsApi = kc.makeApiClient(k8s.AppsV1Api);
 
 export async function getApps() {
   const appDir = getAppsDir();
@@ -22,81 +31,6 @@ export async function getApps() {
 
   return Promise.all(appListPromises);
 }
-
-const kustomizationSchema = z.object({
-  apiVersion: z.string(),
-  kind: z.literal("Kustomization"),
-  metadata: z.object({
-    name: z.string(),
-  }),
-  namespace: z.string(),
-  resources: z.array(z.string()),
-});
-
-const ingressSchema = z.object({
-  apiVersion: z.string(),
-  kind: z.literal("Ingress"),
-  metadata: z.object({
-    name: z.string(),
-    annotations: z.record(z.string(), z.string()),
-  }),
-  spec: z.object({
-    rules: z.array(
-      z.object({
-        host: z.string(),
-        http: z.object({
-          paths: z.array(
-            z.object({
-              path: z.string(),
-              pathType: z.literal("Prefix"),
-              backend: z.object({
-                service: z.object({
-                  name: z.string(),
-                  port: z.object({
-                    number: z.number(),
-                  }),
-                }),
-              }),
-            })
-          ),
-        }),
-      })
-    ),
-  }),
-});
-
-const deploymentSchema = z.object({
-  apiVersion: z.string(),
-  kind: z.literal("Deployment"),
-  metadata: z.object({
-    name: z.string(),
-  }),
-  spec: z.object({
-    template: z.object({
-      spec: z.object({
-        containers: z.array(
-          z.object({
-            name: z.string(),
-            image: z.string(),
-            env: z.array(
-              z.object({
-                name: z.string(),
-                value: z.string(),
-              })
-            ),
-          })
-        ),
-      }),
-    }),
-  }),
-});
-
-export const APP_STATUS = {
-  RUNNING: "Running",
-  UNKNOWN: "Unknown",
-} as const;
-
-export type AppStatus = (typeof APP_STATUS)[keyof typeof APP_STATUS];
 
 async function getAppByName(name: string) {
   const appPath = getAppDir(name);
@@ -121,12 +55,47 @@ async function getAppByName(name: string) {
 
   const ingressData = ingressSchema.parse(YAML.parse(ingressFile));
 
-  const podsRes = await k8sApi.listNamespacedPod({ namespace: "podinfo2" });
+  const [deploymentRes, podsRes] = await Promise.all([
+    appsApi.readNamespacedDeployment({ name, namespace: name }),
+    coreApi.listNamespacedPod({ namespace: name }),
+  ]);
 
-  const pods = podsRes.items.map((pod) => ({
-    name: pod.metadata?.name,
-    status: pod.status?.phase,
-  }));
+  const desiredReplicas = deploymentRes?.spec?.replicas || 0;
+  const replicas = deploymentRes?.status?.replicas || 0;
+  const updatedReplicas = deploymentRes?.status?.updatedReplicas || 0;
+
+  const deploymentPending =
+    updatedReplicas !== desiredReplicas || replicas !== desiredReplicas;
+
+  const pods = podsRes.items.map((pod) => {
+    pod.metadata?.ownerReferences;
+    return {
+      name: pod.metadata?.name,
+      metadata: {
+        creationTimestamp: pod.metadata?.creationTimestamp,
+      },
+      status: {
+        phase: pod.status?.phase,
+        startTime: pod.status?.startTime,
+        message: pod.status?.message,
+        reason: pod.status?.reason,
+        conditions: pod.status?.conditions?.map((condition) => ({
+          type: condition.type,
+          status: condition.status,
+          lastProbeTime: condition.lastProbeTime,
+          lastTransitionTime: condition.lastTransitionTime,
+          reason: condition.reason,
+          message: condition.message,
+        })),
+      },
+    };
+  });
+
+  const appStatus = deploymentPending
+    ? APP_STATUS.PENDING
+    : getPodsAggregatedStatus(
+        pods.map((pod) => pod.status?.phase || APP_STATUS.UNKNOWN)
+      );
 
   return {
     spec: {
@@ -140,9 +109,26 @@ async function getAppByName(name: string) {
       ),
     } satisfies AppFormSchema,
     pods,
-    status: getAggregatedStatus(
-      pods.map((pod) => pod.status || APP_STATUS.UNKNOWN)
-    ),
+    deployment: {
+      spec: {
+        replicas: deploymentRes.spec?.replicas,
+      },
+
+      status: {
+        availableReplicas: deploymentRes.status?.availableReplicas,
+        replicas: deploymentRes.status?.replicas,
+        readyReplicas: deploymentRes.status?.readyReplicas,
+        updatedReplicas: deploymentRes.status?.updatedReplicas,
+        conditions: deploymentRes.status?.conditions?.map((condition) => ({
+          type: condition.type,
+          status: condition.status,
+          lastTransitionTime: condition.lastTransitionTime,
+          reason: condition.reason,
+          message: condition.message,
+        })),
+      },
+    },
+    status: appStatus,
     link: `http://${ingressData.spec.rules[0].host}`,
   };
 }
@@ -152,14 +138,17 @@ export async function updateApp(spec: AppFormSchema) {
 
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
-  const adaptedDeployment = adaptAppToResources(spec).deployment;
+  const newPartialDeployment = adaptAppToResources(spec).deployment;
 
-  const deployment = await getFile({
+  const previousDeployment = await getFile({
     path: deploymentFilePath,
     schema: deploymentSchema,
   });
 
-  const updatedDeployment = _.merge(deployment.raw, adaptedDeployment);
+  const updatedDeployment = _.merge(
+    previousDeployment.raw,
+    newPartialDeployment
+  );
 
   await fs.promises.writeFile(
     deploymentFilePath,
@@ -201,8 +190,22 @@ export async function updateApp(spec: AppFormSchema) {
 
 function adaptAppToResources(app: AppFormSchema) {
   const deployment = {
+    metadata: {
+      name: app.name,
+    },
+
     spec: {
+      selector: {
+        matchLabels: {
+          app: app.name,
+        },
+      },
       template: {
+        metadata: {
+          labels: {
+            app: app.name,
+          },
+        },
         spec: {
           containers: [
             {
@@ -239,7 +242,7 @@ async function getFile<T>({
   return { data: schema.parse(raw), raw };
 }
 
-export function getAggregatedStatus(statuses: string[]) {
+export function getPodsAggregatedStatus(statuses: string[]) {
   const running = statuses.every((status) => status === APP_STATUS.RUNNING);
   if (running) {
     return APP_STATUS.RUNNING;
@@ -270,8 +273,6 @@ export async function reconcileFluxGitRepository({
   namespace: string;
   name: string;
 }): Promise<void> {
-  const customObjectsApi = kc.makeApiClient(k8s.CustomObjectsApi);
-
   const patch = [
     {
       op: "add",
