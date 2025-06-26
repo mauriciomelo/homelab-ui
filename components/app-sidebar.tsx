@@ -3,26 +3,17 @@
 import * as React from "react";
 import {
   AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
   GalleryVerticalEnd,
-  Map,
   PencilRuler,
-  PieChart,
-  Settings2,
-  SquareTerminal,
+  Server,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
-import { NavUser } from "@/components/nav-user";
+
 import { TeamSwitcher } from "@/components/team-switcher";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
@@ -51,6 +42,18 @@ const data = {
         {
           title: "All Apps",
           url: "/apps",
+        },
+      ],
+    },
+    {
+      title: "Devices",
+      url: "/devices",
+      icon: Server,
+      isActive: true,
+      items: [
+        {
+          title: "All Devices",
+          url: "/devices",
         },
       ],
     },

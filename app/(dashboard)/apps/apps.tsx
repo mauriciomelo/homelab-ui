@@ -20,8 +20,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { useState } from "react";
+import { ComponentProps, useState } from "react";
 import { App } from "@/app/api/applications";
+import { Status } from "@/components/ui/status";
 
 export function Apps() {
   const trpc = useTRPC();
@@ -52,7 +53,7 @@ export function Apps() {
               })}
             >
               <TableCell className="w-2">
-                <StatusIcon status={app.status} />
+                <Status {...appStatusProps(app.status)} />
               </TableCell>
               <TableCell
                 className="font-medium cursor-pointer"
@@ -88,16 +89,23 @@ export function Apps() {
   );
 }
 
-function StatusIcon({ status }: { status: AppStatus }) {
-  const shared = cn("inline-flex h-full w-full rounded-full", {
-    "bg-green-400": status === APP_STATUS.RUNNING,
-    "bg-orange-400 animate-ping": status === APP_STATUS.PENDING,
-  });
+function appStatusProps(status: AppStatus): ComponentProps<typeof Status> {
+  if (status === APP_STATUS.RUNNING) {
+    return {
+      color: "green",
+      animate: false,
+    };
+  }
 
-  return (
-    <span className="relative flex size-2">
-      <span className={cn(shared, "absolute opacity-50")}></span>
-      <span className={cn(shared, "relative animate-none")}></span>
-    </span>
-  );
+  if (status === APP_STATUS.PENDING) {
+    return {
+      color: "orange",
+      animate: true,
+    };
+  }
+
+  return {
+    color: "gray",
+    animate: false,
+  };
 }

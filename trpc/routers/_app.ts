@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
 import { getApps } from "@/app/api/applications";
+import { devices } from "@/app/api/devices";
 export const appRouter = createTRPCRouter({
   hello: baseProcedure
     .input(
@@ -16,6 +17,9 @@ export const appRouter = createTRPCRouter({
 
   apps: baseProcedure.query(() => {
     return getApps();
+  }),
+  devices: baseProcedure.query(() => {
+    return devices();
   }),
 });
 

@@ -85,3 +85,11 @@ export const APP_STATUS = {
 } as const;
 
 export type AppStatus = (typeof APP_STATUS)[keyof typeof APP_STATUS];
+
+export const DEVICE_STATUS = {
+  HEALTHY: "Healthy",
+  UNHEALTHY: "Unhealthy",
+  OFFLINE: "Offline",
+} as const;
+
+export type DeviceStatus = (typeof DEVICE_STATUS)[keyof typeof DEVICE_STATUS];
