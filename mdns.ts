@@ -11,6 +11,9 @@ const service = bonjour.publish({
   name: serviceName,
   type: "http",
   host: `${serviceName}.local`,
+  txt: {
+    kind: "cluster-node",
+  },
   port: 3000,
 });
 
