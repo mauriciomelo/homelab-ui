@@ -35,6 +35,7 @@ export function Devices() {
             </TableHead>
             <TableHead className="w-[200px]">Device</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>IP</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -51,6 +52,7 @@ export function Devices() {
               <TableCell className="font-medium ">{device.name}</TableCell>
 
               <TableCell className="font-medium">{device.status}</TableCell>
+              <TableCell className="font-medium">{device.ip}</TableCell>
             </TableRow>
           ))}
         </TableBody>
