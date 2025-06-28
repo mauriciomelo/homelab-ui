@@ -17,11 +17,9 @@ export async function POST(req: Request) {
   // Get the absolute path to join_cluster.sh to avoid privilege escalation issues
   const scriptPath = path.resolve(process.cwd(), "join_cluster.sh");
 
-  console.log({ scriptPath });
+  const command = `K3S_URL=${serverUrl} K3S_TOKEN=${token} ${scriptPath}`;
   // TODO: make sure the token is sanitized to avoid injection attacks
-  const res = await execAsync(
-    `K3S_URL=${serverUrl} K3S_TOKEN=${token} ${scriptPath}`
-  );
+  const res = await execAsync(command);
 
   return Response.json({
     stdout: res.stdout,

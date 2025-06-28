@@ -1,24 +1,13 @@
 import { z } from "zod";
 import { baseProcedure, createCallerFactory, createTRPCRouter } from "../init";
 import { getApps } from "@/app/api/applications";
-import { devices } from "@/app/api/devices";
+import { createBootstrapToken, devices } from "@/app/api/devices";
 import { getDiscoveredNodes } from "@/mdns";
 import { exec } from "child_process";
 import util from "util";
+import path from "path";
 
 export const appRouter = createTRPCRouter({
-  hello: baseProcedure
-    .input(
-      z.object({
-        text: z.string(),
-      })
-    )
-    .query((opts) => {
-      return {
-        greeting: `hello ${opts.input.text}`,
-      };
-    }),
-
   apps: baseProcedure.query(() => {
     return getApps();
   }),
@@ -58,8 +47,6 @@ export const appRouter = createTRPCRouter({
       // Implement your adoption logic here
       console.log(`\n\n\nAdopting device: ${name} at ${ip}:${port}\n\n\n`);
 
-      const joinToken = "implement token";
-
       // TODO: support HTTPS here to transport the token securely
       const remoteNodeUrl = `http://${ip}:${port}/api/join`;
 
@@ -67,12 +54,27 @@ export const appRouter = createTRPCRouter({
 
       const masterNodeUrl = `https://${masterNodeIp}:6443`;
 
+      const joinToken = await createBootstrapToken();
+
+      console.log({ joinToken, masterNodeUrl });
+
+      const scriptPath = path.resolve(
+        "/home/mauricio/homelab-ui",
+        "join_cluster.sh"
+      );
+
+      const command = `K3S_URL=${masterNodeUrl} K3S_TOKEN=${joinToken.joinToken} ${scriptPath}`;
+      console.log({ command });
+
       const res = await fetch(remoteNodeUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ token: joinToken, serverUrl: masterNodeUrl }),
+        body: JSON.stringify({
+          token: joinToken.joinToken,
+          serverUrl: masterNodeUrl,
+        }),
       });
 
       console.log(await res.json());

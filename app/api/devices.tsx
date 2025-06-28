@@ -2,6 +2,7 @@ import "server-only";
 import * as k8s from "@kubernetes/client-node";
 import * as _ from "lodash";
 import { DEVICE_STATUS } from "./schemas";
+import crypto from "crypto";
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
@@ -42,4 +43,60 @@ function nodeStatus(status: string) {
   }
 
   return DEVICE_STATUS.OFFLINE;
+}
+
+export async function createBootstrapToken() {
+  const tokenId = crypto.randomBytes(3).toString("hex");
+  const tokenSecret = crypto.randomBytes(8).toString("hex");
+
+  // Token expires in 10 minutes
+  const expiration = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+  const secret = {
+    apiVersion: "v1",
+    kind: "Secret",
+    metadata: {
+      name: `bootstrap-token-${tokenId}`,
+      namespace: "kube-system",
+    },
+    type: "bootstrap.kubernetes.io/token",
+    stringData: {
+      "token-id": tokenId,
+      "token-secret": tokenSecret,
+      "usage-bootstrap-signing": "true",
+      "usage-bootstrap-authentication": "true",
+      expiration: expiration,
+      "auth-extra-groups": "system:bootstrappers:k3s:default-node-token",
+      description: "homelab-ui generated bootstrap token",
+    },
+  };
+
+  await coreApi.createNamespacedSecret({
+    namespace: "kube-system",
+    body: secret,
+  });
+
+  const cm = await coreApi.readNamespacedConfigMap({
+    namespace: "kube-system",
+    name: "kube-root-ca.crt",
+  });
+
+  const caCrt = cm.data?.["ca.crt"];
+
+  if (!caCrt) {
+    throw new Error("ca.crt not found in kube-root-ca.crt ConfigMap");
+  }
+
+  const shasum = crypto.createHash("sha256");
+  shasum.update(caCrt);
+  const caCertHash = shasum.digest("hex");
+  const formatPrefix = "K10";
+  const joinToken = `${formatPrefix}${caCertHash}::${tokenId}.${tokenSecret}`;
+
+  return {
+    tokenId,
+    tokenSecret,
+    caCertHash,
+    joinToken,
+  };
 }
