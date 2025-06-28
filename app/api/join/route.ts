@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     let stderr = "";
 
     // TODO: make sure the token is sanitized to avoid injection attacks
-    const cmd = spawn("sudo", ["-E", scriptPath], {
+    const cmd = spawn(scriptPath, {
       shell: false,
       env: {
         ...process.env, // Inherit existing environment variables
