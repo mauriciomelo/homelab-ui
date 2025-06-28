@@ -1,8 +1,11 @@
 import { z } from "zod";
-import { baseProcedure, createTRPCRouter } from "../init";
+import { baseProcedure, createCallerFactory, createTRPCRouter } from "../init";
 import { getApps } from "@/app/api/applications";
 import { devices } from "@/app/api/devices";
 import { getDiscoveredNodes } from "@/mdns";
+import { exec } from "child_process";
+import util from "util";
+
 export const appRouter = createTRPCRouter({
   hello: baseProcedure
     .input(
@@ -25,6 +28,44 @@ export const appRouter = createTRPCRouter({
   discoveredNodes: baseProcedure.query(() => {
     return getDiscoveredNodes();
   }),
+  joinCluster: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1).max(300),
+      })
+    )
+    .mutation(async (opts) => {
+      const { token } = opts.input;
+
+      const execAsync = util.promisify(exec);
+
+      const res = await execAsync(`./join_cluster.sh '${token}'`);
+
+      console.log(res.stdout);
+      console.error(res.stderr);
+    }),
+  adoptDevice: baseProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(100),
+        ip: z.string().ip(),
+        port: z.number().min(1).max(65535),
+      })
+    )
+    .mutation(async (opts) => {
+      const { name, ip, port } = opts.input;
+
+      // Implement your adoption logic here
+      console.log(`\n\n\nAdopting device: ${name} at ${ip}:${port}\n\n\n`);
+
+      const joinToken = "implement token";
+
+      const caller = createCaller({});
+
+      caller.joinCluster({ token: joinToken });
+    }),
 });
+
+const createCaller = createCallerFactory(appRouter);
 
 export type AppRouter = typeof appRouter;

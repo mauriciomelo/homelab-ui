@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { DEVICE_STATUS, DeviceStatus } from "@/app/api/schemas";
 import { ComponentProps } from "react";
 import { Status } from "@/components/ui/status";
@@ -37,6 +37,20 @@ export function Devices() {
   const currentDevices = devices.data || [];
 
   const nodes = [...currentDevices, ...newDevices];
+
+  const adoptDeviceMutation = useMutation(trpc.adoptDevice.mutationOptions());
+
+  const handleAdoptDevice = (device: {
+    ip: string;
+    port: number;
+    name: string;
+  }) => {
+    adoptDeviceMutation.mutate({
+      name: device.name,
+      ip: device.ip,
+      port: device.port,
+    });
+  };
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
@@ -71,8 +85,15 @@ export function Devices() {
 
               <TableCell className="font-medium">
                 {device.status === DEVICE_STATUS.NEW ? (
-                  <Button size="sm" variant="outline">
-                    Adopt
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAdoptDevice(device)}
+                    disabled={adoptDeviceMutation.isPending}
+                  >
+                    {adoptDeviceMutation.isPending
+                      ? "Adopting..."
+                      : "Adopt Device"}
                   </Button>
                 ) : (
                   device.status
