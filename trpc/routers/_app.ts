@@ -63,12 +63,16 @@ export const appRouter = createTRPCRouter({
       // TODO: support HTTPS here to transport the token securely
       const remoteNodeUrl = `http://${ip}:${port}/api/join`;
 
+      const masterNodeIp = (await devices()).find((node) => node.isMaster)?.ip;
+
+      const masterNodeUrl = `https://${masterNodeIp}:6443`;
+
       const res = await fetch(remoteNodeUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ token: joinToken }),
+        body: JSON.stringify({ token: joinToken, serverUrl: masterNodeUrl }),
       });
 
       console.log(await res.json());

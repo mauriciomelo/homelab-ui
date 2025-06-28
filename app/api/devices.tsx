@@ -1,21 +1,7 @@
 import "server-only";
-import fs from "fs";
-import YAML from "yaml";
-import * as z from "zod";
 import * as k8s from "@kubernetes/client-node";
-import { getAppConfig } from "../(dashboard)/apps/config";
-import path from "path";
-import { AppFormSchema } from "../(dashboard)/apps/formSchema";
 import * as _ from "lodash";
-import git from "isomorphic-git";
-import http from "isomorphic-git/http/node";
-import {
-  APP_STATUS,
-  deploymentSchema,
-  DEVICE_STATUS,
-  ingressSchema,
-  kustomizationSchema,
-} from "./schemas";
+import { DEVICE_STATUS } from "./schemas";
 
 const kc = new k8s.KubeConfig();
 kc.loadFromDefault();
@@ -31,8 +17,14 @@ export async function devices() {
 
     const status = nodeStatus(readyStatus);
 
+    const isMaster =
+      node.metadata?.labels?.["node-role.kubernetes.io/control-plane"] ===
+        "true" &&
+      node.metadata?.labels?.["node-role.kubernetes.io/master"] === "true";
+
     return {
       name: node.metadata?.name,
+      isMaster,
       status,
       ip: node.status?.addresses?.find((addr) => addr.type === "InternalIP")
         ?.address,
