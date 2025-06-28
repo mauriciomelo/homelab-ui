@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { DEVICE_STATUS, DeviceStatus } from "@/app/api/schemas";
 import { ComponentProps } from "react";
 import { Status } from "@/components/ui/status";
+import { Button } from "@/components/ui/button";
 
 export function Devices() {
   const trpc = useTRPC();
@@ -21,6 +22,21 @@ export function Devices() {
     ...trpc.devices.queryOptions(),
     refetchInterval: 10_000,
   });
+  const discoveredNodes = useQuery({
+    ...trpc.discoveredNodes.queryOptions(),
+    refetchInterval: 5_000,
+  });
+
+  const newDevices =
+    discoveredNodes.data
+      ?.filter((node) => {
+        return devices.data?.some((device) => device.ip !== node.ip);
+      })
+      .map((node) => ({ ...node, status: DEVICE_STATUS.NEW })) || [];
+
+  const currentDevices = devices.data || [];
+
+  const nodes = [...currentDevices, ...newDevices];
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
@@ -39,7 +55,7 @@ export function Devices() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {devices.data?.map((device) => (
+          {nodes.map((device) => (
             <TableRow
               key={device.name}
               className={cn({
@@ -49,9 +65,19 @@ export function Devices() {
               <TableCell className="w-2">
                 <Status {...deviceStatusProps(device.status)} />
               </TableCell>
-              <TableCell className="font-medium ">{device.name}</TableCell>
+              <TableCell className="font-medium overflow-ellipsis overflow-hidden">
+                {device.name}
+              </TableCell>
 
-              <TableCell className="font-medium">{device.status}</TableCell>
+              <TableCell className="font-medium">
+                {device.status === DEVICE_STATUS.NEW ? (
+                  <Button size="sm" variant="outline">
+                    Adopt
+                  </Button>
+                ) : (
+                  device.status
+                )}
+              </TableCell>
               <TableCell className="font-medium">{device.ip}</TableCell>
             </TableRow>
           ))}
@@ -74,6 +100,12 @@ function deviceStatusProps(
   if (status === DEVICE_STATUS.UNHEALTHY) {
     return {
       color: "red",
+      animate: true,
+    };
+  }
+  if (status === DEVICE_STATUS.NEW) {
+    return {
+      color: "blue",
       animate: true,
     };
   }
