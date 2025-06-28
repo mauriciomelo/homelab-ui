@@ -60,12 +60,17 @@ export const appRouter = createTRPCRouter({
 
       const joinToken = "implement token";
 
-      const caller = createCaller({});
+      // TODO: support HTTPS here to transport the token securely
+      const remoteNodeUrl = `http://${ip}:${port}/api/join`;
 
-      caller.joinCluster({ token: joinToken });
+      await fetch(remoteNodeUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token: joinToken }),
+      });
     }),
 });
-
-const createCaller = createCallerFactory(appRouter);
 
 export type AppRouter = typeof appRouter;
