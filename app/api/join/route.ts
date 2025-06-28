@@ -1,5 +1,4 @@
-import { exec } from "child_process";
-import util from "util";
+import { spawn } from "child_process";
 import { z } from "zod/v4";
 import path from "path";
 
@@ -12,17 +11,44 @@ export async function POST(req: Request) {
   const body = await req.json();
   const { token, serverUrl } = joinSchema.parse(body);
 
-  const execAsync = util.promisify(exec);
-
   // Get the absolute path to join_cluster.sh to avoid privilege escalation issues
   const scriptPath = path.resolve(process.cwd(), "join_cluster.sh");
 
-  const command = `K3S_URL=${serverUrl} K3S_TOKEN=${token} ${scriptPath}`;
-  // TODO: make sure the token is sanitized to avoid injection attacks
-  const res = await execAsync(command);
+  const res = new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
 
-  return Response.json({
-    stdout: res.stdout,
-    stderr: res.stderr,
+    // TODO: make sure the token is sanitized to avoid injection attacks
+    const cmd = spawn("sudo", ["-E", scriptPath], {
+      shell: false,
+      env: {
+        ...process.env, // Inherit existing environment variables
+        K3S_URL: serverUrl,
+        K3S_TOKEN: token,
+      },
+    });
+
+    cmd.stdout.on("data", (data) => {
+      const log = data.toString();
+      console.log(log);
+      stdout += log;
+    });
+    cmd.stderr.on("data", (data) => {
+      const log = data.toString();
+      console.error(log);
+      stderr += log;
+    });
+    cmd.on("error", (error) => {
+      reject(error);
+    });
+    cmd.on("close", (code) => {
+      resolve({
+        code,
+        stdout,
+        stderr,
+      });
+    });
   });
+
+  return Response.json(await res);
 }
