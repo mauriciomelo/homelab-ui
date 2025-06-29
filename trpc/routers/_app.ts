@@ -1,11 +1,10 @@
 import { z } from "zod";
-import { baseProcedure, createCallerFactory, createTRPCRouter } from "../init";
+import { baseProcedure, createTRPCRouter } from "../init";
 import { getApps } from "@/app/api/applications";
 import { createBootstrapToken, devices } from "@/app/api/devices";
 import { getDiscoveredNodes } from "@/mdns";
 import { exec } from "child_process";
 import util from "util";
-import path from "path";
 
 export const appRouter = createTRPCRouter({
   apps: baseProcedure.query(() => {
@@ -55,16 +54,6 @@ export const appRouter = createTRPCRouter({
       const masterNodeUrl = `https://${masterNodeIp}:6443`;
 
       const joinToken = await createBootstrapToken();
-
-      console.log({ joinToken, masterNodeUrl });
-
-      const scriptPath = path.resolve(
-        "/home/mauricio/homelab-ui",
-        "join_cluster.sh"
-      );
-
-      const command = `K3S_URL=${masterNodeUrl} K3S_TOKEN=${joinToken.joinToken} ${scriptPath}`;
-      console.log({ command });
 
       const res = await fetch(remoteNodeUrl, {
         method: "POST",

@@ -26,15 +26,14 @@ export function Devices() {
     ...trpc.discoveredNodes.queryOptions(),
     refetchInterval: 5_000,
   });
+  const currentDevices = devices.data || [];
 
   const newDevices =
     discoveredNodes.data
       ?.filter((node) => {
-        return devices.data?.some((device) => device.ip !== node.ip);
+        return currentDevices?.every((device) => device.ip !== node.ip);
       })
       .map((node) => ({ ...node, status: DEVICE_STATUS.NEW })) || [];
-
-  const currentDevices = devices.data || [];
 
   const nodes = [...currentDevices, ...newDevices];
 
@@ -71,7 +70,7 @@ export function Devices() {
         <TableBody>
           {nodes.map((device) => (
             <TableRow
-              key={device.name}
+              key={`${device.name}-${device.ip}`}
               className={cn({
                 "animate-pulse": device.status === DEVICE_STATUS.UNHEALTHY,
               })}
