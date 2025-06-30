@@ -12,9 +12,37 @@ import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { DEVICE_STATUS, DeviceStatus } from "@/app/api/schemas";
-import { ComponentProps } from "react";
+import { useState } from "react";
 import { Status } from "@/components/ui/status";
 import { Button } from "@/components/ui/button";
+import { MiniPCScene } from "./mini-pc";
+import {
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  Sheet,
+} from "@/components/ui/sheet";
+import { statusLedProps } from "./statusLedProps";
+import assert from "assert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+type Device = {
+  ip: string;
+  port?: number;
+  name: string;
+  status: DeviceStatus;
+};
 
 export function Devices() {
   const trpc = useTRPC();
@@ -39,17 +67,17 @@ export function Devices() {
 
   const adoptDeviceMutation = useMutation(trpc.adoptDevice.mutationOptions());
 
-  const handleAdoptDevice = (device: {
-    ip: string;
-    port: number;
-    name: string;
-  }) => {
+  const handleAdoptDevice = (device: Device) => {
+    assert(typeof device.port === "number", "Port is required");
+    setSelected(device);
     adoptDeviceMutation.mutate({
       name: device.name,
       ip: device.ip,
       port: device.port,
     });
   };
+
+  const [selected, setSelected] = useState<Device | null>(null);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
@@ -76,9 +104,12 @@ export function Devices() {
               })}
             >
               <TableCell className="w-2">
-                <Status {...deviceStatusProps(device.status)} />
+                <Status {...statusLedProps(device.status)} />
               </TableCell>
-              <TableCell className="font-medium overflow-ellipsis overflow-hidden">
+              <TableCell
+                onClick={() => setSelected(device)}
+                className="font-medium overflow-ellipsis overflow-hidden"
+              >
                 {device.name}
               </TableCell>
 
@@ -103,35 +134,85 @@ export function Devices() {
           ))}
         </TableBody>
       </Table>
+      <Sheet
+        open={!!selected}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelected(null);
+          }
+        }}
+      >
+        <SheetContent className="w-[600px] sm:max-w-[600px] ">
+          <SheetHeader>
+            <SheetTitle>{selected?.name}</SheetTitle>
+            <SheetDescription>Edit the App's configuration.</SheetDescription>
+          </SheetHeader>
+          {selected && (
+            <div>
+              <MiniPCScene
+                status={selected.status}
+                adopting={adoptDeviceMutation.isPending}
+              />
+
+              <DeleteDeviceDialog device={selected} />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
 
-function deviceStatusProps(
-  status: DeviceStatus
-): ComponentProps<typeof Status> {
-  if (status === DEVICE_STATUS.HEALTHY) {
-    return {
-      color: "green",
-      animate: false,
-    };
-  }
+function DeleteDeviceDialog({ device }: { device: Device }) {
+  const trpc = useTRPC();
+  const [open, setOpen] = useState(false);
 
-  if (status === DEVICE_STATUS.UNHEALTHY) {
-    return {
-      color: "red",
-      animate: true,
-    };
-  }
-  if (status === DEVICE_STATUS.NEW) {
-    return {
-      color: "blue",
-      animate: true,
-    };
-  }
+  const resetDeviceMutation = useMutation(trpc.resetDevice.mutationOptions());
 
-  return {
-    color: "gray",
-    animate: false,
+  const handleDelete = async () => {
+    assert(typeof device.port === "number", "Port is required");
+    await resetDeviceMutation.mutateAsync({
+      name: device.name,
+      ip: device.ip,
+      port: device.port,
+    });
+    setOpen(false);
   };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button
+          variant="destructive"
+          className="w-full"
+          size="sm"
+          onClick={() => setOpen(true)}
+        >
+          Reset Device
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Reset Device</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to reset this device? This action cannot be
+            undone. All data and configurations will be permanently deleted, and
+            the device will be restored to factory settings.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={resetDeviceMutation.isPending}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            onClick={handleDelete}
+            disabled={resetDeviceMutation.isPending}
+          >
+            Reset Device
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
 import { getApps } from "@/app/api/applications";
-import { createBootstrapToken, devices } from "@/app/api/devices";
+import { createBootstrapToken, devices, resetDevice } from "@/app/api/devices";
 import { getDiscoveredNodes } from "@/mdns";
 import { exec } from "child_process";
 import util from "util";
@@ -64,6 +64,30 @@ export const appRouter = createTRPCRouter({
           token: joinToken.joinToken,
           serverUrl: masterNodeUrl,
         }),
+      });
+
+      console.log(await res.json());
+    }),
+  resetDevice: baseProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(100),
+        ip: z.string().ip(),
+        port: z.number().min(1).max(65535),
+      })
+    )
+    .mutation(async (opts) => {
+      const { name } = opts.input;
+
+      const remoteNodeUrl = `http://${ip}:${port}/api/reset`;
+
+      await resetDevice(name);
+
+      const res = await fetch(remoteNodeUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
 
       console.log(await res.json());
