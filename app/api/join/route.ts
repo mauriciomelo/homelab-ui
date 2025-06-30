@@ -20,7 +20,8 @@ export async function POST(req: Request) {
 
     // TODO: make sure the token is sanitized to avoid injection attacks
     const cmd = spawn(
-      `sudo ${scriptPath} --token=${token} --url=${serverUrl}`,
+      "sudo",
+      [scriptPath, `--token=${token}`, `--url=${serverUrl}`],
       {
         shell: false,
       }
