@@ -19,14 +19,12 @@ export async function POST(req: Request) {
     let stderr = "";
 
     // TODO: make sure the token is sanitized to avoid injection attacks
-    const cmd = spawn(scriptPath, {
-      shell: false,
-      env: {
-        ...process.env, // Inherit existing environment variables
-        K3S_URL: serverUrl,
-        K3S_TOKEN: token,
-      },
-    });
+    const cmd = spawn(
+      `sudo ${scriptPath} --token=${token} --url=${serverUrl}`,
+      {
+        shell: false,
+      }
+    );
 
     cmd.stdout.on("data", (data) => {
       const log = data.toString();
