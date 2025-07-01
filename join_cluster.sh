@@ -22,4 +22,8 @@ while [[ "$#" -gt 0 ]]; do
   shift # Consume the current argument (option or option=value)
 done
 
+if command -v k3s &>/dev/null; then
+  echo "Uninstalling k3s..."
+fi
+
 curl -sfL https://get.k3s.io | K3S_URL="${K3S_URL}" K3S_TOKEN="${K3S_TOKEN}" sh -

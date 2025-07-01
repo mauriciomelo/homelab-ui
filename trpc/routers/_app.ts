@@ -66,6 +66,11 @@ export const appRouter = createTRPCRouter({
         }),
       });
 
+      await waitFor(async () => {
+        const nodes = await devices();
+        return nodes.some((node) => node.ip === ip);
+      });
+
       console.log(await res.json());
     }),
   resetDevice: baseProcedure
@@ -89,7 +94,27 @@ export const appRouter = createTRPCRouter({
           "Content-Type": "application/json",
         },
       });
+
+      await waitFor(async () => {
+        const nodes = await devices();
+        return !nodes.some((node) => node.ip === ip);
+      });
     }),
 });
 
 export type AppRouter = typeof appRouter;
+
+async function waitFor(
+  asyncFn: () => Promise<boolean>,
+  {
+    interval = 2000,
+    retries = 10,
+  }: { interval?: number; retries?: number } = {}
+): Promise<boolean> {
+  for (let i = 0; i < retries; i++) {
+    const result = await asyncFn();
+    if (result) return true;
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+  throw new Error("Operation timed out");
+}

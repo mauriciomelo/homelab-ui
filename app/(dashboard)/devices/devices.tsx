@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DEVICE_STATUS, DeviceStatus } from "@/app/api/schemas";
 import { useState } from "react";
 import { Status } from "@/components/ui/status";
@@ -22,6 +22,7 @@ import {
   SheetTitle,
   SheetDescription,
   Sheet,
+  SheetFooter,
 } from "@/components/ui/sheet";
 import { statusLedProps } from "./statusLedProps";
 import assert from "assert";
@@ -50,6 +51,8 @@ export function Devices() {
     ...trpc.devices.queryOptions(),
     refetchInterval: 10_000,
   });
+  const queryClient = useQueryClient();
+
   const discoveredNodes = useQuery({
     ...trpc.discoveredNodes.queryOptions(),
     refetchInterval: 5_000,
@@ -67,14 +70,16 @@ export function Devices() {
 
   const adoptDeviceMutation = useMutation(trpc.adoptDevice.mutationOptions());
 
-  const handleAdoptDevice = (device: Device) => {
+  const handleAdoptDevice = async (device: Device) => {
     assert(typeof device.port === "number", "Port is required");
     setSelectedId(device.ip);
-    adoptDeviceMutation.mutate({
+    await adoptDeviceMutation.mutateAsync({
       name: device.name,
       ip: device.ip,
       port: device.port,
     });
+
+    queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });
   };
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -155,10 +160,20 @@ export function Devices() {
                 status={selected.status}
                 adopting={adoptDeviceMutation.isPending}
               />
-
-              <DeleteDeviceDialog device={selected} />
             </div>
           )}
+          <SheetFooter>
+            {selected && selected.status !== DEVICE_STATUS.NEW && (
+              <DeleteDeviceDialog device={selected} />
+            )}
+
+            <Button
+              onClick={() => handleAdoptDevice(selected!)}
+              disabled={adoptDeviceMutation.isPending}
+            >
+              {adoptDeviceMutation.isPending ? "Adopting..." : "Adopt Device"}
+            </Button>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
     </div>
@@ -169,6 +184,8 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
   const trpc = useTRPC();
   const [open, setOpen] = useState(false);
 
+  const queryClient = useQueryClient();
+
   const resetDeviceMutation = useMutation(trpc.resetDevice.mutationOptions());
 
   const handleDelete = async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -178,6 +195,9 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
       ip: device.ip,
       port: 3000,
     });
+
+    queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });
+
     setOpen(false);
   };
 
@@ -211,7 +231,7 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
             onClick={handleDelete}
             disabled={resetDeviceMutation.isPending}
           >
-            Reset Device
+            {resetDeviceMutation.isPending ? "Resetting..." : "Reset Device"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
