@@ -167,12 +167,14 @@ export function Devices() {
               <DeleteDeviceDialog device={selected} />
             )}
 
-            <Button
-              onClick={() => handleAdoptDevice(selected!)}
-              disabled={adoptDeviceMutation.isPending}
-            >
-              {adoptDeviceMutation.isPending ? "Adopting..." : "Adopt Device"}
-            </Button>
+            {selected && selected.status === DEVICE_STATUS.NEW && (
+              <Button
+                onClick={() => handleAdoptDevice(selected!)}
+                disabled={adoptDeviceMutation.isPending}
+              >
+                {adoptDeviceMutation.isPending ? "Adopting..." : "Adopt Device"}
+              </Button>
+            )}
           </SheetFooter>
         </SheetContent>
       </Sheet>

@@ -24,6 +24,7 @@ done
 
 if command -v k3s &>/dev/null; then
   echo "Uninstalling k3s..."
+  /usr/local/bin/k3s-agent-uninstall.sh
 fi
 
 curl -sfL https://get.k3s.io | K3S_URL="${K3S_URL}" K3S_TOKEN="${K3S_TOKEN}" sh -
