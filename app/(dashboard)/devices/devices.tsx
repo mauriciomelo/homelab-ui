@@ -169,12 +169,12 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
 
   const resetDeviceMutation = useMutation(trpc.resetDevice.mutationOptions());
 
-  const handleDelete = async () => {
-    assert(typeof device.port === "number", "Port is required");
+  const handleDelete = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
     await resetDeviceMutation.mutateAsync({
       name: device.name,
       ip: device.ip,
-      port: device.port,
+      port: 3000,
     });
     setOpen(false);
   };

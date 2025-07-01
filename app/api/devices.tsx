@@ -110,10 +110,13 @@ export async function createBootstrapToken() {
 }
 
 export async function resetDevice(nodeName: string) {
-  await coreApi.deleteNode({ name: nodeName });
+  try {
+    await coreApi.deleteNode({ name: nodeName });
+  } catch (error) {
+    if (_.get(error, "code") === 404) {
+      return;
+    }
 
-  return {
-    success: true,
-    message: `Node ${nodeName} has been reset successfully`,
-  };
+    throw new Error(`Failed to delete node ${nodeName}: ${error}`);
+  }
 }

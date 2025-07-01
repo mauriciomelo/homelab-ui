@@ -18,31 +18,16 @@ SUDOERS_FILE_PATH="/etc/sudoers.d/$SUDOERS_FILENAME"
 # --- Sudoers File Creation ---
 echo "--> Configuring sudo access for '$NODEUSER'..."
 
-# Define the rule that will be written into the sudoers file.
-# This rule allows NODEUSER to run the JOIN_SCRIPT_PATH as any user (ALL)
-# on any host (ALL) without being prompted for a password (NOPASSWD).
-SUDOERS_RULE="$NODEUSER ALL=(ALL) NOPASSWD: $JOIN_SCRIPT_PATH "
 
 
-read -r -d '' SUDOERS_RULES <<EOF
+
+echo "--> Creating/overwriting sudoers file at '$SUDOERS_FILE_PATH'..."
+
+sudo tee "$SUDOERS_FILE_PATH" > /dev/null <<EOF
 $NODEUSER ALL=(ALL) NOPASSWD: $JOIN_SCRIPT_PATH
 $NODEUSER ALL=(ALL) NOPASSWD: /usr/local/bin/k3s-agent-uninstall.sh
 $NODEUSER ALL=(ALL) NOPASSWD: /usr/local/bin/k3s-uninstall.sh
-# Add more rules here, one per line
 EOF
-
-echo "--> Creating/overwriting sudoers file at '$SUDOERS_FILE_PATH'..."
-# Use 'tee' with 'sudo' to write the rule to the sudoers file.
-# This will overwrite the file if it exists, or create it if it doesn't.
-# The output is redirected to /dev/null to keep the script output clean.
-echo "$SUDOERS_RULES" | sudo tee "$SUDOERS_FILE_PATH" > /dev/null
-
-
-echo ""
-echo "✅ Setup complete."
-echo "The '$NODEUSER' user can now execute the following command via sudo without a password:"
-echo "   sudo $JOIN_SCRIPT_PATH"
-
 
 
 echo "--> Running setup as user: $(whoami) in home directory: $HOMEDIR"

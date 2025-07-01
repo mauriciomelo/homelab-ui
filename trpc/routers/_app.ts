@@ -77,20 +77,18 @@ export const appRouter = createTRPCRouter({
       })
     )
     .mutation(async (opts) => {
-      const { name } = opts.input;
+      const { name, ip, port } = opts.input;
 
       const remoteNodeUrl = `http://${ip}:${port}/api/reset`;
 
       await resetDevice(name);
 
-      const res = await fetch(remoteNodeUrl, {
+      await fetch(remoteNodeUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
       });
-
-      console.log(await res.json());
     }),
 });
 
