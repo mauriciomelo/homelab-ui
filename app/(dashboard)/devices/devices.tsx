@@ -69,7 +69,7 @@ export function Devices() {
 
   const handleAdoptDevice = (device: Device) => {
     assert(typeof device.port === "number", "Port is required");
-    setSelected(device);
+    setSelectedId(device.ip);
     adoptDeviceMutation.mutate({
       name: device.name,
       ip: device.ip,
@@ -77,7 +77,9 @@ export function Devices() {
     });
   };
 
-  const [selected, setSelected] = useState<Device | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const selected = nodes.find((node) => node.ip === selectedId);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
@@ -107,7 +109,7 @@ export function Devices() {
                 <Status {...statusLedProps(device.status)} />
               </TableCell>
               <TableCell
-                onClick={() => setSelected(device)}
+                onClick={() => setSelectedId(device.ip)}
                 className="font-medium overflow-ellipsis overflow-hidden"
               >
                 {device.name}
@@ -138,7 +140,7 @@ export function Devices() {
         open={!!selected}
         onOpenChange={(open) => {
           if (!open) {
-            setSelected(null);
+            setSelectedId(null);
           }
         }}
       >
