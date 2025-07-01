@@ -2,7 +2,6 @@ import "server-only";
 import fs from "fs";
 import YAML from "yaml";
 import * as z from "zod";
-import * as k8s from "@kubernetes/client-node";
 import { getAppConfig } from "../(dashboard)/apps/config";
 import path from "path";
 import { AppFormSchema } from "../(dashboard)/apps/formSchema";
@@ -15,12 +14,7 @@ import {
   ingressSchema,
   kustomizationSchema,
 } from "./schemas";
-
-const kc = new k8s.KubeConfig();
-kc.loadFromDefault();
-const coreApi = kc.makeApiClient(k8s.CoreV1Api);
-const customObjectsApi = kc.makeApiClient(k8s.CustomObjectsApi);
-const appsApi = kc.makeApiClient(k8s.AppsV1Api);
+import * as k from "./k8s";
 
 export async function getApps() {
   const appDir = getAppsDir();
@@ -56,8 +50,8 @@ async function getAppByName(name: string) {
   const ingressData = ingressSchema.parse(YAML.parse(ingressFile));
 
   const [deploymentRes, podsRes] = await Promise.all([
-    appsApi.readNamespacedDeployment({ name, namespace: name }),
-    coreApi.listNamespacedPod({ namespace: name }),
+    k.appsApi().readNamespacedDeployment({ name, namespace: name }),
+    k.coreApi().listNamespacedPod({ namespace: name }),
   ]);
 
   const desiredReplicas = deploymentRes?.spec?.replicas || 0;
@@ -68,7 +62,6 @@ async function getAppByName(name: string) {
     updatedReplicas !== desiredReplicas || replicas !== desiredReplicas;
 
   const pods = podsRes.items.map((pod) => {
-    pod.metadata?.ownerReferences;
     return {
       name: pod.metadata?.name,
       metadata: {
@@ -284,7 +277,7 @@ export async function reconcileFluxGitRepository({
   ];
 
   try {
-    await customObjectsApi.patchNamespacedCustomObject({
+    await k.customObjectsApi().patchNamespacedCustomObject({
       namespace,
       group: "source.toolkit.fluxcd.io",
       version: "v1",

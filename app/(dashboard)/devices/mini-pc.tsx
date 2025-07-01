@@ -9,6 +9,8 @@ import { statusLedProps } from "./statusLedProps";
 
 const miniPcModelPath = "/models/minipc.gltf";
 
+type VectorLike = [number, number, number];
+
 function MiniPC({
   status,
   adopting,
@@ -25,13 +27,13 @@ function MiniPC({
   const { scale, rotation, position } = useSpring({
     from: {
       scale: 1,
-      rotation: [-0.9, -0.8, -0.2],
-      position: [3, -2, -4],
+      rotation: [-0.9, -0.8, -0.2] satisfies VectorLike,
+      position: [3, -2, -4] satisfies VectorLike,
     },
     to: {
-      scale: adopting ? 1.2 : 1,
-      rotation: [0, 0, 0],
-      position: [0, 0, 0],
+      scale: adopting ? 0.9 : 1,
+      rotation: [0, 0, 0] satisfies VectorLike,
+      position: [0, 0, 0] satisfies VectorLike,
     },
     config: { mass: 2, tension: 150, friction: 40 },
     loop: false,
@@ -45,9 +47,9 @@ function MiniPC({
 
   return (
     <animated.group
-      position={position as any}
-      scale={scale as any}
-      rotation={rotation as any}
+      position={position}
+      scale={scale}
+      rotation={rotation as unknown as VectorLike}
     >
       {/* GLTF Mini PC Model */}
       <primitive object={scene} scale={[20, 20, 20]} position={[0, -0.5, 0]} />

@@ -5,6 +5,7 @@ import { createBootstrapToken, devices, resetDevice } from "@/app/api/devices";
 import { getDiscoveredNodes } from "@/mdns";
 import { exec } from "child_process";
 import util from "util";
+import axios from "axios";
 
 export const appRouter = createTRPCRouter({
   apps: baseProcedure.query(() => {
@@ -55,23 +56,15 @@ export const appRouter = createTRPCRouter({
 
       const joinToken = await createBootstrapToken();
 
-      const res = await fetch(remoteNodeUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token: joinToken.joinToken,
-          serverUrl: masterNodeUrl,
-        }),
+      await axios.post(remoteNodeUrl, {
+        token: joinToken.joinToken,
+        serverUrl: masterNodeUrl,
       });
 
       await waitFor(async () => {
         const nodes = await devices();
         return nodes.some((node) => node.ip === ip);
       });
-
-      console.log(await res.json());
     }),
   resetDevice: baseProcedure
     .input(
@@ -88,12 +81,7 @@ export const appRouter = createTRPCRouter({
 
       await resetDevice(name);
 
-      await fetch(remoteNodeUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      await axios.post(remoteNodeUrl);
 
       await waitFor(async () => {
         const nodes = await devices();

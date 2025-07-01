@@ -13,12 +13,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Container, Loader2Icon, Plus, Rocket, Trash2 } from "lucide-react";
+import { Loader2Icon, Plus, Rocket, Trash2 } from "lucide-react";
 import type { App } from "@/app/api/applications";
 import { appFormSchema } from "./formSchema";
 import { updateApp } from "./actions";
 import { Separator } from "@radix-ui/react-separator";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 type FormData = z.infer<typeof appFormSchema>;
@@ -112,7 +111,7 @@ export function ApplicationForm(props: {
         <FormField
           control={form.control}
           name="envVariables"
-          render={({ field }) => (
+          render={() => (
             <div className="space-y-3">
               {fields.map((item, index) => (
                 <div key={item.id} className="flex gap-2 items-start">

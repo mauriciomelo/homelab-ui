@@ -24,7 +24,7 @@ export function TeamSwitcher({
 }: {
   teams: {
     name: string;
-    logo: React.ElementType;
+    logo: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     description: string;
   }[];
 }) {

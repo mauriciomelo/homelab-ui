@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 
-export async function POST(req: Request) {
+export async function POST() {
   const res = new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";

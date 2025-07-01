@@ -1,15 +1,12 @@
 import "server-only";
-import * as k8s from "@kubernetes/client-node";
 import * as _ from "lodash";
 import { DEVICE_STATUS } from "./schemas";
 import crypto from "crypto";
 import assert from "assert";
-
-const kc = new k8s.KubeConfig();
-kc.loadFromDefault();
-const coreApi = kc.makeApiClient(k8s.CoreV1Api);
+import * as k8s from "./k8s";
 
 export async function devices() {
+  const coreApi = k8s.coreApi();
   const nodes = await coreApi.listNode();
 
   return nodes.items.map((node) => {
@@ -78,6 +75,7 @@ export async function createBootstrapToken() {
       description: "homelab-ui generated bootstrap token",
     },
   };
+  const coreApi = k8s.coreApi();
 
   await coreApi.createNamespacedSecret({
     namespace: "kube-system",
@@ -111,6 +109,7 @@ export async function createBootstrapToken() {
 
 export async function resetDevice(nodeName: string) {
   try {
+    const coreApi = k8s.coreApi();
     await coreApi.deleteNode({ name: nodeName });
   } catch (error) {
     if (_.get(error, "code") === 404) {

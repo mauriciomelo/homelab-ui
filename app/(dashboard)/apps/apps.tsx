@@ -78,7 +78,9 @@ export function Apps() {
         <SheetContent className="w-[600px] sm:max-w-[600px] ">
           <SheetHeader>
             <SheetTitle>{selectedApp?.spec.name}</SheetTitle>
-            <SheetDescription>Edit the App's configuration.</SheetDescription>
+            <SheetDescription>
+              Edit the App&apos;s configuration.
+            </SheetDescription>
           </SheetHeader>
           {selectedApp && (
             <ApplicationForm className="p-4" data={selectedApp.spec} />

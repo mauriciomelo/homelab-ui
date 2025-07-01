@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { RotateCcw } from "lucide-react";
 
 type Device = {
   ip: string;
@@ -152,7 +153,7 @@ export function Devices() {
         <SheetContent className="w-[600px] sm:max-w-[600px] ">
           <SheetHeader>
             <SheetTitle>{selected?.name}</SheetTitle>
-            <SheetDescription>Edit the App's configuration.</SheetDescription>
+            <SheetDescription>Overview</SheetDescription>
           </SheetHeader>
           {selected && (
             <div>
@@ -207,11 +208,12 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
         <Button
-          variant="destructive"
+          variant="outline"
           className="w-full"
           size="sm"
           onClick={() => setOpen(true)}
         >
+          <RotateCcw />
           Reset Device
         </Button>
       </AlertDialogTrigger>
