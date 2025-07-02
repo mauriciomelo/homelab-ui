@@ -54,4 +54,4 @@ pnpm install
 
 # Start the server (dev mode for now):
 
-pnpm dev
+PORT=3131 pnpm dev
