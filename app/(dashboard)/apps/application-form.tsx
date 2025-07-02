@@ -111,67 +111,78 @@ export function ApplicationForm(props: {
         <FormField
           control={form.control}
           name="envVariables"
-          render={() => (
-            <div className="space-y-3">
-              {fields.map((item, index) => (
-                <div key={item.id} className="flex gap-2 items-start">
-                  <FormField
-                    control={form.control}
-                    name={`envVariables.${index}.name`}
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <Input
-                            placeholder="VARIABLE_NAME"
-                            className="font-mono text-sm"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`envVariables.${index}.value`}
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <Input
-                            placeholder="value"
-                            className="font-mono text-sm"
-                            type="text"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => removeEnvVariable(index)}
-                    disabled={fields.length === 1}
-                    className="shrink-0"
+          render={() => {
+            const fieldClassName = "font-mono text-sm m-0";
+            return (
+              <div className="space-y-2">
+                {fields.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex gap-2  border-gray-200 border rounded-md p-2 items-center"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addEnvVariable}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Environment Variable
-              </Button>
-            </div>
-          )}
+                    <FormField
+                      control={form.control}
+                      name={`envVariables.${index}.name`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              placeholder="VARIABLE_NAME"
+                              className={cn(
+                                fieldClassName,
+                                "text-blue-700 w-[200px]"
+                              )}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <span className="text-gray-400">=</span>
+                    <FormField
+                      control={form.control}
+                      name={`envVariables.${index}.value`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1 grow">
+                          <FormControl>
+                            <Input
+                              placeholder="value"
+                              className={cn(fieldClassName)}
+                              type="text"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => removeEnvVariable(index)}
+                      disabled={fields.length === 1}
+                      className="shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addEnvVariable}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Environment Variable
+                </Button>
+              </div>
+            );
+          }}
         />
+
         <div className="flex gap-3 pt-4">
           {form.formState.isSubmitting ? (
             <Button type="submit" className="flex-1" disabled>
