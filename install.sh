@@ -16,11 +16,7 @@ SUDOERS_FILENAME="homelab_permissions"
 SUDOERS_FILE_PATH="/etc/sudoers.d/$SUDOERS_FILENAME"
 
 # --- Sudoers File Creation ---
-echo "--> Configuring sudo access for '$NODEUSER'..."
-
-
-
-
+echo "--> Configuring access for '$NODEUSER'..."
 echo "--> Creating/overwriting sudoers file at '$SUDOERS_FILE_PATH'..."
 
 sudo tee "$SUDOERS_FILE_PATH" > /dev/null <<EOF
@@ -29,28 +25,19 @@ $NODEUSER ALL=(ALL) NOPASSWD: /usr/local/bin/k3s-agent-uninstall.sh
 $NODEUSER ALL=(ALL) NOPASSWD: /usr/local/bin/k3s-uninstall.sh
 EOF
 
-
-echo "--> Running setup as user: $(whoami) in home directory: $HOMEDIR"
-
 # Download and install nvm:
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 
 # in lieu of restarting the shell
 \. "$HOME/.nvm/nvm.sh"
 
-# Download and install Node.js:
 nvm install 22
-
-# Verify the Node.js version:
 node -v # Should print "v22.17.0".
 nvm current # Should print "v22.17.0".
-
-# Download and install pnpm:
 corepack enable pnpm
-
-# Verify pnpm version:
 pnpm -v
 
+cd "$HOMEDIR"
 
 if [ ! -d "homelab-ui/.git" ]; then
   # Clone the repository if it doesn't exist:
@@ -61,8 +48,6 @@ else
   cd homelab-ui
   git pull
 fi
-
-
 
 # Install dependencies:
 pnpm install
