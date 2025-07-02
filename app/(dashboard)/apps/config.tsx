@@ -2,6 +2,7 @@ import { z } from "zod/v4";
 
 const optionalConfig = z.object({
   PUBLISH_MDNS_SERVICE: z.stringbool().default(true),
+  PORT: z.coerce.number().default(3000),
 });
 
 const clientConfigSchema = z.object({

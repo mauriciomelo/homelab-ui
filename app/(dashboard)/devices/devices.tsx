@@ -58,10 +58,14 @@ export function Devices() {
     ...trpc.discoveredNodes.queryOptions(),
     refetchInterval: 5_000,
   });
-  const currentDevices = devices.data || [];
+  const currentDevices =
+    devices.data?.map((device) => ({
+      ...device,
+      port: discoveredNodes.data?.get(device.ip)?.port,
+    })) || [];
 
   const newDevices =
-    discoveredNodes.data
+    Array.from(discoveredNodes?.data?.values() || [])
       ?.filter((node) => {
         return currentDevices?.every((device) => device.ip !== node.ip);
       })
@@ -193,10 +197,11 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
 
   const handleDelete = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
+    assert(typeof device.port === "number", "Port is required");
     await resetDeviceMutation.mutateAsync({
       name: device.name,
       ip: device.ip,
-      port: 3000,
+      port: device.port,
     });
 
     queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });

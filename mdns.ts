@@ -2,6 +2,7 @@ import assert from "assert";
 import { Bonjour } from "bonjour-service";
 import os from "node:os";
 import * as z from "zod/v4";
+import { getOptionalConfig } from "./app/(dashboard)/apps/config";
 
 const bonjour = new Bonjour();
 
@@ -15,6 +16,8 @@ export function publishService() {
   console.log("Initializing mDNS service advertiser...");
   console.log(`Publishing service with name: ${serviceName}`);
 
+  const config = getOptionalConfig();
+
   const service = bonjour.publish({
     name: serviceName,
     type: "http",
@@ -23,7 +26,7 @@ export function publishService() {
       kind: CLUSTER_NODE,
       name: hostname,
     },
-    port: 3000,
+    port: config.PORT,
   });
 
   service.on("up", () => {
@@ -54,10 +57,10 @@ const servicePayloadSchema = z.object({
   name: z.string().min(1),
 });
 
-const nodes = new Map<string, ClusterNode>();
+const nodesMap = new Map<string, ClusterNode>();
 
-export function getDiscoveredNodes(): ClusterNode[] {
-  return Array.from(nodes.values());
+export function getDiscoveredNodes() {
+  return nodesMap;
 }
 
 bonjour.find({ type: "http" }, function (service) {
@@ -72,7 +75,7 @@ bonjour.find({ type: "http" }, function (service) {
         port: service.port,
       };
 
-      nodes.set(service.name, node);
+      nodesMap.set(node.ip, node);
 
       console.log(
         `Cluster Node Discovered: ${service.name} at ${service.host}:${service.port}`
