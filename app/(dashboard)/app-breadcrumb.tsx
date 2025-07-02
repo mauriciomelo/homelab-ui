@@ -10,11 +10,11 @@ import {
 import { useSelectedLayoutSegments } from "next/navigation";
 import React from "react";
 
-export function AppBreadcrumb() {
+export function AppBreadcrumb({ className }: React.ComponentProps<"nav">) {
   const segments = useSelectedLayoutSegments();
 
   return (
-    <Breadcrumb>
+    <Breadcrumb className={className}>
       <BreadcrumbList>
         <BreadcrumbItem className="hidden md:block">
           <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
@@ -25,7 +25,9 @@ export function AppBreadcrumb() {
             <React.Fragment key={index}>
               <BreadcrumbSeparator />
               {index === segments.length - 1 ? (
-                <BreadcrumbPage>{segment}</BreadcrumbPage>
+                <BreadcrumbPage className="capitalize">
+                  {segment}
+                </BreadcrumbPage>
               ) : (
                 <BreadcrumbItem>
                   <BreadcrumbLink

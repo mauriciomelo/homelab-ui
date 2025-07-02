@@ -37,7 +37,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { RotateCcw } from "lucide-react";
+import {
+  Cpu,
+  HardDrive,
+  Heart,
+  LineChart,
+  MemoryStick,
+  Monitor,
+  Network,
+  RotateCcw,
+  Tag,
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type Device = {
   ip: string;
@@ -91,10 +102,9 @@ export function Devices() {
 
   const selected = nodes.find((node) => node.ip === selectedId);
 
+  const isNew = selected?.status === DEVICE_STATUS.NEW;
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <h1 className="text-2xl font-bold">Devices</h1>
-
       <Table className="table-fixed max-w-7xl">
         <TableCaption>A list of your adopted Devices.</TableCaption>
         <TableHeader>
@@ -154,33 +164,74 @@ export function Devices() {
           }
         }}
       >
-        <SheetContent className="w-[600px] sm:max-w-[600px] ">
+        <SheetContent className="w-[600px] sm:max-w-[600px] bg-sidebar-accent">
           <SheetHeader>
             <SheetTitle>{selected?.name}</SheetTitle>
-            <SheetDescription>Overview</SheetDescription>
+            <SheetDescription>Device details</SheetDescription>
           </SheetHeader>
           {selected && (
             <div>
-              <MiniPCScene
-                status={selected.status}
-                adopting={adoptDeviceMutation.isPending}
-              />
+              <div>
+                <MiniPCScene
+                  status={selected.status}
+                  adopting={adoptDeviceMutation.isPending}
+                />
+              </div>
+              <div className="m-4 flex flex-col items-end">
+                <Alert
+                  className={cn(
+                    "border-blue-400 text-blue-900  bg-blue-50 transition-opacity",
+                    {
+                      "opacity-0": !isNew,
+                    }
+                  )}
+                >
+                  <AlertTitle className="font-medium flex items-center gap-2">
+                    <Status {...statusLedProps(selected.status)} /> Ready for
+                    adoption
+                  </AlertTitle>
+                  <AlertDescription className="flex flex-row justify-between items-center">
+                    <span className="text-xs text-blue-900">
+                      Expand cluster capacity by adopting this device.
+                    </span>
+                    <Button
+                      onClick={() => handleAdoptDevice(selected!)}
+                      disabled={adoptDeviceMutation.isPending || !isNew}
+                    >
+                      {adoptDeviceMutation.isPending
+                        ? "Adopting..."
+                        : "Adopt Device"}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+
+                <Button
+                  variant="outline"
+                  className={cn("mt-4", {
+                    "opacity-0": isNew,
+                  })}
+                  asChild
+                  disabled={isNew}
+                >
+                  <a
+                    href={`http://grafana.home.mauriciomelo.io/d/cehfovv63aneoe-cluster-otel/cluster?orgId=1&from=now-30m&to=now&timezone=browser&var-Node=${selected.name}&refresh=5s`}
+                    target="_blank"
+                  >
+                    <LineChart />
+                    Explore Metrics
+                  </a>
+                </Button>
+              </div>
+
+              <NodeDetails node={selected} />
+
+              {selected && !isNew && (
+                <div className="m-4">
+                  <DeleteDeviceDialog device={selected} />
+                </div>
+              )}
             </div>
           )}
-          <SheetFooter>
-            {selected && selected.status !== DEVICE_STATUS.NEW && (
-              <DeleteDeviceDialog device={selected} />
-            )}
-
-            {selected && selected.status === DEVICE_STATUS.NEW && (
-              <Button
-                onClick={() => handleAdoptDevice(selected!)}
-                disabled={adoptDeviceMutation.isPending}
-              >
-                {adoptDeviceMutation.isPending ? "Adopting..." : "Adopt Device"}
-              </Button>
-            )}
-          </SheetFooter>
         </SheetContent>
       </Sheet>
     </div>
@@ -214,12 +265,12 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
       <AlertDialogTrigger asChild>
         <Button
           variant="outline"
-          className="w-full"
+          className="w-fit text-red-500"
           size="sm"
           onClick={() => setOpen(true)}
         >
           <RotateCcw />
-          Reset Device
+          Factory Reset
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -245,5 +296,105 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function NodeDetails({ node }: { node: Device }) {
+  const sections = [
+    {
+      title: "Info",
+      items: [
+        {
+          label: "Status",
+          value: (
+            <div className="flex items-center gap-2">
+              <Status {...statusLedProps(node.status)} />
+              {node.status}
+            </div>
+          ),
+          icon: Heart,
+          color: "group-hover:text-green-500",
+        },
+        {
+          label: "Name",
+          value: node.name,
+          icon: Tag,
+          color: "group-hover:text-blue-500",
+        },
+        {
+          label: "Architecture",
+          value: "amd64",
+          icon: Cpu,
+          color: "group-hover:text-purple-500",
+        },
+        {
+          label: "Operating System",
+          value: "Linux (Ubuntu 24.04.1 LTS)",
+          icon: Monitor,
+          color: "group-hover:text-orange-500",
+        },
+        {
+          label: "IP Address",
+          value: node.ip,
+          icon: Network,
+          color: "group-hover:text-indigo-500",
+        },
+      ],
+    },
+    {
+      title: "Capacity",
+      items: [
+        {
+          label: "CPU",
+          value: "3 cores",
+          icon: Cpu,
+          color: "group-hover:text-purple-500",
+        },
+        {
+          label: "Storage",
+          value: "40 GB",
+          icon: HardDrive,
+          color: "group-hover:text-green-500",
+        },
+        {
+          label: "Memory",
+          value: "8 GB",
+          icon: MemoryStick,
+          color: "group-hover:text-red-500",
+        },
+      ],
+    },
+  ];
+
+  return (
+    <div>
+      {sections.map((section) => (
+        <div
+          key={section.title}
+          className="space-y-1 m-4 p-4 bg-white rounded-lg"
+        >
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            {section.title}
+          </h4>
+          {section.items.map((item) => (
+            <div
+              key={item.label}
+              className="group flex items-center justify-between text-sm p-2"
+            >
+              <div className="flex items-center space-x-2">
+                <item.icon
+                  className={cn(
+                    `w-4 h-4 text-gray-400 transition-colors`,
+                    item.color
+                  )}
+                />
+                <span className="text-gray-600">{item.label}:</span>
+              </div>
+              <span className="font-medium">{item.value}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }

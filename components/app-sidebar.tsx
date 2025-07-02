@@ -10,7 +10,7 @@ import {
 
 import { NavMain } from "@/components/nav-main";
 
-import { TeamSwitcher } from "@/components/team-switcher";
+import { ClusterSwitcher } from "@/components/team-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -20,18 +20,6 @@ import {
 
 // This is sample data.
 const data = {
-  teams: [
-    {
-      name: "Mau's Homelab",
-      logo: GalleryVerticalEnd,
-      description: "My personal homelab",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      description: "Example",
-    },
-  ],
   navMain: [
     {
       title: "Apps",
@@ -63,9 +51,6 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
-      </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
       </SidebarContent>

@@ -8,13 +8,23 @@ import * as k8s from "./k8s";
 export async function devices() {
   const coreApi = k8s.coreApi();
   const nodes = await coreApi.listNode();
-
   return nodes.items.map((node) => {
     const readyStatus =
       node?.status?.conditions?.find((condition) => condition.type === "Ready")
         ?.status || "Unknown";
 
     const status = nodeStatus(readyStatus);
+
+    const info = node.status?.nodeInfo;
+
+    const nodeInfo = {
+      architecture: info?.architecture,
+      operatingSystem: info?.operatingSystem,
+      osImage: info?.osImage,
+    };
+
+    const capacity = node.status?.capacity;
+    const allocable = node.status?.allocatable;
 
     const isMaster =
       node.metadata?.labels?.["node-role.kubernetes.io/control-plane"] ===
@@ -32,6 +42,9 @@ export async function devices() {
     return {
       name,
       isMaster,
+      nodeInfo,
+      capacity,
+      allocable,
       status,
       ip,
     };
