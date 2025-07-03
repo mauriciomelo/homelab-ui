@@ -23,7 +23,8 @@ import {
 import { ComponentProps, useState } from "react";
 import { App } from "@/app/api/applications";
 import { Status } from "@/components/ui/status";
-import { PageHeader } from "@/components/page-header";
+import { PageTitle } from "@/components/page-header";
+import { PageContent } from "@/components/page-content";
 
 export function Apps() {
   const trpc = useTRPC();
@@ -32,8 +33,8 @@ export function Apps() {
 
   return (
     <>
-      <PageHeader title="Apps" />
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <PageTitle title="Apps" />
+      <PageContent>
         <Table className="max-w-7xl table-fixed">
           <TableCaption>A list of your installed Apps.</TableCaption>
           <TableHeader>
@@ -88,7 +89,7 @@ export function Apps() {
             )}
           </SheetContent>
         </Sheet>
-      </div>
+      </PageContent>
     </>
   );
 }

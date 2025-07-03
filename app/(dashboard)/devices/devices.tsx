@@ -22,7 +22,6 @@ import {
   SheetTitle,
   SheetDescription,
   Sheet,
-  SheetFooter,
 } from "@/components/ui/sheet";
 import { statusLedProps } from "./statusLedProps";
 import assert from "assert";
@@ -40,7 +39,6 @@ import {
 import {
   Cpu,
   HardDrive,
-  Heart,
   LineChart,
   MemoryStick,
   Monitor,
@@ -49,7 +47,8 @@ import {
   Tag,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PageHeader } from "@/components/page-header";
+import { PageContent } from "@/components/page-content";
+import { PageTitle } from "@/components/page-header";
 
 type Device = {
   ip: string;
@@ -106,8 +105,8 @@ export function Devices() {
   const isNew = selected?.status === DEVICE_STATUS.NEW;
   return (
     <>
-      <PageHeader title="Cluster" />
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+      <PageTitle title="Devices" />
+      <PageContent>
         <Table className="max-w-7xl table-fixed">
           <TableCaption>A list of your adopted Devices.</TableCaption>
           <TableHeader>
@@ -116,7 +115,7 @@ export function Devices() {
                 <span className="sr-only">Status</span>
               </TableHead>
               <TableHead className="w-[200px]">Device</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="w-[200px]">Status</TableHead>
               <TableHead>IP</TableHead>
             </TableRow>
           </TableHeader>
@@ -242,7 +241,7 @@ export function Devices() {
             )}
           </SheetContent>
         </Sheet>
-      </div>
+      </PageContent>
     </>
   );
 }
