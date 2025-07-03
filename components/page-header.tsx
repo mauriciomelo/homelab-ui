@@ -28,7 +28,11 @@ export function PageHeader() {
 
         <div className="grow-1"></div>
 
-        <div className="flex items-center gap-5">
+        <div
+          className="flex items-center gap-5"
+          // @ts-expect-error electron types are not available in this context
+          style={{ appRegion: "no-drag" }}
+        >
           <ClusterSwitcher />
 
           <Avatar>
