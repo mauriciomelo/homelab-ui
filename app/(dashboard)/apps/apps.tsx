@@ -23,6 +23,7 @@ import {
 import { ComponentProps, useState } from "react";
 import { App } from "@/app/api/applications";
 import { Status } from "@/components/ui/status";
+import { PageHeader } from "@/components/page-header";
 
 export function Apps() {
   const trpc = useTRPC();
@@ -30,64 +31,65 @@ export function Apps() {
   const [selectedApp, setSelectedApp] = useState<App | null>(null);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <h1 className="text-2xl font-bold">Apps</h1>
-
-      <Table className="table-fixed max-w-7xl">
-        <TableCaption>A list of your installed Apps.</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-2">
-              <span className="sr-only">Status</span>
-            </TableHead>
-            <TableHead className="w-[200px]">App</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {apps.data?.map((app) => (
-            <TableRow
-              key={app.spec.name}
-              className={cn({
-                "animate-pulse": app.status === APP_STATUS.PENDING,
-              })}
-            >
-              <TableCell className="w-2">
-                <Status {...appStatusProps(app.status)} />
-              </TableCell>
-              <TableCell
-                className="font-medium cursor-pointer"
-                onClick={() => setSelectedApp(app)}
-              >
-                {app.spec.name}
-              </TableCell>
-
-              <TableCell className="font-medium">{app.status}</TableCell>
+    <>
+      <PageHeader title="Apps" />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <Table className="max-w-7xl table-fixed">
+          <TableCaption>A list of your installed Apps.</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-2">
+                <span className="sr-only">Status</span>
+              </TableHead>
+              <TableHead className="w-[200px]">App</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <Sheet
-        open={!!selectedApp}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedApp(null);
-          }
-        }}
-      >
-        <SheetContent className="w-[600px] sm:max-w-[600px] ">
-          <SheetHeader>
-            <SheetTitle>{selectedApp?.spec.name}</SheetTitle>
-            <SheetDescription>
-              Edit the App&apos;s configuration.
-            </SheetDescription>
-          </SheetHeader>
-          {selectedApp && (
-            <ApplicationForm className="p-4" data={selectedApp.spec} />
-          )}
-        </SheetContent>
-      </Sheet>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {apps.data?.map((app) => (
+              <TableRow
+                key={app.spec.name}
+                className={cn({
+                  "animate-pulse": app.status === APP_STATUS.PENDING,
+                })}
+              >
+                <TableCell className="w-2">
+                  <Status {...appStatusProps(app.status)} />
+                </TableCell>
+                <TableCell
+                  className="cursor-pointer font-medium"
+                  onClick={() => setSelectedApp(app)}
+                >
+                  {app.spec.name}
+                </TableCell>
+
+                <TableCell className="font-medium">{app.status}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <Sheet
+          open={!!selectedApp}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedApp(null);
+            }
+          }}
+        >
+          <SheetContent className="w-[600px] sm:max-w-[600px]">
+            <SheetHeader>
+              <SheetTitle>{selectedApp?.spec.name}</SheetTitle>
+              <SheetDescription>
+                Edit the App&apos;s configuration.
+              </SheetDescription>
+            </SheetHeader>
+            {selectedApp && (
+              <ApplicationForm className="p-4" data={selectedApp.spec} />
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
+    </>
   );
 }
 

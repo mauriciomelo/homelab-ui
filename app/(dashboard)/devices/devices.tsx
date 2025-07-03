@@ -49,6 +49,7 @@ import {
   Tag,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PageHeader } from "@/components/page-header";
 
 type Device = {
   ip: string;
@@ -104,140 +105,145 @@ export function Devices() {
 
   const isNew = selected?.status === DEVICE_STATUS.NEW;
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <Table className="max-w-7xl table-fixed">
-        <TableCaption>A list of your adopted Devices.</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-2">
-              <span className="sr-only">Status</span>
-            </TableHead>
-            <TableHead className="w-[200px]">Device</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>IP</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {nodes.map((device) => (
-            <TableRow
-              key={`${device.name}-${device.ip}`}
-              className={cn({
-                "animate-pulse": device.status === DEVICE_STATUS.UNHEALTHY,
-              })}
-            >
-              <TableCell className="w-2">
-                <Status {...statusLedProps(device.status)} />
-              </TableCell>
-              <TableCell
-                onClick={() => setSelectedId(device.ip)}
-                className="overflow-hidden font-medium overflow-ellipsis"
-              >
-                {device.name}
-              </TableCell>
-
-              <TableCell className="font-medium">
-                {device.status === DEVICE_STATUS.NEW ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleAdoptDevice(device)}
-                    disabled={adoptDeviceMutation.isPending}
-                  >
-                    {adoptDeviceMutation.isPending
-                      ? "Adopting..."
-                      : "Adopt Device"}
-                  </Button>
-                ) : (
-                  device.status
-                )}
-              </TableCell>
-              <TableCell className="font-medium">{device.ip}</TableCell>
+    <>
+      <PageHeader title="Cluster" />
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <Table className="max-w-7xl table-fixed">
+          <TableCaption>A list of your adopted Devices.</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-2">
+                <span className="sr-only">Status</span>
+              </TableHead>
+              <TableHead className="w-[200px]">Device</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>IP</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <Sheet
-        open={!!selected}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedId(null);
-          }
-        }}
-      >
-        <SheetContent className="bg-sidebar-accent w-[600px] sm:max-w-[600px]">
-          <SheetHeader>
-            <SheetTitle>{selected?.name}</SheetTitle>
-            <SheetDescription>Device details</SheetDescription>
-          </SheetHeader>
-          {selected && (
-            <div>
-              <div>
-                <MiniPCScene
-                  status={selected.status}
-                  adopting={adoptDeviceMutation.isPending}
-                />
-              </div>
-              <div className="m-4 flex h-22 flex-row items-end">
-                <Alert
-                  className={cn("flex transition-all", {
-                    "flex-col border-blue-400 bg-blue-50 text-blue-900": isNew,
-                    "flex-row items-center justify-between border-none": !isNew,
-                  })}
+          </TableHeader>
+          <TableBody>
+            {nodes.map((device) => (
+              <TableRow
+                key={`${device.name}-${device.ip}`}
+                className={cn({
+                  "animate-pulse": device.status === DEVICE_STATUS.UNHEALTHY,
+                })}
+              >
+                <TableCell className="w-2">
+                  <Status {...statusLedProps(device.status)} />
+                </TableCell>
+                <TableCell
+                  onClick={() => setSelectedId(device.ip)}
+                  className="overflow-hidden font-medium overflow-ellipsis"
                 >
-                  <AlertTitle className="flex items-center gap-2 font-medium">
-                    <Status {...statusLedProps(selected.status)} />{" "}
-                    {isNew ? "Ready for adoption" : selected.status}
-                  </AlertTitle>
-                  <AlertDescription
-                    className={cn(
-                      "flex flex-row items-center justify-between text-black",
-                      {
-                        "w-full": isNew,
-                      },
-                    )}
-                  >
-                    <div className="flex-1 text-xs text-blue-900">
-                      {isNew
-                        ? "Expand cluster capacity by adopting this device."
-                        : null}
-                    </div>
+                  {device.name}
+                </TableCell>
 
-                    {isNew ? (
-                      <Button
-                        onClick={() => handleAdoptDevice(selected!)}
-                        disabled={adoptDeviceMutation.isPending || !isNew}
-                      >
-                        {adoptDeviceMutation.isPending
-                          ? "Adopting..."
-                          : "Adopt Device"}
-                      </Button>
-                    ) : (
-                      <Button variant="outline" asChild>
-                        <a
-                          href={`http://grafana.home.mauriciomelo.io/d/cehfovv63aneoe-cluster-otel/cluster?orgId=1&from=now-30m&to=now&timezone=browser&var-Node=${selected.name}&refresh=5s`}
-                          target="_blank"
-                        >
-                          <LineChart />
-                          Explore Metrics
-                        </a>
-                      </Button>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              </div>
-
-              <NodeDetails node={selected} />
-
-              {selected && !isNew && (
-                <div className="m-4">
-                  <DeleteDeviceDialog device={selected} />
+                <TableCell className="font-medium">
+                  {device.status === DEVICE_STATUS.NEW ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAdoptDevice(device)}
+                      disabled={adoptDeviceMutation.isPending}
+                    >
+                      {adoptDeviceMutation.isPending
+                        ? "Adopting..."
+                        : "Adopt Device"}
+                    </Button>
+                  ) : (
+                    device.status
+                  )}
+                </TableCell>
+                <TableCell className="font-medium">{device.ip}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <Sheet
+          open={!!selected}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedId(null);
+            }
+          }}
+        >
+          <SheetContent className="bg-sidebar-accent w-[600px] sm:max-w-[600px]">
+            <SheetHeader>
+              <SheetTitle>{selected?.name}</SheetTitle>
+              <SheetDescription>Device details</SheetDescription>
+            </SheetHeader>
+            {selected && (
+              <div>
+                <div>
+                  <MiniPCScene
+                    status={selected.status}
+                    adopting={adoptDeviceMutation.isPending}
+                  />
                 </div>
-              )}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-    </div>
+                <div className="m-4 flex h-22 flex-row items-end">
+                  <Alert
+                    className={cn("flex transition-all", {
+                      "flex-col border-blue-400 bg-blue-50 text-blue-900":
+                        isNew,
+                      "flex-row items-center justify-between border-none":
+                        !isNew,
+                    })}
+                  >
+                    <AlertTitle className="flex items-center gap-2 font-medium">
+                      <Status {...statusLedProps(selected.status)} />{" "}
+                      {isNew ? "Ready for adoption" : selected.status}
+                    </AlertTitle>
+                    <AlertDescription
+                      className={cn(
+                        "flex flex-row items-center justify-between text-black",
+                        {
+                          "w-full": isNew,
+                        },
+                      )}
+                    >
+                      <div className="flex-1 text-xs text-blue-900">
+                        {isNew
+                          ? "Expand cluster capacity by adopting this device."
+                          : null}
+                      </div>
+
+                      {isNew ? (
+                        <Button
+                          onClick={() => handleAdoptDevice(selected!)}
+                          disabled={adoptDeviceMutation.isPending || !isNew}
+                        >
+                          {adoptDeviceMutation.isPending
+                            ? "Adopting..."
+                            : "Adopt Device"}
+                        </Button>
+                      ) : (
+                        <Button variant="outline" asChild>
+                          <a
+                            href={`http://grafana.home.mauriciomelo.io/d/cehfovv63aneoe-cluster-otel/cluster?orgId=1&from=now-30m&to=now&timezone=browser&var-Node=${selected.name}&refresh=5s`}
+                            target="_blank"
+                          >
+                            <LineChart />
+                            Explore Metrics
+                          </a>
+                        </Button>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
+                <NodeDetails node={selected} />
+
+                {selected && !isNew && (
+                  <div className="m-4">
+                    <DeleteDeviceDialog device={selected} />
+                  </div>
+                )}
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
+    </>
   );
 }
 
