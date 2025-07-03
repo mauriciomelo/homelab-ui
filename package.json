@@ -2,10 +2,12 @@
   "name": "homelab-ui",
   "version": "0.1.0",
   "private": true,
+  "main": "main.js",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
+    "dev:electron": "electron .",
     "lint": "next lint"
   },
   "dependencies": {
@@ -55,6 +57,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "electron": "^37.2.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

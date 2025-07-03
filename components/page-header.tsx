@@ -10,7 +10,14 @@ export function PageHeader() {
   const sidebar = useAppSideBar();
 
   return (
-    <header className="bg-sidebar-accent flex h-20 w-full items-center gap-2 transition-[width,height] ease-linear">
+    <header
+      style={{
+        userSelect: "none",
+        // @ts-expect-error electron types are not available in this context
+        appRegion: "drag",
+      }}
+      className="bg-sidebar-accent flex h-20 w-full items-center gap-2 transition-[width,height] ease-linear"
+    >
       <div className="flex w-full items-center gap-2 px-4">
         <div
           className={cn("transition-duration-50 w-22 transition-[width]", {
