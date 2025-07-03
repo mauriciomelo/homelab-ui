@@ -105,7 +105,7 @@ export function Devices() {
   const isNew = selected?.status === DEVICE_STATUS.NEW;
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <Table className="table-fixed max-w-7xl">
+      <Table className="max-w-7xl table-fixed">
         <TableCaption>A list of your adopted Devices.</TableCaption>
         <TableHeader>
           <TableRow>
@@ -130,7 +130,7 @@ export function Devices() {
               </TableCell>
               <TableCell
                 onClick={() => setSelectedId(device.ip)}
-                className="font-medium overflow-ellipsis overflow-hidden"
+                className="overflow-hidden font-medium overflow-ellipsis"
               >
                 {device.name}
               </TableCell>
@@ -164,7 +164,7 @@ export function Devices() {
           }
         }}
       >
-        <SheetContent className="w-[600px] sm:max-w-[600px] bg-sidebar-accent">
+        <SheetContent className="bg-sidebar-accent w-[600px] sm:max-w-[600px]">
           <SheetHeader>
             <SheetTitle>{selected?.name}</SheetTitle>
             <SheetDescription>Device details</SheetDescription>
@@ -177,50 +177,53 @@ export function Devices() {
                   adopting={adoptDeviceMutation.isPending}
                 />
               </div>
-              <div className="m-4 flex flex-col items-end">
+              <div className="m-4 flex h-22 flex-row items-end">
                 <Alert
-                  className={cn(
-                    "border-blue-400 text-blue-900  bg-blue-50 transition-opacity",
-                    {
-                      "opacity-0": !isNew,
-                    }
-                  )}
+                  className={cn("flex transition-all", {
+                    "flex-col border-blue-400 bg-blue-50 text-blue-900": isNew,
+                    "flex-row items-center justify-between border-none": !isNew,
+                  })}
                 >
-                  <AlertTitle className="font-medium flex items-center gap-2">
-                    <Status {...statusLedProps(selected.status)} /> Ready for
-                    adoption
+                  <AlertTitle className="flex items-center gap-2 font-medium">
+                    <Status {...statusLedProps(selected.status)} />{" "}
+                    {isNew ? "Ready for adoption" : selected.status}
                   </AlertTitle>
-                  <AlertDescription className="flex flex-row justify-between items-center">
-                    <span className="text-xs text-blue-900">
-                      Expand cluster capacity by adopting this device.
-                    </span>
-                    <Button
-                      onClick={() => handleAdoptDevice(selected!)}
-                      disabled={adoptDeviceMutation.isPending || !isNew}
-                    >
-                      {adoptDeviceMutation.isPending
-                        ? "Adopting..."
-                        : "Adopt Device"}
-                    </Button>
+                  <AlertDescription
+                    className={cn(
+                      "flex flex-row items-center justify-between text-black",
+                      {
+                        "w-full": isNew,
+                      },
+                    )}
+                  >
+                    <div className="flex-1 text-xs text-blue-900">
+                      {isNew
+                        ? "Expand cluster capacity by adopting this device."
+                        : null}
+                    </div>
+
+                    {isNew ? (
+                      <Button
+                        onClick={() => handleAdoptDevice(selected!)}
+                        disabled={adoptDeviceMutation.isPending || !isNew}
+                      >
+                        {adoptDeviceMutation.isPending
+                          ? "Adopting..."
+                          : "Adopt Device"}
+                      </Button>
+                    ) : (
+                      <Button variant="outline" asChild>
+                        <a
+                          href={`http://grafana.home.mauriciomelo.io/d/cehfovv63aneoe-cluster-otel/cluster?orgId=1&from=now-30m&to=now&timezone=browser&var-Node=${selected.name}&refresh=5s`}
+                          target="_blank"
+                        >
+                          <LineChart />
+                          Explore Metrics
+                        </a>
+                      </Button>
+                    )}
                   </AlertDescription>
                 </Alert>
-
-                <Button
-                  variant="outline"
-                  className={cn("mt-4", {
-                    "opacity-0": isNew,
-                  })}
-                  asChild
-                  disabled={isNew}
-                >
-                  <a
-                    href={`http://grafana.home.mauriciomelo.io/d/cehfovv63aneoe-cluster-otel/cluster?orgId=1&from=now-30m&to=now&timezone=browser&var-Node=${selected.name}&refresh=5s`}
-                    target="_blank"
-                  >
-                    <LineChart />
-                    Explore Metrics
-                  </a>
-                </Button>
               </div>
 
               <NodeDetails node={selected} />
@@ -305,17 +308,6 @@ function NodeDetails({ node }: { node: Device }) {
       title: "Info",
       items: [
         {
-          label: "Status",
-          value: (
-            <div className="flex items-center gap-2">
-              <Status {...statusLedProps(node.status)} />
-              {node.status}
-            </div>
-          ),
-          icon: Heart,
-          color: "group-hover:text-green-500",
-        },
-        {
           label: "Name",
           value: node.name,
           icon: Tag,
@@ -371,26 +363,23 @@ function NodeDetails({ node }: { node: Device }) {
       {sections.map((section) => (
         <div
           key={section.title}
-          className="space-y-1 m-4 p-4 bg-white rounded-lg"
+          className="m-4 space-y-1 rounded-lg bg-white p-4"
         >
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+          <h4 className="mb-3 text-sm font-semibold text-gray-700">
             {section.title}
           </h4>
           {section.items.map((item) => (
             <div
               key={item.label}
-              className="group flex items-center justify-between text-sm p-2"
+              className="group flex items-center justify-between p-2 text-sm font-medium"
             >
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 text-gray-600">
                 <item.icon
-                  className={cn(
-                    `w-4 h-4 text-gray-400 transition-colors`,
-                    item.color
-                  )}
+                  className={cn(`h-4 w-4 transition-colors`, item.color)}
                 />
-                <span className="text-gray-600">{item.label}:</span>
+                <span className="">{item.label}:</span>
               </div>
-              <span className="font-medium">{item.value}</span>
+              <span className="text-gray-600">{item.value}</span>
             </div>
           ))}
         </div>
