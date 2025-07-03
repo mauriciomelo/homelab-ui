@@ -11,6 +11,17 @@ const miniPcModelPath = "/models/minipc.gltf";
 
 type VectorLike = [number, number, number];
 
+type LedColor = ReturnType<typeof statusLedProps>["color"];
+
+function adaptLedColor(color: LedColor): string {
+  switch (color) {
+    case "blue":
+      return "#00346e";
+    default:
+      return color;
+  }
+}
+
 function MiniPC({
   status,
   adopting,
@@ -21,8 +32,13 @@ function MiniPC({
   const { scene } = useGLTF(miniPcModelPath);
 
   const led = statusLedProps(status);
-  const ledColor = led.color;
-  const ledPosition = new THREE.Vector3(0.5, -0.8, 1.18);
+  const ledColor = adaptLedColor(led.color);
+
+  const pcBodyPosition = new THREE.Vector3(0, 0, 0);
+
+  const ledPosition = pcBodyPosition
+    .clone()
+    .add(new THREE.Vector3(0.5, -0.35, 1.18));
 
   const { scale, rotation, position } = useSpring({
     from: {
@@ -52,7 +68,11 @@ function MiniPC({
       rotation={rotation as unknown as VectorLike}
     >
       {/* GLTF Mini PC Model */}
-      <primitive object={scene} scale={[20, 20, 20]} position={[0, -0.5, 0]} />
+      <primitive
+        object={scene}
+        scale={[20, 20, 20]}
+        position={pcBodyPosition}
+      />
 
       {/* LED sphere with emissive light */}
       <mesh position={ledPosition}>
@@ -83,13 +103,18 @@ export function MiniPCScene({
   adopting: boolean;
 }) {
   return (
-    <div className="w-full min-w-[400px] h-[500px] rounded-lg overflow-hidden">
-      <Canvas camera={{ position: [0, 0.7, 5], fov: 70 }}>
+    <div className="w-full h-[200px] rounded-lg overflow-hidden ">
+      <Canvas camera={{ position: [0, 0.7, 5], fov: 30 }}>
         <ambientLight intensity={0.4} />
         <directionalLight position={[10, 10, 5]} intensity={0.8} />
         <MiniPC status={status} adopting={adopting} />
         <Environment preset="studio" environmentIntensity={0.2} />
-        <OrbitControls enableZoom={true} enablePan={false} autoRotate={false} />
+        <OrbitControls
+          enableZoom={false}
+          enablePan={false}
+          enableRotate={false}
+          autoRotate={false}
+        />
       </Canvas>
     </div>
   );
