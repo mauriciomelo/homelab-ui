@@ -88,7 +88,6 @@ export function Devices() {
 
   const handleAdoptDevice = async (device: Device) => {
     assert(typeof device.port === "number", "Port is required");
-    setSelectedId(device.ip);
     await adoptDeviceMutation.mutateAsync({
       name: device.name,
       ip: device.ip,
@@ -132,7 +131,7 @@ export function Devices() {
                 </TableCell>
                 <TableCell
                   onClick={() => setSelectedId(device.ip)}
-                  className="overflow-hidden font-medium overflow-ellipsis"
+                  className="cursor-pointer overflow-hidden font-medium overflow-ellipsis"
                 >
                   {device.name}
                 </TableCell>
