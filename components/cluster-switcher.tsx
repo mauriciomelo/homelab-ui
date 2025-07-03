@@ -52,7 +52,7 @@ export function ClusterSwitcher() {
         sideOffset={4}
       >
         <DropdownMenuLabel className="text-muted-foreground text-xs">
-          Teams
+          Clusters
         </DropdownMenuLabel>
         {clusterList.map((team, index) => (
           <DropdownMenuItem

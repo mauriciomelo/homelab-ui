@@ -1,5 +1,5 @@
 "use client";
-import { ClusterSwitcher } from "@/components/team-switcher";
+import { ClusterSwitcher } from "@/components/cluster-switcher";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createPortal } from "react-dom";
 import { useAppSideBar } from "./app-sidebar";
