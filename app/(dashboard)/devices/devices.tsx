@@ -115,7 +115,7 @@ export function Devices() {
               </TableHead>
               <TableHead className="w-[200px]">Device</TableHead>
               <TableHead className="w-[200px]">Status</TableHead>
-              <TableHead>IP</TableHead>
+              <TableHead>IP Address</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
