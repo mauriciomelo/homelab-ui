@@ -19,7 +19,7 @@ const servicePayloadSchema = z.object({
   arch: z.string().min(1),
   platform: z.string().min(1),
   memory: z.string().optional(),
-  cpu: z.number().optional(),
+  cpu: z.coerce.number().optional(),
 });
 
 type ServicePayload = z.infer<typeof servicePayloadSchema>;
