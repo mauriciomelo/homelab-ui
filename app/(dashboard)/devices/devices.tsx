@@ -49,13 +49,10 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageContent } from "@/components/page-content";
 import { PageTitle } from "@/components/page-header";
+import { DiscoveredNode } from "@/mdns";
+import { ClusterNode } from "@/app/api/devices";
 
-type Device = {
-  ip: string;
-  port?: number;
-  name: string;
-  status: DeviceStatus;
-};
+type Device = DiscoveredNode | (ClusterNode & { port?: number });
 
 export function Devices() {
   const trpc = useTRPC();
@@ -307,6 +304,7 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
 }
 
 function NodeDetails({ node }: { node: Device }) {
+  const UNKNOWN = "Unknown";
   const sections = [
     {
       title: "Info",
@@ -319,13 +317,13 @@ function NodeDetails({ node }: { node: Device }) {
         },
         {
           label: "Architecture",
-          value: "amd64",
+          value: node.nodeInfo.architecture || UNKNOWN,
           icon: Cpu,
           color: "group-hover:text-purple-500",
         },
         {
           label: "Operating System",
-          value: "Linux (Ubuntu 24.04.1 LTS)",
+          value: node.nodeInfo.operatingSystem || UNKNOWN,
           icon: Monitor,
           color: "group-hover:text-orange-500",
         },

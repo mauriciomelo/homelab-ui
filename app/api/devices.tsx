@@ -5,6 +5,8 @@ import crypto from "crypto";
 import assert from "assert";
 import * as k8s from "./k8s";
 
+export type ClusterNode = Awaited<ReturnType<typeof devices>>[number];
+
 export async function devices() {
   const coreApi = k8s.coreApi();
   const nodes = await coreApi.listNode();
@@ -32,7 +34,7 @@ export async function devices() {
       node.metadata?.labels?.["node-role.kubernetes.io/master"] === "true";
 
     const ip = node.status?.addresses?.find(
-      (addr) => addr.type === "InternalIP"
+      (addr) => addr.type === "InternalIP",
     )?.address;
     const name = node.metadata?.name;
 

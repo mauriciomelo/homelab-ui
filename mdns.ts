@@ -12,6 +12,24 @@ const serviceName = `${hostname}_node`;
 
 const CLUSTER_NODE = "cluster-node";
 
+const servicePayloadSchema = z.object({
+  kind: z.string().min(1),
+  name: z.string().min(1),
+  nodeInfo: z
+    .object({
+      architecture: z.string().min(1).default("Unknown"),
+      operatingSystem: z.string().min(1).default("Unknown"),
+      osImage: z.string().min(1).default("Unknown"),
+    })
+    .default({
+      architecture: "Unknown",
+      operatingSystem: "Unknown",
+      osImage: "Unknown",
+    }),
+});
+
+type ServicePayload = z.infer<typeof servicePayloadSchema>;
+
 export function publishService() {
   console.log("Initializing mDNS service advertiser...");
   console.log(`Publishing service with name: ${serviceName}`);
@@ -25,7 +43,12 @@ export function publishService() {
     txt: {
       kind: CLUSTER_NODE,
       name: hostname,
-    },
+      nodeInfo: {
+        architecture: os.arch(),
+        operatingSystem: os.platform(),
+        osImage: os.release(),
+      },
+    } satisfies ServicePayload,
     port: config.PORT,
   });
 
@@ -46,18 +69,18 @@ export function publishService() {
   });
 }
 
-type ClusterNode = {
+export type DiscoveredNode = {
   name: string;
   ip: string;
   port: number;
+  nodeInfo: {
+    architecture?: string;
+    operatingSystem?: string;
+    osImage?: string;
+  };
 };
 
-const servicePayloadSchema = z.object({
-  kind: z.string().min(1),
-  name: z.string().min(1),
-});
-
-const nodesMap = new Map<string, ClusterNode>();
+const nodesMap = new Map<string, DiscoveredNode>();
 
 export function getDiscoveredNodes() {
   return nodesMap;
@@ -69,16 +92,17 @@ bonjour.find({ type: "http" }, function (service) {
       assert(service.referer?.address, "Service referer address is undefined");
       const payload = servicePayloadSchema.parse(service.txt);
 
-      const node: ClusterNode = {
+      const node: DiscoveredNode = {
         name: payload.name,
         ip: service.referer.address,
         port: service.port,
+        nodeInfo: payload.nodeInfo,
       };
 
       nodesMap.set(node.ip, node);
 
       console.log(
-        `Cluster Node Discovered: ${service.name} at ${service.host}:${service.port}`
+        `Cluster Node Discovered: ${service.name} at ${service.host}:${service.port}`,
       );
     } catch (error) {
       console.error("Error processing service:", error);
