@@ -5,7 +5,7 @@ const createWindow = () => {
     width: 1440,
     height: 920,
     titleBarStyle: "hidden",
-    trafficLightPosition: { x: 25, y: 25 },
+    trafficLightPosition: { x: 20, y: 30 },
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
