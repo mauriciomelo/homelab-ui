@@ -51,6 +51,7 @@ import { PageContent } from "@/components/page-content";
 import { PageTitle } from "@/components/page-header";
 import { DiscoveredNode } from "@/mdns";
 import { ClusterNode } from "@/app/api/devices";
+import _ from "lodash";
 
 type Device = DiscoveredNode | (ClusterNode & { port?: number });
 
@@ -303,8 +304,27 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
   );
 }
 
+function kibiBytesToGigabytes(size: unknown): string {
+  if (!size || typeof size !== "string") return "Unknown";
+  if (!size.includes("Ki")) return "Unknown";
+
+  const sizeInteger = Number.parseInt(size.replace("Ki", ""));
+
+  const gigabytes = sizeInteger / 976600;
+
+  return `${gigabytes.toFixed(1)} GB`;
+}
+
 function NodeDetails({ node }: { node: Device }) {
   const UNKNOWN = "Unknown";
+
+  const osImage = node.nodeInfo.osImage ? ` (${node.nodeInfo.osImage})` : "";
+  const storage = kibiBytesToGigabytes(
+    _.get(node, ["capacity", "ephemeral-storage"]),
+  );
+
+  const memory = kibiBytesToGigabytes(node.capacity?.memory);
+
   const sections = [
     {
       title: "Info",
@@ -323,7 +343,9 @@ function NodeDetails({ node }: { node: Device }) {
         },
         {
           label: "Operating System",
-          value: node.nodeInfo.operatingSystem || UNKNOWN,
+          value:
+            `${_.capitalize(node.nodeInfo.operatingSystem)}${osImage}` ||
+            UNKNOWN,
           icon: Monitor,
           color: "group-hover:text-orange-500",
         },
@@ -340,19 +362,19 @@ function NodeDetails({ node }: { node: Device }) {
       items: [
         {
           label: "CPU",
-          value: "3 cores",
+          value: node.capacity?.cpu || UNKNOWN,
           icon: Cpu,
           color: "group-hover:text-purple-500",
         },
         {
           label: "Storage",
-          value: "40 GB",
+          value: storage,
           icon: HardDrive,
           color: "group-hover:text-green-500",
         },
         {
           label: "Memory",
-          value: "8 GB",
+          value: memory,
           icon: MemoryStick,
           color: "group-hover:text-red-500",
         },

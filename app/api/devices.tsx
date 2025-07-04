@@ -18,9 +18,8 @@ export async function devices() {
     const status = nodeStatus(readyStatus);
 
     const info = node.status?.nodeInfo;
-
     const nodeInfo = {
-      architecture: info?.architecture,
+      architecture: info?.architecture === "amd64" ? "x64" : info?.architecture,
       operatingSystem: info?.operatingSystem,
       osImage: info?.osImage,
     };

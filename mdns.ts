@@ -3,6 +3,7 @@ import { Bonjour } from "bonjour-service";
 import os from "node:os";
 import * as z from "zod/v4";
 import { getOptionalConfig } from "./app/(dashboard)/apps/config";
+import { memo } from "react";
 
 const bonjour = new Bonjour();
 
@@ -15,9 +16,10 @@ const CLUSTER_NODE = "cluster-node";
 const servicePayloadSchema = z.object({
   kind: z.string().min(1),
   name: z.string().min(1),
-  arch: z.string().min(1).default("Unknown"),
-  platform: z.string().min(1).default("Unknown"),
-  release: z.string().min(1).default("Unknown"),
+  arch: z.string().min(1),
+  platform: z.string().min(1),
+  memory: z.string().optional(),
+  cpu: z.number().optional(),
 });
 
 type ServicePayload = z.infer<typeof servicePayloadSchema>;
@@ -37,7 +39,8 @@ export function publishService() {
       name: hostname,
       arch: os.arch(),
       platform: os.platform(),
-      release: os.release(),
+      memory: `${Math.round(os.totalmem() / 1024)}Ki`,
+      cpu: os.cpus().length,
     } satisfies ServicePayload,
     port: config.PORT,
   });
@@ -68,6 +71,10 @@ export type DiscoveredNode = {
     operatingSystem?: string;
     osImage?: string;
   };
+  capacity: {
+    memory?: string;
+    cpu?: number;
+  };
 };
 
 const nodesMap = new Map<string, DiscoveredNode>();
@@ -89,7 +96,10 @@ bonjour.find({ type: "http" }, function (service) {
         nodeInfo: {
           architecture: payload.arch,
           operatingSystem: payload.platform,
-          osImage: payload.release,
+        },
+        capacity: {
+          memory: payload.memory,
+          cpu: payload.cpu,
         },
       };
 
