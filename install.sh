@@ -25,6 +25,13 @@ $NODEUSER ALL=(ALL) NOPASSWD: /usr/local/bin/k3s-agent-uninstall.sh
 $NODEUSER ALL=(ALL) NOPASSWD: /usr/local/bin/k3s-uninstall.sh
 EOF
 
+
+if [ -n "$NODE_NAME" ]; then
+  echo "--> Changing hostname to '$NODE_NAME'..."
+  sudo hostnamectl set-hostname "$NODE_NAME"
+fi
+
+
 # Download and install nvm:
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 
