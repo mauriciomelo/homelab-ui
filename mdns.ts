@@ -15,17 +15,9 @@ const CLUSTER_NODE = "cluster-node";
 const servicePayloadSchema = z.object({
   kind: z.string().min(1),
   name: z.string().min(1),
-  nodeInfo: z
-    .object({
-      architecture: z.string().min(1).default("Unknown"),
-      operatingSystem: z.string().min(1).default("Unknown"),
-      osImage: z.string().min(1).default("Unknown"),
-    })
-    .default({
-      architecture: "Unknown",
-      operatingSystem: "Unknown",
-      osImage: "Unknown",
-    }),
+  arch: z.string().min(1).default("Unknown"),
+  platform: z.string().min(1).default("Unknown"),
+  release: z.string().min(1).default("Unknown"),
 });
 
 type ServicePayload = z.infer<typeof servicePayloadSchema>;
@@ -43,11 +35,9 @@ export function publishService() {
     txt: {
       kind: CLUSTER_NODE,
       name: hostname,
-      nodeInfo: {
-        architecture: os.arch(),
-        operatingSystem: os.platform(),
-        osImage: os.release(),
-      },
+      arch: os.arch(),
+      platform: os.platform(),
+      release: os.release(),
     } satisfies ServicePayload,
     port: config.PORT,
   });
@@ -96,7 +86,11 @@ bonjour.find({ type: "http" }, function (service) {
         name: payload.name,
         ip: service.referer.address,
         port: service.port,
-        nodeInfo: payload.nodeInfo,
+        nodeInfo: {
+          architecture: payload.arch,
+          operatingSystem: payload.platform,
+          osImage: payload.release,
+        },
       };
 
       nodesMap.set(node.ip, node);
