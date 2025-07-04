@@ -11,7 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DEVICE_STATUS, DeviceStatus } from "@/app/api/schemas";
+import { DEVICE_STATUS } from "@/app/api/schemas";
 import { useState } from "react";
 import { Status } from "@/components/ui/status";
 import { Button } from "@/components/ui/button";

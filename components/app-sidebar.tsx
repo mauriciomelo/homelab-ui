@@ -20,7 +20,8 @@ import { cn } from "@/lib/utils";
 
 const AppSideBarContext = createContext({
   open: true,
-  setOpen: (value: boolean) => {},
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  setOpen: (_value: boolean) => {},
 });
 
 export function useAppSideBar() {
