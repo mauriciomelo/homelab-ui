@@ -23,7 +23,6 @@ import {
 import { ComponentProps, useState } from "react";
 import { App } from "@/app/api/applications";
 import { Status } from "@/components/ui/status";
-import { PageTitle } from "@/components/page-header";
 import { PageContent } from "@/components/page-content";
 
 export function Apps() {
@@ -33,7 +32,6 @@ export function Apps() {
 
   return (
     <>
-      <PageTitle title="Apps" />
       <PageContent>
         <Table className="max-w-7xl table-fixed">
           <TableCaption>A list of your installed Apps.</TableCaption>

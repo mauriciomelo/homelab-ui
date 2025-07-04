@@ -6,17 +6,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "./ui/button";
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  PencilRuler,
-  Server,
-  Settings,
-} from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useContext, useState } from "react";
 
 import { createContext } from "react";
 import { cn } from "@/lib/utils";
+import { pathMap } from "@/hooks/use-page-title";
 
 const AppSideBarContext = createContext({
   open: true,
@@ -58,10 +53,27 @@ export function AppSideBar() {
         {open ? <PanelLeftClose /> : <PanelLeftOpen />}
       </Button>
 
-      <SidebarButton icon={PencilRuler} title="Apps" href="/apps" />
-      <SidebarButton icon={Server} title="Devices" href="/devices" />
+      <SidebarButton
+        icon={pathMap["/"].icon}
+        title={pathMap["/"].title}
+        href="/"
+      />
+      <SidebarButton
+        icon={pathMap["/apps"].icon}
+        title={pathMap["/apps"].title}
+        href="/apps"
+      />
+      <SidebarButton
+        icon={pathMap["/devices"].icon}
+        title={pathMap["/devices"].title}
+        href="/devices"
+      />
       <div className="grow-1"></div>
-      <SidebarButton icon={Settings} title="Settings" href="/settings" />
+      <SidebarButton
+        icon={pathMap["/settings"].icon}
+        title={pathMap["/settings"].title}
+        href="/settings"
+      />
     </div>
   );
 }

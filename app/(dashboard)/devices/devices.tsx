@@ -48,7 +48,6 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageContent } from "@/components/page-content";
-import { PageTitle } from "@/components/page-header";
 import { DiscoveredNode } from "@/mdns";
 import { ClusterNode } from "@/app/api/devices";
 import _ from "lodash";
@@ -102,7 +101,6 @@ export function Devices() {
   const isNew = selected?.status === DEVICE_STATUS.NEW;
   return (
     <>
-      <PageTitle title="Devices" />
       <PageContent>
         <Table className="max-w-7xl table-fixed">
           <TableCaption>A list of your adopted Devices.</TableCaption>

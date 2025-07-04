@@ -1,13 +1,13 @@
 "use client";
 import { ClusterSwitcher } from "@/components/cluster-switcher";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { createPortal } from "react-dom";
 import { useAppSideBar } from "./app-sidebar";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef } from "react";
+import { usePageInfo } from "@/hooks/use-page-title";
 
 export function PageHeader() {
   const sidebar = useAppSideBar();
+  const pageInfo = usePageInfo();
 
   return (
     <header
@@ -24,7 +24,9 @@ export function PageHeader() {
             "w-58": sidebar.open,
           })}
         ></div>
-        <h1 id="app-bar-title" className="text-2xl text-gray-600"></h1>
+        <h1 id="app-bar-title" className="text-2xl text-gray-600">
+          {pageInfo.title}
+        </h1>
 
         <div className="grow-1"></div>
 
@@ -45,21 +47,5 @@ export function PageHeader() {
         </div>
       </div>
     </header>
-  );
-}
-
-export function PageTitle({ title }: { title: string }) {
-  const titleRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    titleRef.current = document.getElementById("app-bar-title");
-  }, [title]);
-
-  return (
-    <span>
-      {titleRef.current
-        ? createPortal(<span>{title}</span>, titleRef.current)
-        : null}
-    </span>
   );
 }
