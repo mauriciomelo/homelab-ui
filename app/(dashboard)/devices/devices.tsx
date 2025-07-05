@@ -10,9 +10,14 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { DEVICE_STATUS } from "@/app/api/schemas";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Status } from "@/components/ui/status";
 import { Button } from "@/components/ui/button";
 import { MiniPCScene } from "./mini-pc";
@@ -53,6 +58,7 @@ import { ClusterNode } from "@/app/api/devices";
 import _ from "lodash";
 import { App } from "@/app/api/applications";
 import { AppIcon } from "@/components/app-icon";
+import { useTransition, animated } from "@react-spring/web";
 
 type Device = DiscoveredNode | (ClusterNode & { port?: number });
 
@@ -62,21 +68,54 @@ function nodeApps(apps: App[], nodeName: string) {
   );
 }
 
+function NodeApps(props: { apps: App[]; node: string; className?: string }) {
+  const items = nodeApps(props.apps, props.node);
+
+  const transitions = useTransition(items, {
+    keys: (item) => item.name,
+    from: { opacity: 0, scale: 0 },
+    enter: { opacity: 1, scale: 1 },
+    leave: { opacity: 0, scale: 0 },
+    trail: 100,
+  });
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {transitions((style, item) => (
+        // @ts-expect-error TODO: Upgrade this package, this looks like a bug in react-spring
+        <animated.div style={style} className={cn("size-5", props.className)}>
+          <AppIcon app={item} />
+        </animated.div>
+      ))}
+    </div>
+  );
+}
+
 export function Devices() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  // Check if the reset mutation is in progress to pause updates, so the apps animation can happen in bulk.
+  const isResetting =
+    useIsMutating({
+      mutationKey: trpc.resetDevice.mutationKey(),
+    }) > 0;
+
   const devices = useQuery({
     ...trpc.devices.queryOptions(),
     refetchInterval: 10_000,
+    enabled: !isResetting,
   });
-  const queryClient = useQueryClient();
 
   const discoveredNodes = useQuery({
     ...trpc.discoveredNodes.queryOptions(),
     refetchInterval: 5_000,
+    enabled: !isResetting,
   });
   const apps = useQuery({
     ...trpc.apps.queryOptions(),
     refetchInterval: 5_000,
+    enabled: !isResetting,
   });
 
   const invalidateQueries = () => {
@@ -87,20 +126,28 @@ export function Devices() {
     queryClient.invalidateQueries({ queryKey: trpc.apps.queryKey() });
   };
 
-  const currentDevices =
-    devices.data?.map((device) => ({
-      ...device,
-      port: discoveredNodes.data?.get(device.ip)?.port,
-    })) || [];
+  const currentDevices = useMemo(
+    () =>
+      devices.data?.map((device) => ({
+        ...device,
+        port: discoveredNodes.data?.get(device.ip)?.port,
+      })) || [],
+    [devices.data, discoveredNodes.data],
+  );
 
-  const newDevices =
-    Array.from(discoveredNodes?.data?.values() || [])
-      ?.filter((node) => {
-        return currentDevices?.every((device) => device.ip !== node.ip);
-      })
-      .map((node) => ({ ...node, status: DEVICE_STATUS.NEW })) || [];
+  const newDevices = useMemo(
+    () =>
+      Array.from(discoveredNodes?.data?.values() || [])
+        .filter((node) => {
+          return currentDevices?.every((device) => device.ip !== node.ip);
+        })
+        .map((node) => ({ ...node, status: DEVICE_STATUS.NEW })) || [],
+    [discoveredNodes.data, currentDevices],
+  );
 
-  const nodes = [...currentDevices, ...newDevices];
+  const nodes = [...currentDevices, ...newDevices].sort((a, b) => {
+    return a.name.localeCompare(b.name);
+  });
 
   const adoptDeviceMutation = useMutation(trpc.adoptDevice.mutationOptions());
 
@@ -157,31 +204,33 @@ export function Devices() {
                   {device.name}
                 </TableCell>
 
-                <TableCell className="font-medium">
-                  {device.status === DEVICE_STATUS.NEW ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleAdoptDevice(device)}
-                      disabled={adoptDeviceMutation.isPending}
-                    >
-                      {adoptDeviceMutation.isPending
-                        ? "Adopting..."
-                        : "Adopt Device"}
-                    </Button>
-                  ) : (
-                    device.status
-                  )}
+                <TableCell
+                  className={cn("px-2 py-0 font-medium", {
+                    "p-0": device.status === DEVICE_STATUS.NEW,
+                  })}
+                >
+                  <div className="flex min-h-12 items-center">
+                    {device.status === DEVICE_STATUS.NEW ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleAdoptDevice(device)}
+                        disabled={adoptDeviceMutation.isPending}
+                      >
+                        {adoptDeviceMutation.isPending
+                          ? "Adopting..."
+                          : "Adopt Device"}
+                      </Button>
+                    ) : (
+                      device.status
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="font-medium">{device.ip}</TableCell>
                 <TableCell className="font-medium">
-                  <div className="flex flex-wrap gap-2">
-                    {nodeApps(apps.data || [], device.name).map((app) => (
-                      <div className="size-5" key={app.name}>
-                        <AppIcon app={app} />
-                      </div>
-                    ))}
-                  </div>
+                  <NodeApps
+                    apps={apps.data || []}
+                    node={device.name}
+                  ></NodeApps>
                 </TableCell>
               </TableRow>
             ))}
@@ -265,11 +314,11 @@ export function Devices() {
                   </h4>
                   <div className="flex flex-wrap gap-3">
                     {runningApps.length > 0 ? (
-                      runningApps.map((app) => (
-                        <div className="size-6" key={app.name}>
-                          <AppIcon app={app} />
-                        </div>
-                      ))
+                      <NodeApps
+                        className="size-6"
+                        apps={apps.data || []}
+                        node={selected.name}
+                      />
                     ) : (
                       <div className="text-sm text-gray-500">
                         No running apps yet
@@ -318,9 +367,7 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
       ip: device.ip,
       port: device.port,
     });
-
     invalidateQueries();
-
     setOpen(false);
   };
 
