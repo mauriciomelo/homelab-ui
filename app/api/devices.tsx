@@ -4,6 +4,7 @@ import { DEVICE_STATUS } from "./schemas";
 import crypto from "crypto";
 import assert from "assert";
 import * as k8s from "./k8s";
+import { V1Eviction, V1Pod } from "@kubernetes/client-node";
 
 export type ClusterNode = Awaited<ReturnType<typeof devices>>[number];
 
@@ -121,7 +122,7 @@ export async function createBootstrapToken() {
   };
 }
 
-export async function resetDevice(nodeName: string) {
+export async function deleteNode(nodeName: string) {
   try {
     const coreApi = k8s.coreApi();
     await coreApi.deleteNode({ name: nodeName });
@@ -131,5 +132,77 @@ export async function resetDevice(nodeName: string) {
     }
 
     throw new Error(`Failed to delete node ${nodeName}: ${error}`);
+  }
+}
+
+export async function drainNode(nodeName: string) {
+  try {
+    await cordonNode(nodeName);
+    const pods = await getPodsForNode(nodeName);
+    await evictPods(pods);
+  } catch (error) {
+    throw new Error(`Failed to drain node ${nodeName}: ${error}`);
+  }
+}
+
+function cordonNode(nodeName: string) {
+  const coreApi = k8s.coreApi();
+  const patch = {
+    op: "replace",
+    path: "/spec/unschedulable",
+    value: true,
+  };
+
+  return coreApi.patchNode({
+    name: nodeName,
+    body: [patch],
+  });
+}
+
+export async function getPodsForNode(nodeName: string) {
+  const coreApi = k8s.coreApi();
+  const allPods = await coreApi.listPodForAllNamespaces({
+    fieldSelector: `spec.nodeName=${nodeName}`,
+    labelSelector: "app-type=user",
+  });
+
+  return allPods.items;
+}
+
+async function evictPods(pods: V1Pod[]) {
+  const coreApi = k8s.coreApi();
+
+  console.log(`Evicting pods for node: ${pods}`);
+
+  for (const pod of pods) {
+    if (!pod.metadata?.namespace || !pod.metadata.name) {
+      console.warn(
+        `Pod ${pod.metadata?.name} in namespace ${pod.metadata?.namespace} is missing metadata, skipping eviction.`,
+        pod.metadata,
+      );
+      continue;
+    }
+
+    try {
+      const eviction = {
+        apiVersion: "policy/v1",
+        kind: "Eviction",
+        metadata: {
+          name: pod.metadata.name,
+          namespace: pod.metadata.namespace,
+        },
+      } satisfies V1Eviction;
+
+      await coreApi.createNamespacedPodEviction({
+        namespace: pod.metadata.namespace,
+        name: pod.metadata.name,
+        body: eviction,
+      });
+      console.log(`Evicting ${pod.metadata.namespace}/${pod.metadata.name}`);
+    } catch (error) {
+      console.warn(
+        `Could not evict pod ${pod.metadata.namespace}/${pod.metadata.name}: ${error}`,
+      );
+    }
   }
 }

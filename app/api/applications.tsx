@@ -31,15 +31,15 @@ async function getAppByName(name: string) {
 
   const kustomizationFile = await fs.promises.readFile(
     `${appPath}/kustomization.yaml`,
-    "utf-8"
+    "utf-8",
   );
   const ingressFile = await fs.promises.readFile(
     `${appPath}/ingress.yaml`,
-    "utf-8"
+    "utf-8",
   );
 
   const kustomizationData = kustomizationSchema.parse(
-    YAML.parse(kustomizationFile)
+    YAML.parse(kustomizationFile),
   );
 
   const deployment = await getFile({
@@ -67,6 +67,9 @@ async function getAppByName(name: string) {
       metadata: {
         creationTimestamp: pod.metadata?.creationTimestamp,
       },
+      spec: {
+        nodeName: pod.spec?.nodeName,
+      },
       status: {
         phase: pod.status?.phase,
         startTime: pod.status?.startTime,
@@ -87,21 +90,25 @@ async function getAppByName(name: string) {
   const appStatus = deploymentPending
     ? APP_STATUS.PENDING
     : getPodsAggregatedStatus(
-        pods.map((pod) => pod.status?.phase || APP_STATUS.UNKNOWN)
+        pods.map((pod) => pod.status?.phase || APP_STATUS.UNKNOWN),
       );
 
+  const appName = kustomizationData.namespace;
+
   return {
+    name: appName,
     spec: {
-      name: kustomizationData.namespace,
+      name: appName,
       image: deployment.data.spec.template.spec.containers[0].image,
       envVariables: deployment.data.spec.template.spec.containers[0].env.map(
         (env) => ({
           name: env.name,
           value: env.value,
-        })
+        }),
       ),
     } satisfies AppFormSchema,
     pods,
+    iconUrl: `https://cdn.simpleicons.org/${appName}`,
     deployment: {
       spec: {
         replicas: deploymentRes.spec?.replicas,
@@ -140,12 +147,12 @@ export async function updateApp(spec: AppFormSchema) {
 
   const updatedDeployment = _.merge(
     previousDeployment.raw,
-    newPartialDeployment
+    newPartialDeployment,
   );
 
   await fs.promises.writeFile(
     deploymentFilePath,
-    YAML.stringify(updatedDeployment)
+    YAML.stringify(updatedDeployment),
   );
 
   await git.add({
@@ -250,7 +257,7 @@ function getAppsDir() {
     config.PROJECT_DIR,
     "clusters",
     config.CLUSTER_NAME,
-    "my-applications"
+    "my-applications",
   );
 }
 
@@ -287,7 +294,7 @@ export async function reconcileFluxGitRepository({
     });
 
     console.log(
-      `Successfully triggered reconciliation for GitRepository '${name}' in namespace '${namespace}'.`
+      `Successfully triggered reconciliation for GitRepository '${name}' in namespace '${namespace}'.`,
     );
   } catch (err) {
     console.error("Error triggering reconciliation:", err);

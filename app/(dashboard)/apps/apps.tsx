@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { ApplicationForm } from "./application-form";
 import { useTRPC } from "@/trpc/client";
 import { useQuery } from "@tanstack/react-query";
-import { APP_STATUS, AppStatus } from "@/app/api/schemas";
+import { APP_STATUS } from "@/app/api/schemas";
 import {
   Sheet,
   SheetContent,
@@ -20,10 +20,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { ComponentProps, useState } from "react";
+import { useState } from "react";
 import { App } from "@/app/api/applications";
 import { Status } from "@/components/ui/status";
 import { PageContent } from "@/components/page-content";
+import { AppIcon, appStatusProps } from "@/components/app-icon";
 
 export function Apps() {
   const trpc = useTRPC();
@@ -40,6 +41,7 @@ export function Apps() {
               <TableHead className="w-2">
                 <span className="sr-only">Status</span>
               </TableHead>
+              <TableHead className="w-8"></TableHead>
               <TableHead className="w-[200px]">App</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
@@ -54,6 +56,11 @@ export function Apps() {
               >
                 <TableCell className="w-2">
                   <Status {...appStatusProps(app.status)} />
+                </TableCell>
+                <TableCell>
+                  <div className="size-4">
+                    <AppIcon app={app} showStatus={false} />
+                  </div>
                 </TableCell>
                 <TableCell
                   className="cursor-pointer font-medium"
@@ -90,25 +97,4 @@ export function Apps() {
       </PageContent>
     </>
   );
-}
-
-function appStatusProps(status: AppStatus): ComponentProps<typeof Status> {
-  if (status === APP_STATUS.RUNNING) {
-    return {
-      color: "green",
-      animate: false,
-    };
-  }
-
-  if (status === APP_STATUS.PENDING) {
-    return {
-      color: "orange",
-      animate: true,
-    };
-  }
-
-  return {
-    color: "gray",
-    animate: false,
-  };
 }

@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
 import { getApps } from "@/app/api/applications";
-import { createBootstrapToken, devices, resetDevice } from "@/app/api/devices";
+import {
+  createBootstrapToken,
+  devices,
+  getPodsForNode,
+  deleteNode,
+  drainNode,
+} from "@/app/api/devices";
 import { getDiscoveredNodes } from "@/mdns";
 import { exec } from "child_process";
 import util from "util";
@@ -21,7 +27,7 @@ export const appRouter = createTRPCRouter({
     .input(
       z.object({
         token: z.string().min(1).max(300),
-      })
+      }),
     )
     .mutation(async (opts) => {
       const { token } = opts.input;
@@ -39,7 +45,7 @@ export const appRouter = createTRPCRouter({
         name: z.string().min(1).max(100),
         ip: z.string().ip(),
         port: z.number().min(1).max(65535),
-      })
+      }),
     )
     .mutation(async (opts) => {
       const { name, ip, port } = opts.input;
@@ -72,16 +78,26 @@ export const appRouter = createTRPCRouter({
         name: z.string().min(1).max(100),
         ip: z.string().ip(),
         port: z.number().min(1).max(65535),
-      })
+      }),
     )
     .mutation(async (opts) => {
       const { name, ip, port } = opts.input;
 
-      const remoteNodeUrl = `http://${ip}:${port}/api/reset`;
+      await drainNode(name);
 
-      await resetDevice(name);
+      try {
+        await waitFor(async () => {
+          const pods = await getPodsForNode(name);
+          return pods.length === 0;
+        });
+      } catch (error) {
+        console.warn(`Timeout while draining node ${name}:`, error);
+        console.warn("Remaining pods:", await getPodsForNode(name));
+      }
 
-      await axios.post(remoteNodeUrl);
+      await deleteNode(name);
+
+      await remoteReset({ ip, port });
 
       await waitFor(async () => {
         const nodes = await devices();
@@ -90,6 +106,16 @@ export const appRouter = createTRPCRouter({
     }),
 });
 
+async function remoteReset({ ip, port }: { ip: string; port: number }) {
+  const remoteNodeUrl = `http://${ip}:${port}/api/reset`;
+
+  try {
+    await axios.post(remoteNodeUrl);
+  } catch (error) {
+    throw new Error(`Failed to send reset command to ${ip}:${port}: ${error}`);
+  }
+}
+
 export type AppRouter = typeof appRouter;
 
 async function waitFor(
@@ -97,7 +123,7 @@ async function waitFor(
   {
     interval = 2000,
     retries = 10,
-  }: { interval?: number; retries?: number } = {}
+  }: { interval?: number; retries?: number } = {},
 ): Promise<boolean> {
   for (let i = 0; i < retries; i++) {
     const result = await asyncFn();

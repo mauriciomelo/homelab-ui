@@ -51,8 +51,16 @@ import { PageContent } from "@/components/page-content";
 import { DiscoveredNode } from "@/mdns";
 import { ClusterNode } from "@/app/api/devices";
 import _ from "lodash";
+import { App } from "@/app/api/applications";
+import { AppIcon } from "@/components/app-icon";
 
 type Device = DiscoveredNode | (ClusterNode & { port?: number });
+
+function nodeApps(apps: App[], nodeName: string) {
+  return apps.filter((app) =>
+    app.pods.some((pod) => pod.spec.nodeName === nodeName),
+  );
+}
 
 export function Devices() {
   const trpc = useTRPC();
@@ -66,6 +74,19 @@ export function Devices() {
     ...trpc.discoveredNodes.queryOptions(),
     refetchInterval: 5_000,
   });
+  const apps = useQuery({
+    ...trpc.apps.queryOptions(),
+    refetchInterval: 5_000,
+  });
+
+  const invalidateQueries = () => {
+    queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });
+    queryClient.invalidateQueries({
+      queryKey: trpc.discoveredNodes.queryKey(),
+    });
+    queryClient.invalidateQueries({ queryKey: trpc.apps.queryKey() });
+  };
+
   const currentDevices =
     devices.data?.map((device) => ({
       ...device,
@@ -91,7 +112,7 @@ export function Devices() {
       port: device.port,
     });
 
-    queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });
+    invalidateQueries();
   };
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -99,6 +120,9 @@ export function Devices() {
   const selected = nodes.find((node) => node.ip === selectedId);
 
   const isNew = selected?.status === DEVICE_STATUS.NEW;
+
+  const runningApps = selected ? nodeApps(apps.data || [], selected.name) : [];
+
   return (
     <>
       <PageContent>
@@ -109,9 +133,10 @@ export function Devices() {
               <TableHead className="w-2">
                 <span className="sr-only">Status</span>
               </TableHead>
-              <TableHead className="w-[200px]">Device</TableHead>
-              <TableHead className="w-[200px]">Status</TableHead>
-              <TableHead>IP Address</TableHead>
+              <TableHead className="w-38">Device</TableHead>
+              <TableHead className="w-35">Status</TableHead>
+              <TableHead className="w-35">IP Address</TableHead>
+              <TableHead>Running Apps</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -149,6 +174,15 @@ export function Devices() {
                   )}
                 </TableCell>
                 <TableCell className="font-medium">{device.ip}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex flex-wrap gap-2">
+                    {nodeApps(apps.data || [], device.name).map((app) => (
+                      <div className="size-5" key={app.name}>
+                        <AppIcon app={app} />
+                      </div>
+                    ))}
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -225,6 +259,25 @@ export function Devices() {
                   </Alert>
                 </div>
 
+                <div className="m-4 flex items-center justify-between rounded-lg bg-white p-4">
+                  <h4 className="text-sm font-semibold text-gray-700">
+                    Running Apps
+                  </h4>
+                  <div className="flex flex-wrap gap-3">
+                    {runningApps.length > 0 ? (
+                      runningApps.map((app) => (
+                        <div className="size-6" key={app.name}>
+                          <AppIcon app={app} />
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-500">
+                        No running apps yet
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <NodeDetails node={selected} />
 
                 {selected && !isNew && (
@@ -247,6 +300,14 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
 
   const queryClient = useQueryClient();
 
+  const invalidateQueries = () => {
+    queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });
+    queryClient.invalidateQueries({
+      queryKey: trpc.discoveredNodes.queryKey(),
+    });
+    queryClient.invalidateQueries({ queryKey: trpc.apps.queryKey() });
+  };
+
   const resetDeviceMutation = useMutation(trpc.resetDevice.mutationOptions());
 
   const handleDelete = async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -258,7 +319,7 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
       port: device.port,
     });
 
-    queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });
+    invalidateQueries();
 
     setOpen(false);
   };
@@ -271,6 +332,10 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
           className="w-fit text-red-500"
           size="sm"
           onClick={() => setOpen(true)}
+          disabled={
+            resetDeviceMutation.isPending ||
+            ("isMaster" in device && device.isMaster)
+          }
         >
           <RotateCcw />
           Factory Reset

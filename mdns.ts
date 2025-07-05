@@ -104,10 +104,6 @@ bonjour.find({ type: "http" }, function (service) {
       };
 
       nodesMap.set(node.ip, node);
-
-      console.log(
-        `Cluster Node Discovered: ${service.name} at ${service.host}:${service.port}`,
-      );
     } catch (error) {
       console.error("Error processing service:", error);
     }
