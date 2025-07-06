@@ -120,3 +120,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+
+body {
+  /* workaround for the shadcn dialog bug related to https://github.com/shadcn-ui/ui/discussions/6116 */
+  pointer-events: auto !important;
+}

@@ -39,7 +39,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Cpu,
@@ -95,6 +94,10 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
 export function Devices() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+
+  const [activeModal, setActiveModal] = useState<
+    "nodeDetails" | "resetNode" | null
+  >(null);
 
   // Check if the reset mutation is in progress to pause updates, so the apps animation can happen in bulk.
   const isResetting =
@@ -171,6 +174,20 @@ export function Devices() {
 
   const runningApps = selected ? nodeApps(apps.data || [], selected.name) : [];
 
+  const handleOpenNodeDetails = (node: Device) => {
+    setSelectedId(node.ip);
+    setActiveModal("nodeDetails");
+  };
+  const handleOpenResetNode = (node: Device) => {
+    setSelectedId(node.ip);
+    setActiveModal("resetNode");
+  };
+
+  const handleCloseModal = () => {
+    setActiveModal(null);
+    setSelectedId(null);
+  };
+
   return (
     <>
       <PageContent>
@@ -207,7 +224,7 @@ export function Devices() {
                   <Status {...statusLedProps(device.status)} />
                 </TableCell>
                 <TableCell
-                  onClick={() => setSelectedId(device.ip)}
+                  onClick={() => handleOpenNodeDetails(device)}
                   className="cursor-pointer overflow-hidden font-medium overflow-ellipsis"
                 >
                   {device.name}
@@ -247,11 +264,18 @@ export function Devices() {
             ))}
           </TableBody>
         </Table>
+
+        <DeleteDeviceDialog
+          open={activeModal === "resetNode"}
+          device={selected}
+          close={handleCloseModal}
+        />
+
         <Sheet
-          open={!!selected}
+          open={!!selected && activeModal === "nodeDetails"}
           onOpenChange={(open) => {
             if (!open) {
-              setSelectedId(null);
+              handleCloseModal();
             }
           }}
         >
@@ -342,7 +366,21 @@ export function Devices() {
 
                 {selected && !isNew && (
                   <div className="m-4">
-                    <DeleteDeviceDialog device={selected} />
+                    <Button
+                      variant="outline"
+                      className="w-fit text-red-500"
+                      size="sm"
+                      onClick={() => {
+                        handleOpenResetNode(selected);
+                      }}
+                      disabled={
+                        isResetting ||
+                        ("isMaster" in selected && selected.isMaster)
+                      }
+                    >
+                      <RotateCcw />
+                      Factory Reset
+                    </Button>
                   </div>
                 )}
               </div>
@@ -354,9 +392,16 @@ export function Devices() {
   );
 }
 
-function DeleteDeviceDialog({ device }: { device: Device }) {
+function DeleteDeviceDialog({
+  device,
+  close,
+  open,
+}: {
+  device?: Device;
+  open: boolean;
+  close?: () => void;
+}) {
   const trpc = useTRPC();
-  const [open, setOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -372,33 +417,25 @@ function DeleteDeviceDialog({ device }: { device: Device }) {
 
   const handleDelete = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    assert(typeof device.port === "number", "Port is required");
+    assert(typeof device?.port === "number", "Port is required");
     await resetDeviceMutation.mutateAsync({
       name: device.name,
       ip: device.ip,
       port: device.port,
     });
     invalidateQueries();
-    setOpen(false);
+    close?.();
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="w-fit text-red-500"
-          size="sm"
-          onClick={() => setOpen(true)}
-          disabled={
-            resetDeviceMutation.isPending ||
-            ("isMaster" in device && device.isMaster)
-          }
-        >
-          <RotateCcw />
-          Factory Reset
-        </Button>
-      </AlertDialogTrigger>
+    <AlertDialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!open) {
+          close?.();
+        }
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Reset Device</AlertDialogTitle>
