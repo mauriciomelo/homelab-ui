@@ -70,7 +70,9 @@ export function Apps() {
                   className="cursor-pointer font-medium"
                   onClick={() => setSelectedApp(app)}
                 >
-                  {app.spec.name}
+                  <div className="flex min-h-9 items-center">
+                    {app.spec.name}
+                  </div>
                 </TableCell>
 
                 <TableCell className="font-medium">{app.status}</TableCell>
