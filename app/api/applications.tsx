@@ -26,6 +26,23 @@ export async function getApps() {
   return Promise.all(appListPromises);
 }
 
+export async function restartApp(name: string) {
+  const patch = [
+    {
+      op: "replace",
+      path: "/spec/template/metadata/annotations",
+      value: {
+        "kubectl.kubernetes.io/restartedAt": new Date().toISOString(),
+      },
+    },
+  ];
+  await k.appsApi().patchNamespacedDeployment({
+    name: name,
+    namespace: name,
+    body: patch,
+  });
+}
+
 async function getAppByName(name: string) {
   const appPath = getAppDir(name);
 

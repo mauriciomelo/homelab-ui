@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
-import { getApps } from "@/app/api/applications";
+import { getApps, restartApp } from "@/app/api/applications";
 import {
   createBootstrapToken,
   devices,
@@ -17,6 +17,15 @@ export const appRouter = createTRPCRouter({
   apps: baseProcedure.query(() => {
     return getApps();
   }),
+  restartApp: baseProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+      }),
+    )
+    .mutation((opts) => {
+      return restartApp(opts.input.name);
+    }),
   devices: baseProcedure.query(() => {
     return devices();
   }),

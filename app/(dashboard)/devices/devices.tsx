@@ -76,6 +76,9 @@ function nodeApps(apps: App[], nodeName: string) {
 
 function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   const items = nodeApps(props.apps, props.node);
+  const trpc = useTRPC();
+
+  const restartAppMutation = useMutation(trpc.restartApp.mutationOptions());
 
   const transitions = useTransition(items, {
     keys: (item) => item.name,
@@ -90,7 +93,18 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
       {transitions((style, item) => (
         // @ts-expect-error TODO: Upgrade this package, this looks like a bug in react-spring
         <animated.div style={style} className={cn("size-5", props.className)}>
-          <AppIcon app={item} />
+          <ContextMenu>
+            <ContextMenuTrigger>
+              <AppIcon app={item} />
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem
+                onClick={() => restartAppMutation.mutate({ name: item.name })}
+              >
+                Restart App
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         </animated.div>
       ))}
     </div>
