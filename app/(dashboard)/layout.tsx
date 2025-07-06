@@ -1,5 +1,5 @@
 import { AppSideBar, AppSideBarProvider } from "@/components/app-sidebar";
-import { PageHeader } from "@/components/page-header";
+import { AppHeader } from "@/components/app-header";
 
 export default function DashboardLayout({
   children,
@@ -9,7 +9,7 @@ export default function DashboardLayout({
   return (
     <AppSideBarProvider>
       <div className="flex h-screen flex-col">
-        <PageHeader />
+        <AppHeader />
         <div className="flex h-full">
           <AppSideBar />
 

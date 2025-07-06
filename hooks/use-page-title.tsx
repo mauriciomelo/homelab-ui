@@ -27,5 +27,5 @@ export function usePageInfo() {
   const pathname = usePathname();
   const page = _.get(pathMap, pathname, defaultPageInfo);
 
-  return page;
+  return { ...page, pathname };
 }

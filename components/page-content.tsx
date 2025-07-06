@@ -7,7 +7,7 @@ export function PageContent({
   return (
     <div
       className={cn(
-        "m-3 flex w-fit flex-1 flex-col gap-4 rounded-lg p-6",
+        "mx-2 my-8 flex w-fit flex-1 flex-col gap-4 rounded-lg p-6",
         className,
       )}
     >

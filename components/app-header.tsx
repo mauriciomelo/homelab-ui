@@ -5,7 +5,7 @@ import { useAppSideBar } from "./app-sidebar";
 import { cn } from "@/lib/utils";
 import { usePageInfo } from "@/hooks/use-page-title";
 
-export function PageHeader() {
+export function AppHeader() {
   const sidebar = useAppSideBar();
   const pageInfo = usePageInfo();
 
@@ -16,7 +16,7 @@ export function PageHeader() {
         // @ts-expect-error electron types are not available in this context
         appRegion: "drag",
       }}
-      className="bg-sidebar-accent flex h-20 w-full items-center gap-2 transition-[width,height] ease-linear"
+      className="flex h-20 w-full items-center gap-2 bg-gray-100 transition-[width,height] ease-linear"
     >
       <div className="flex w-full items-center gap-2 px-4">
         <div
@@ -24,7 +24,7 @@ export function PageHeader() {
             "w-58": sidebar.open,
           })}
         ></div>
-        <h1 id="app-bar-title" className="text-2xl text-gray-600">
+        <h1 id="app-bar-title" className="text-2xl font-light text-gray-600">
           {pageInfo.title}
         </h1>
 

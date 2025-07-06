@@ -20,7 +20,7 @@ import { DEVICE_STATUS } from "@/app/api/schemas";
 import { useMemo, useState } from "react";
 import { Status } from "@/components/ui/status";
 import { Button } from "@/components/ui/button";
-import { MiniPCScene } from "./mini-pc";
+import { MINI_PC_MODEL, MiniPCScene } from "./mini-pc";
 import {
   SheetContent,
   SheetHeader,
@@ -59,6 +59,7 @@ import _ from "lodash";
 import { App } from "@/app/api/applications";
 import { AppIcon } from "@/components/app-icon";
 import { useTransition, animated } from "@react-spring/web";
+import { useGLTF } from "@react-three/drei";
 
 type Device = DiscoveredNode | (ClusterNode & { port?: number });
 
@@ -180,10 +181,18 @@ export function Devices() {
               <TableHead className="w-2">
                 <span className="sr-only">Status</span>
               </TableHead>
-              <TableHead className="w-38">Device</TableHead>
-              <TableHead className="w-35">Status</TableHead>
-              <TableHead className="w-35">IP Address</TableHead>
-              <TableHead>Running Apps</TableHead>
+              <TableHead className="w-38 font-medium text-gray-600">
+                Device
+              </TableHead>
+              <TableHead className="w-35 font-medium text-gray-600">
+                Status
+              </TableHead>
+              <TableHead className="w-35 font-medium text-gray-600">
+                IP Address
+              </TableHead>
+              <TableHead className="font-medium text-gray-600">
+                Running Apps
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -213,6 +222,8 @@ export function Devices() {
                     {device.status === DEVICE_STATUS.NEW ? (
                       <Button
                         size="sm"
+                        variant={"outline"}
+                        className="animate-pulse border-blue-500 text-blue-500 hover:border-blue-600 hover:text-blue-600"
                         onClick={() => handleAdoptDevice(device)}
                         disabled={adoptDeviceMutation.isPending}
                       >
@@ -521,3 +532,4 @@ function NodeDetails({ node }: { node: Device }) {
     </div>
   );
 }
+useGLTF.preload(MINI_PC_MODEL);

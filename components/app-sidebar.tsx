@@ -11,7 +11,7 @@ import { useContext, useState } from "react";
 
 import { createContext } from "react";
 import { cn } from "@/lib/utils";
-import { pathMap } from "@/hooks/use-page-title";
+import { pathMap, usePageInfo } from "@/hooks/use-page-title";
 
 const AppSideBarContext = createContext({
   open: true,
@@ -47,7 +47,7 @@ export function AppSideBar() {
     >
       <Button
         variant="ghost"
-        className="mb-2 w-12"
+        className="mb-4 w-12"
         onClick={() => setOpen(!open)}
       >
         {open ? <PanelLeftClose /> : <PanelLeftOpen />}
@@ -89,6 +89,10 @@ function SidebarButton({
 }) {
   const IconComponent = icon;
 
+  const currentPath = usePageInfo().pathname;
+
+  const isActive = currentPath === href;
+
   const collapsed = !useAppSideBar().open;
 
   return (
@@ -99,6 +103,7 @@ function SidebarButton({
           size="lg"
           className={cn("w-full justify-start", {
             "mb-4": collapsed,
+            "bg-gray-200": isActive,
           })}
           asChild
         >

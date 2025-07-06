@@ -7,7 +7,7 @@ import { useSpring, animated } from "@react-spring/three";
 import { DeviceStatus } from "@/app/api/schemas";
 import { statusLedProps } from "./statusLedProps";
 
-const miniPcModelPath = "/models/minipc.gltf";
+export const MINI_PC_MODEL = "/models/minipc.gltf";
 
 type VectorLike = [number, number, number];
 
@@ -29,7 +29,7 @@ function MiniPC({
   status: DeviceStatus;
   adopting: boolean;
 }) {
-  const { scene } = useGLTF(miniPcModelPath);
+  const { scene } = useGLTF(MINI_PC_MODEL);
 
   const led = statusLedProps(status);
   const ledColor = adaptLedColor(led.color);
@@ -43,8 +43,8 @@ function MiniPC({
   const { scale, rotation, position } = useSpring({
     from: {
       scale: 1,
-      rotation: [-0.9, -0.8, -0.2] satisfies VectorLike,
-      position: [3, -2, -4] satisfies VectorLike,
+      rotation: [-0.5, -1, 0] satisfies VectorLike,
+      position: [3, -3, -7] satisfies VectorLike,
     },
     to: {
       scale: adopting ? 0.9 : 1,
@@ -103,12 +103,12 @@ export function MiniPCScene({
   adopting: boolean;
 }) {
   return (
-    <div className="w-full h-[200px] rounded-lg overflow-hidden ">
-      <Canvas camera={{ position: [0, 0.7, 5], fov: 30 }}>
+    <div className="h-[150px] w-full overflow-hidden rounded-lg">
+      <Canvas camera={{ position: [0, 0.7, 5], fov: 25 }}>
         <ambientLight intensity={0.4} />
         <directionalLight position={[10, 10, 5]} intensity={0.8} />
         <MiniPC status={status} adopting={adopting} />
-        <Environment preset="studio" environmentIntensity={0.2} />
+        <Environment preset="studio" environmentIntensity={0.15} />
         <OrbitControls
           enableZoom={false}
           enablePan={false}
@@ -119,5 +119,3 @@ export function MiniPCScene({
     </div>
   );
 }
-
-useGLTF.preload(miniPcModelPath);

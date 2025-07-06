@@ -42,8 +42,12 @@ export function Apps() {
                 <span className="sr-only">Status</span>
               </TableHead>
               <TableHead className="w-8"></TableHead>
-              <TableHead className="w-[200px]">App</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="w-[200px] font-medium text-gray-600">
+                App
+              </TableHead>
+              <TableHead className="font-medium text-gray-600">
+                Status
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
