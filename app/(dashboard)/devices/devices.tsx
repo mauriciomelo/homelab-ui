@@ -59,7 +59,13 @@ import { App } from "@/app/api/applications";
 import { AppIcon } from "@/components/app-icon";
 import { useTransition, animated } from "@react-spring/web";
 import { useGLTF } from "@react-three/drei";
-
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 type Device = DiscoveredNode | (ClusterNode & { port?: number });
 
 function nodeApps(apps: App[], nodeName: string) {
@@ -223,11 +229,32 @@ export function Devices() {
                 <TableCell className="w-2">
                   <Status {...statusLedProps(device.status)} />
                 </TableCell>
-                <TableCell
-                  onClick={() => handleOpenNodeDetails(device)}
-                  className="cursor-pointer overflow-hidden font-medium overflow-ellipsis"
-                >
-                  {device.name}
+                <TableCell className="overflow-hidden font-medium overflow-ellipsis">
+                  <ContextMenu>
+                    <ContextMenuTrigger>
+                      <Button
+                        onClick={() => handleOpenNodeDetails(device)}
+                        variant="link"
+                      >
+                        {device.name}
+                      </Button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        onClick={() => handleOpenNodeDetails(device)}
+                      >
+                        View Details
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        className="text-red-500"
+                        onClick={() => handleOpenResetNode(device)}
+                      >
+                        <RotateCcw className="text-red-500" />
+                        Factory Reset
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 </TableCell>
 
                 <TableCell
@@ -265,7 +292,7 @@ export function Devices() {
           </TableBody>
         </Table>
 
-        <DeleteDeviceDialog
+        <ResetDeviceDialog
           open={activeModal === "resetNode"}
           device={selected}
           close={handleCloseModal}
@@ -392,7 +419,7 @@ export function Devices() {
   );
 }
 
-function DeleteDeviceDialog({
+function ResetDeviceDialog({
   device,
   close,
   open,
@@ -438,11 +465,12 @@ function DeleteDeviceDialog({
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Reset Device</AlertDialogTitle>
+          <AlertDialogTitle>Reset {device?.name}</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to reset this device? This action cannot be
-            undone. All data and configurations will be permanently deleted, and
-            the device will be restored to factory settings.
+            Are you sure you want to reset <strong>{device?.name}</strong>? This
+            action cannot be undone. All data and configurations will be
+            permanently deleted, and the device will be restored to factory
+            settings.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
