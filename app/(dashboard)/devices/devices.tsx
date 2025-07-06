@@ -43,6 +43,7 @@ import {
 import {
   Cpu,
   HardDrive,
+  Icon,
   LineChart,
   MemoryStick,
   Monitor,
@@ -50,6 +51,7 @@ import {
   RotateCcw,
   Tag,
 } from "lucide-react";
+import { faucet } from "@lucide/lab";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageContent } from "@/components/page-content";
 import { DiscoveredNode } from "@/mdns";
@@ -175,6 +177,10 @@ export function Devices() {
 
   const adoptDeviceMutation = useMutation(trpc.adoptDevice.mutationOptions());
 
+  const drainCurrentNodeAppsMutation = useMutation(
+    trpc.drainCurrentNodeApps.mutationOptions(),
+  );
+
   const handleAdoptDevice = async (device: Device) => {
     assert(typeof device.port === "number", "Port is required");
     await adoptDeviceMutation.mutateAsync({
@@ -260,6 +266,16 @@ export function Devices() {
                         View Details
                       </ContextMenuItem>
                       <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onClick={() =>
+                          drainCurrentNodeAppsMutation.mutate({
+                            name: device.name,
+                          })
+                        }
+                      >
+                        <Icon iconNode={faucet} />
+                        Drain
+                      </ContextMenuItem>
                       <ContextMenuItem
                         className="text-red-500"
                         onClick={() => handleOpenResetNode(device)}

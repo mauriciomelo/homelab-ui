@@ -159,6 +159,20 @@ function cordonNode(nodeName: string) {
   });
 }
 
+export function uncordonNode(nodeName: string) {
+  const coreApi = k8s.coreApi();
+  const patch = {
+    op: "replace",
+    path: "/spec/unschedulable",
+    value: false,
+  };
+
+  return coreApi.patchNode({
+    name: nodeName,
+    body: [patch],
+  });
+}
+
 export async function getPodsForNode(nodeName: string) {
   const coreApi = k8s.coreApi();
   const allPods = await coreApi.listPodForAllNamespaces({

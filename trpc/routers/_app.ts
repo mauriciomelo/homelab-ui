@@ -7,6 +7,7 @@ import {
   getPodsForNode,
   deleteNode,
   drainNode,
+  uncordonNode,
 } from "@/app/api/devices";
 import { getDiscoveredNodes } from "@/mdns";
 import { exec } from "child_process";
@@ -92,18 +93,7 @@ export const appRouter = createTRPCRouter({
     .mutation(async (opts) => {
       const { name, ip, port } = opts.input;
 
-      await drainNode(name);
-
-      try {
-        await waitFor(async () => {
-          const pods = await getPodsForNode(name);
-          return pods.length === 0;
-        });
-      } catch (error) {
-        console.warn(`Timeout while draining node ${name}:`, error);
-        console.warn("Remaining pods:", await getPodsForNode(name));
-      }
-
+      await drainAndWait(name);
       await deleteNode(name);
 
       await remoteReset({ ip, port });
@@ -113,7 +103,34 @@ export const appRouter = createTRPCRouter({
         return !nodes.some((node) => node.ip === ip);
       });
     }),
+
+  drainCurrentNodeApps: baseProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(100),
+      }),
+    )
+    .mutation(async (opts) => {
+      const { name } = opts.input;
+
+      await drainAndWait(name);
+      await uncordonNode(name);
+    }),
 });
+
+async function drainAndWait(name: string) {
+  await drainNode(name);
+
+  try {
+    await waitFor(async () => {
+      const pods = await getPodsForNode(name);
+      return pods.length === 0;
+    });
+  } catch (error) {
+    console.warn(`Timeout while draining node ${name}:`, error);
+    console.warn("Remaining pods:", await getPodsForNode(name));
+  }
+}
 
 async function remoteReset({ ip, port }: { ip: string; port: number }) {
   const remoteNodeUrl = `http://${ip}:${port}/api/reset`;
