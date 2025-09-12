@@ -1,8 +1,8 @@
-"use client";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray, useForm } from "react-hook-form";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
+'use client';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -11,19 +11,19 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Loader2Icon, Plus, Rocket, Trash2 } from "lucide-react";
-import type { App } from "@/app/api/applications";
-import { appFormSchema } from "./formSchema";
-import { updateApp } from "./actions";
-import { Separator } from "@radix-ui/react-separator";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Loader2Icon, Plus, Rocket, Trash2 } from 'lucide-react';
+import type { App } from '@/app/api/applications';
+import { appFormSchema } from './formSchema';
+import { updateApp } from './actions';
+import { Separator } from '@radix-ui/react-separator';
+import { cn } from '@/lib/utils';
 
 type FormData = z.infer<typeof appFormSchema>;
 
 export function ApplicationForm(props: {
-  data: App["spec"];
+  data: App['spec'];
   className?: string;
 }) {
   const form = useForm<FormData>({
@@ -37,11 +37,11 @@ export function ApplicationForm(props: {
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: "envVariables",
+    name: 'envVariables',
   });
 
   const addEnvVariable = () => {
-    append({ name: "", value: "" });
+    append({ name: '', value: '' });
   };
 
   const removeEnvVariable = (index: number) => {
@@ -53,7 +53,7 @@ export function ApplicationForm(props: {
   return (
     <Form {...form}>
       <form
-        className={cn("space-y-4", props.className)}
+        className={cn('space-y-4', props.className)}
         onSubmit={form.handleSubmit(async (data) => {
           const result = await updateApp(data);
           console.log(result);
@@ -64,7 +64,7 @@ export function ApplicationForm(props: {
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-base font-medium flex items-center gap-2">
+              <FormLabel className="flex items-center gap-2 text-base font-medium">
                 App Name
               </FormLabel>
               <FormControl>
@@ -85,13 +85,13 @@ export function ApplicationForm(props: {
           name="image"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-base font-medium flex items-center gap-2">
+              <FormLabel className="flex items-center gap-2 text-base font-medium">
                 Container Image
               </FormLabel>
               <FormControl>
                 <Input
                   placeholder="nginx:latest or registry.example.com/my-app:v1.0.0"
-                  className="text-base font-mono"
+                  className="font-mono text-base"
                   {...field}
                 />
               </FormControl>
@@ -112,13 +112,13 @@ export function ApplicationForm(props: {
           control={form.control}
           name="envVariables"
           render={() => {
-            const fieldClassName = "font-mono text-sm m-0";
+            const fieldClassName = 'font-mono text-sm m-0';
             return (
               <div className="space-y-2">
                 {fields.map((item, index) => (
                   <div
                     key={item.id}
-                    className="flex gap-2  border-gray-200 border rounded-md p-2 items-center"
+                    className="flex items-center gap-2 rounded-md border border-gray-200 p-2"
                   >
                     <FormField
                       control={form.control}
@@ -130,7 +130,7 @@ export function ApplicationForm(props: {
                               placeholder="VARIABLE_NAME"
                               className={cn(
                                 fieldClassName,
-                                "text-blue-700 w-[200px]"
+                                'w-[200px] text-blue-700',
                               )}
                               {...field}
                             />
@@ -175,7 +175,7 @@ export function ApplicationForm(props: {
                   onClick={addEnvVariable}
                   className="w-full"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="mr-2 h-4 w-4" />
                   Add Environment Variable
                 </Button>
               </div>
@@ -191,7 +191,7 @@ export function ApplicationForm(props: {
             </Button>
           ) : (
             <Button type="submit" className="flex-1">
-              <Rocket className="h-4 w-4 mr-2" />
+              <Rocket className="mr-2 h-4 w-4" />
               Update
             </Button>
           )}

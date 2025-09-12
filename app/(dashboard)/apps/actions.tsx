@@ -1,7 +1,7 @@
-"use server";
+'use server';
 
-import { appFormSchema } from "./formSchema";
-import * as apps from "@/app/api/applications";
+import { appFormSchema } from './formSchema';
+import * as apps from '@/app/api/applications';
 
 export async function updateApp(data: unknown) {
   const app = appFormSchema.parse(data);

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { ChevronsUpDown, FlaskConical, House, Plus } from "lucide-react";
+import * as React from 'react';
+import { ChevronsUpDown, FlaskConical, House, Plus } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -11,8 +11,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "./ui/button";
+} from '@/components/ui/dropdown-menu';
+import { Button } from './ui/button';
 
 export function ClusterSwitcher() {
   const clusterList = [
@@ -21,7 +21,7 @@ export function ClusterSwitcher() {
       logo: FlaskConical,
     },
     {
-      name: "Home",
+      name: 'Home',
       logo: House,
     },
   ];
@@ -48,7 +48,7 @@ export function ClusterSwitcher() {
       <DropdownMenuContent
         className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
         align="start"
-        side={"bottom"}
+        side={'bottom'}
         sideOffset={4}
       >
         <DropdownMenuLabel className="text-muted-foreground text-xs">

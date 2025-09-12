@@ -1,6 +1,6 @@
-import { spawn } from "child_process";
-import { z } from "zod/v4";
-import path from "path";
+import { spawn } from 'child_process';
+import { z } from 'zod/v4';
+import path from 'path';
 
 const joinSchema = z.object({
   token: z.string().min(1).max(300),
@@ -12,35 +12,35 @@ export async function POST(req: Request) {
   const { token, serverUrl } = joinSchema.parse(body);
 
   // Get the absolute path to join_cluster.sh to avoid privilege escalation issues
-  const scriptPath = path.resolve(process.cwd(), "join_cluster.sh");
+  const scriptPath = path.resolve(process.cwd(), 'join_cluster.sh');
 
   const res = new Promise((resolve, reject) => {
-    let stdout = "";
-    let stderr = "";
+    let stdout = '';
+    let stderr = '';
 
     // TODO: make sure the token is sanitized to avoid injection attacks
     const cmd = spawn(
-      "sudo",
+      'sudo',
       [scriptPath, `--token=${token}`, `--url=${serverUrl}`],
       {
         shell: false,
-      }
+      },
     );
 
-    cmd.stdout.on("data", (data) => {
+    cmd.stdout.on('data', (data) => {
       const log = data.toString();
       console.log(log);
       stdout += log;
     });
-    cmd.stderr.on("data", (data) => {
+    cmd.stderr.on('data', (data) => {
       const log = data.toString();
       console.error(log);
       stderr += log;
     });
-    cmd.on("error", (error) => {
+    cmd.on('error', (error) => {
       reject(error);
     });
-    cmd.on("close", (code) => {
+    cmd.on('close', (code) => {
       resolve({
         code,
         stdout,

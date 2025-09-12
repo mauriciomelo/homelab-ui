@@ -1,17 +1,17 @@
-"use client";
-import Link from "next/link";
+'use client';
+import Link from 'next/link';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Button } from "./ui/button";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useContext, useState } from "react";
+} from '@/components/ui/tooltip';
+import { Button } from './ui/button';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { useContext, useState } from 'react';
 
-import { createContext } from "react";
-import { cn } from "@/lib/utils";
-import { pathMap, usePageInfo } from "@/hooks/use-page-title";
+import { createContext } from 'react';
+import { cn } from '@/lib/utils';
+import { pathMap, usePageInfo } from '@/hooks/use-page-title';
 
 const AppSideBarContext = createContext({
   open: true,
@@ -54,24 +54,24 @@ export function AppSideBar() {
       </Button>
 
       <SidebarButton
-        icon={pathMap["/"].icon}
-        title={pathMap["/"].title}
+        icon={pathMap['/'].icon}
+        title={pathMap['/'].title}
         href="/"
       />
       <SidebarButton
-        icon={pathMap["/apps"].icon}
-        title={pathMap["/apps"].title}
+        icon={pathMap['/apps'].icon}
+        title={pathMap['/apps'].title}
         href="/apps"
       />
       <SidebarButton
-        icon={pathMap["/devices"].icon}
-        title={pathMap["/devices"].title}
+        icon={pathMap['/devices'].icon}
+        title={pathMap['/devices'].title}
         href="/devices"
       />
       <div className="grow-1"></div>
       <SidebarButton
-        icon={pathMap["/settings"].icon}
-        title={pathMap["/settings"].title}
+        icon={pathMap['/settings'].icon}
+        title={pathMap['/settings'].title}
         href="/settings"
       />
     </div>
@@ -101,9 +101,9 @@ function SidebarButton({
         <Button
           variant="ghost"
           size="lg"
-          className={cn("w-full justify-start", {
-            "mb-4": collapsed,
-            "bg-gray-200": isActive,
+          className={cn('w-full justify-start', {
+            'mb-4': collapsed,
+            'bg-gray-200': isActive,
           })}
           asChild
         >

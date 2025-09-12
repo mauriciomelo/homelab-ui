@@ -1,4 +1,4 @@
-import * as k8s from "@kubernetes/client-node";
+import * as k8s from '@kubernetes/client-node';
 
 export function coreApi() {
   const kc = new k8s.KubeConfig();

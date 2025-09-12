@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -120,7 +120,6 @@
     @apply bg-background text-foreground;
   }
 }
-
 
 body {
   /* workaround for the shadcn dialog bug related to https://github.com/shadcn-ui/ui/discussions/6116 */

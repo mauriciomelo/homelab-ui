@@ -1,6 +1,6 @@
-import { z } from "zod";
-import { baseProcedure, createTRPCRouter } from "../init";
-import { getApps, restartApp } from "@/app/api/applications";
+import { z } from 'zod';
+import { baseProcedure, createTRPCRouter } from '../init';
+import { getApps, restartApp } from '@/app/api/applications';
 import {
   createBootstrapToken,
   devices,
@@ -8,11 +8,11 @@ import {
   deleteNode,
   drainNode,
   uncordonNode,
-} from "@/app/api/devices";
-import { getDiscoveredNodes } from "@/mdns";
-import { exec } from "child_process";
-import util from "util";
-import axios from "axios";
+} from '@/app/api/devices';
+import { getDiscoveredNodes } from '@/mdns';
+import { exec } from 'child_process';
+import util from 'util';
+import axios from 'axios';
 
 export const appRouter = createTRPCRouter({
   apps: baseProcedure.query(() => {
@@ -128,7 +128,7 @@ async function drainAndWait(name: string) {
     });
   } catch (error) {
     console.warn(`Timeout while draining node ${name}:`, error);
-    console.warn("Remaining pods:", await getPodsForNode(name));
+    console.warn('Remaining pods:', await getPodsForNode(name));
   }
 }
 
@@ -156,5 +156,5 @@ async function waitFor(
     if (result) return true;
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
-  throw new Error("Operation timed out");
+  throw new Error('Operation timed out');
 }

@@ -1,10 +1,10 @@
-import "server-only";
-import * as _ from "lodash";
-import { DEVICE_STATUS } from "./schemas";
-import crypto from "crypto";
-import assert from "assert";
-import * as k8s from "./k8s";
-import { V1Eviction, V1Pod } from "@kubernetes/client-node";
+import 'server-only';
+import * as _ from 'lodash';
+import { DEVICE_STATUS } from './schemas';
+import crypto from 'crypto';
+import assert from 'assert';
+import * as k8s from './k8s';
+import { V1Eviction, V1Pod } from '@kubernetes/client-node';
 
 export type ClusterNode = Awaited<ReturnType<typeof devices>>[number];
 
@@ -13,14 +13,14 @@ export async function devices() {
   const nodes = await coreApi.listNode();
   return nodes.items.map((node) => {
     const readyStatus =
-      node?.status?.conditions?.find((condition) => condition.type === "Ready")
-        ?.status || "Unknown";
+      node?.status?.conditions?.find((condition) => condition.type === 'Ready')
+        ?.status || 'Unknown';
 
     const status = nodeStatus(readyStatus);
 
     const info = node.status?.nodeInfo;
     const nodeInfo = {
-      architecture: info?.architecture === "amd64" ? "x64" : info?.architecture,
+      architecture: info?.architecture === 'amd64' ? 'x64' : info?.architecture,
       operatingSystem: info?.operatingSystem,
       osImage: info?.osImage,
     };
@@ -29,17 +29,17 @@ export async function devices() {
     const allocable = node.status?.allocatable;
 
     const isMaster =
-      node.metadata?.labels?.["node-role.kubernetes.io/control-plane"] ===
-        "true" &&
-      node.metadata?.labels?.["node-role.kubernetes.io/master"] === "true";
+      node.metadata?.labels?.['node-role.kubernetes.io/control-plane'] ===
+        'true' &&
+      node.metadata?.labels?.['node-role.kubernetes.io/master'] === 'true';
 
     const ip = node.status?.addresses?.find(
-      (addr) => addr.type === "InternalIP",
+      (addr) => addr.type === 'InternalIP',
     )?.address;
     const name = node.metadata?.name;
 
-    assert(typeof ip === "string", "IP should should be a string");
-    assert(typeof name === "string", "Name should be a string");
+    assert(typeof ip === 'string', 'IP should should be a string');
+    assert(typeof name === 'string', 'Name should be a string');
 
     return {
       name,
@@ -54,11 +54,11 @@ export async function devices() {
 }
 
 function nodeStatus(status: string) {
-  if (status === "True") {
+  if (status === 'True') {
     return DEVICE_STATUS.HEALTHY;
   }
 
-  if (status === "False") {
+  if (status === 'False') {
     return DEVICE_STATUS.UNHEALTHY;
   }
 
@@ -66,52 +66,52 @@ function nodeStatus(status: string) {
 }
 
 export async function createBootstrapToken() {
-  const tokenId = crypto.randomBytes(3).toString("hex");
-  const tokenSecret = crypto.randomBytes(8).toString("hex");
+  const tokenId = crypto.randomBytes(3).toString('hex');
+  const tokenSecret = crypto.randomBytes(8).toString('hex');
 
   // Token expires in 10 minutes
   const expiration = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
   const secret = {
-    apiVersion: "v1",
-    kind: "Secret",
+    apiVersion: 'v1',
+    kind: 'Secret',
     metadata: {
       name: `bootstrap-token-${tokenId}`,
-      namespace: "kube-system",
+      namespace: 'kube-system',
     },
-    type: "bootstrap.kubernetes.io/token",
+    type: 'bootstrap.kubernetes.io/token',
     stringData: {
-      "token-id": tokenId,
-      "token-secret": tokenSecret,
-      "usage-bootstrap-signing": "true",
-      "usage-bootstrap-authentication": "true",
+      'token-id': tokenId,
+      'token-secret': tokenSecret,
+      'usage-bootstrap-signing': 'true',
+      'usage-bootstrap-authentication': 'true',
       expiration: expiration,
-      "auth-extra-groups": "system:bootstrappers:k3s:default-node-token",
-      description: "homelab-ui generated bootstrap token",
+      'auth-extra-groups': 'system:bootstrappers:k3s:default-node-token',
+      description: 'homelab-ui generated bootstrap token',
     },
   };
   const coreApi = k8s.coreApi();
 
   await coreApi.createNamespacedSecret({
-    namespace: "kube-system",
+    namespace: 'kube-system',
     body: secret,
   });
 
   const cm = await coreApi.readNamespacedConfigMap({
-    namespace: "kube-system",
-    name: "kube-root-ca.crt",
+    namespace: 'kube-system',
+    name: 'kube-root-ca.crt',
   });
 
-  const caCrt = cm.data?.["ca.crt"];
+  const caCrt = cm.data?.['ca.crt'];
 
   if (!caCrt) {
-    throw new Error("ca.crt not found in kube-root-ca.crt ConfigMap");
+    throw new Error('ca.crt not found in kube-root-ca.crt ConfigMap');
   }
 
-  const shasum = crypto.createHash("sha256");
+  const shasum = crypto.createHash('sha256');
   shasum.update(caCrt);
-  const caCertHash = shasum.digest("hex");
-  const formatPrefix = "K10";
+  const caCertHash = shasum.digest('hex');
+  const formatPrefix = 'K10';
   const joinToken = `${formatPrefix}${caCertHash}::${tokenId}.${tokenSecret}`;
 
   return {
@@ -127,7 +127,7 @@ export async function deleteNode(nodeName: string) {
     const coreApi = k8s.coreApi();
     await coreApi.deleteNode({ name: nodeName });
   } catch (error) {
-    if (_.get(error, "code") === 404) {
+    if (_.get(error, 'code') === 404) {
       return;
     }
 
@@ -148,8 +148,8 @@ export async function drainNode(nodeName: string) {
 function cordonNode(nodeName: string) {
   const coreApi = k8s.coreApi();
   const patch = {
-    op: "replace",
-    path: "/spec/unschedulable",
+    op: 'replace',
+    path: '/spec/unschedulable',
     value: true,
   };
 
@@ -162,8 +162,8 @@ function cordonNode(nodeName: string) {
 export function uncordonNode(nodeName: string) {
   const coreApi = k8s.coreApi();
   const patch = {
-    op: "replace",
-    path: "/spec/unschedulable",
+    op: 'replace',
+    path: '/spec/unschedulable',
     value: false,
   };
 
@@ -177,7 +177,7 @@ export async function getPodsForNode(nodeName: string) {
   const coreApi = k8s.coreApi();
   const allPods = await coreApi.listPodForAllNamespaces({
     fieldSelector: `spec.nodeName=${nodeName}`,
-    labelSelector: "app-type=user",
+    labelSelector: 'app-type=user',
   });
 
   return allPods.items;
@@ -199,8 +199,8 @@ async function evictPods(pods: V1Pod[]) {
 
     try {
       const eviction = {
-        apiVersion: "policy/v1",
-        kind: "Eviction",
+        apiVersion: 'policy/v1',
+        kind: 'Eviction',
         metadata: {
           name: pod.metadata.name,
           namespace: pod.metadata.namespace,

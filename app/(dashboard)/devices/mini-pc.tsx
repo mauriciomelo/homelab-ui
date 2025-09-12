@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Environment, useGLTF } from "@react-three/drei";
-import * as THREE from "three";
-import { useSpring, animated } from "@react-spring/three";
-import { DeviceStatus } from "@/app/api/schemas";
-import { statusLedProps } from "./statusLedProps";
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Environment, useGLTF } from '@react-three/drei';
+import * as THREE from 'three';
+import { useSpring, animated } from '@react-spring/three';
+import { DeviceStatus } from '@/app/api/schemas';
+import { statusLedProps } from './statusLedProps';
 
-export const MINI_PC_MODEL = "/models/minipc.gltf";
+export const MINI_PC_MODEL = '/models/minipc.gltf';
 
 type VectorLike = [number, number, number];
 
-type LedColor = ReturnType<typeof statusLedProps>["color"];
+type LedColor = ReturnType<typeof statusLedProps>['color'];
 
 function adaptLedColor(color: LedColor): string {
   switch (color) {
-    case "blue":
-      return "#00346e";
+    case 'blue':
+      return '#00346e';
     default:
       return color;
   }

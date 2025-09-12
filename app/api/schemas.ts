@@ -1,8 +1,8 @@
-import * as z from "zod";
+import * as z from 'zod';
 
 export const kustomizationSchema = z.object({
   apiVersion: z.string(),
-  kind: z.literal("Kustomization"),
+  kind: z.literal('Kustomization'),
   metadata: z.object({
     name: z.string(),
   }),
@@ -12,7 +12,7 @@ export const kustomizationSchema = z.object({
 
 export const ingressSchema = z.object({
   apiVersion: z.string(),
-  kind: z.literal("Ingress"),
+  kind: z.literal('Ingress'),
   metadata: z.object({
     name: z.string(),
     annotations: z.record(z.string(), z.string()),
@@ -25,7 +25,7 @@ export const ingressSchema = z.object({
           paths: z.array(
             z.object({
               path: z.string(),
-              pathType: z.literal("Prefix"),
+              pathType: z.literal('Prefix'),
               backend: z.object({
                 service: z.object({
                   name: z.string(),
@@ -34,17 +34,17 @@ export const ingressSchema = z.object({
                   }),
                 }),
               }),
-            })
+            }),
           ),
         }),
-      })
+      }),
     ),
   }),
 });
 
 export const deploymentSchema = z.object({
   apiVersion: z.string(),
-  kind: z.literal("Deployment"),
+  kind: z.literal('Deployment'),
   metadata: z.object({
     name: z.string(),
   }),
@@ -69,9 +69,9 @@ export const deploymentSchema = z.object({
               z.object({
                 name: z.string(),
                 value: z.string(),
-              })
+              }),
             ),
-          })
+          }),
         ),
       }),
     }),
@@ -79,18 +79,18 @@ export const deploymentSchema = z.object({
 });
 
 export const APP_STATUS = {
-  RUNNING: "Running",
-  PENDING: "Pending",
-  UNKNOWN: "Unknown",
+  RUNNING: 'Running',
+  PENDING: 'Pending',
+  UNKNOWN: 'Unknown',
 } as const;
 
 export type AppStatus = (typeof APP_STATUS)[keyof typeof APP_STATUS];
 
 export const DEVICE_STATUS = {
-  HEALTHY: "Healthy",
-  UNHEALTHY: "Unhealthy",
-  OFFLINE: "Offline",
-  NEW: "New",
+  HEALTHY: 'Healthy',
+  UNHEALTHY: 'Unhealthy',
+  OFFLINE: 'Offline',
+  NEW: 'New',
 } as const;
 
 export type DeviceStatus = (typeof DEVICE_STATUS)[keyof typeof DEVICE_STATUS];

@@ -1,5 +1,5 @@
-import { PageContent } from "@/components/page-content";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PageContent } from '@/components/page-content';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function PageSkeleton() {
   return (

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 import {
   Table,
   TableBody,
@@ -7,29 +7,29 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/client";
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+import { useTRPC } from '@/trpc/client';
 import {
   useIsMutating,
   useMutation,
   useQuery,
   useQueryClient,
-} from "@tanstack/react-query";
-import { DEVICE_STATUS } from "@/app/api/schemas";
-import { useMemo, useState } from "react";
-import { Status } from "@/components/ui/status";
-import { Button } from "@/components/ui/button";
-import { MINI_PC_MODEL, MiniPCScene } from "./mini-pc";
+} from '@tanstack/react-query';
+import { DEVICE_STATUS } from '@/app/api/schemas';
+import { useMemo, useState } from 'react';
+import { Status } from '@/components/ui/status';
+import { Button } from '@/components/ui/button';
+import { MINI_PC_MODEL, MiniPCScene } from './mini-pc';
 import {
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
   Sheet,
-} from "@/components/ui/sheet";
-import { statusLedProps } from "./statusLedProps";
-import assert from "assert";
+} from '@/components/ui/sheet';
+import { statusLedProps } from './statusLedProps';
+import assert from 'assert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +39,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import {
   Cpu,
   HardDrive,
@@ -50,24 +50,24 @@ import {
   Network,
   RotateCcw,
   Tag,
-} from "lucide-react";
-import { faucet } from "@lucide/lab";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PageContent } from "@/components/page-content";
-import { DiscoveredNode } from "@/mdns";
-import { ClusterNode } from "@/app/api/devices";
-import _ from "lodash";
-import { App } from "@/app/api/applications";
-import { AppIcon } from "@/components/app-icon";
-import { useTransition, animated } from "@react-spring/web";
-import { useGLTF } from "@react-three/drei";
+} from 'lucide-react';
+import { faucet } from '@lucide/lab';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PageContent } from '@/components/page-content';
+import { DiscoveredNode } from '@/mdns';
+import { ClusterNode } from '@/app/api/devices';
+import _ from 'lodash';
+import { App } from '@/app/api/applications';
+import { AppIcon } from '@/components/app-icon';
+import { useTransition, animated } from '@react-spring/web';
+import { useGLTF } from '@react-three/drei';
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+} from '@/components/ui/context-menu';
 type Device = DiscoveredNode | (ClusterNode & { port?: number });
 
 function nodeApps(apps: App[], nodeName: string) {
@@ -94,7 +94,7 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
     <div className="flex flex-wrap gap-2">
       {transitions((style, item) => (
         // @ts-expect-error TODO: Upgrade this package, this looks like a bug in react-spring
-        <animated.div style={style} className={cn("size-5", props.className)}>
+        <animated.div style={style} className={cn('size-5', props.className)}>
           <ContextMenu>
             <ContextMenuTrigger>
               <AppIcon app={item} />
@@ -118,7 +118,7 @@ export function Devices() {
   const queryClient = useQueryClient();
 
   const [activeModal, setActiveModal] = useState<
-    "nodeDetails" | "resetNode" | null
+    'nodeDetails' | 'resetNode' | null
   >(null);
 
   // Check if the reset mutation is in progress to pause updates, so the apps animation can happen in bulk.
@@ -182,7 +182,7 @@ export function Devices() {
   );
 
   const handleAdoptDevice = async (device: Device) => {
-    assert(typeof device.port === "number", "Port is required");
+    assert(typeof device.port === 'number', 'Port is required');
     await adoptDeviceMutation.mutateAsync({
       name: device.name,
       ip: device.ip,
@@ -202,11 +202,11 @@ export function Devices() {
 
   const handleOpenNodeDetails = (node: Device) => {
     setSelectedId(node.ip);
-    setActiveModal("nodeDetails");
+    setActiveModal('nodeDetails');
   };
   const handleOpenResetNode = (node: Device) => {
     setSelectedId(node.ip);
-    setActiveModal("resetNode");
+    setActiveModal('resetNode');
   };
 
   const handleCloseModal = () => {
@@ -243,7 +243,7 @@ export function Devices() {
               <TableRow
                 key={`${device.name}-${device.ip}`}
                 className={cn({
-                  "animate-pulse": device.status === DEVICE_STATUS.UNHEALTHY,
+                  'animate-pulse': device.status === DEVICE_STATUS.UNHEALTHY,
                 })}
               >
                 <TableCell className="w-2">
@@ -288,22 +288,22 @@ export function Devices() {
                 </TableCell>
 
                 <TableCell
-                  className={cn("px-2 py-0 font-medium", {
-                    "p-0": device.status === DEVICE_STATUS.NEW,
+                  className={cn('px-2 py-0 font-medium', {
+                    'p-0': device.status === DEVICE_STATUS.NEW,
                   })}
                 >
                   <div className="flex min-h-12 items-center">
                     {device.status === DEVICE_STATUS.NEW ? (
                       <Button
                         size="sm"
-                        variant={"outline"}
+                        variant={'outline'}
                         className="animate-pulse border-blue-500 text-blue-500 hover:border-blue-600 hover:text-blue-600"
                         onClick={() => handleAdoptDevice(device)}
                         disabled={adoptDeviceMutation.isPending}
                       >
                         {adoptDeviceMutation.isPending
-                          ? "Adopting..."
-                          : "Adopt Device"}
+                          ? 'Adopting...'
+                          : 'Adopt Device'}
                       </Button>
                     ) : (
                       device.status
@@ -323,13 +323,13 @@ export function Devices() {
         </Table>
 
         <ResetDeviceDialog
-          open={activeModal === "resetNode"}
+          open={activeModal === 'resetNode'}
           device={selected}
           close={handleCloseModal}
         />
 
         <Sheet
-          open={!!selected && activeModal === "nodeDetails"}
+          open={!!selected && activeModal === 'nodeDetails'}
           onOpenChange={(open) => {
             if (!open) {
               handleCloseModal();
@@ -351,28 +351,28 @@ export function Devices() {
                 </div>
                 <div className="m-4 flex h-22 flex-row items-end">
                   <Alert
-                    className={cn("flex transition-all", {
-                      "flex-col border-blue-400 bg-blue-50 text-blue-900":
+                    className={cn('flex transition-all', {
+                      'flex-col border-blue-400 bg-blue-50 text-blue-900':
                         isNew,
-                      "flex-row items-center justify-between border-none":
+                      'flex-row items-center justify-between border-none':
                         !isNew,
                     })}
                   >
                     <AlertTitle className="flex items-center gap-2 font-medium">
-                      <Status {...statusLedProps(selected.status)} />{" "}
-                      {isNew ? "Ready for adoption" : selected.status}
+                      <Status {...statusLedProps(selected.status)} />{' '}
+                      {isNew ? 'Ready for adoption' : selected.status}
                     </AlertTitle>
                     <AlertDescription
                       className={cn(
-                        "flex flex-row items-center justify-between text-black",
+                        'flex flex-row items-center justify-between text-black',
                         {
-                          "w-full": isNew,
+                          'w-full': isNew,
                         },
                       )}
                     >
                       <div className="flex-1 text-xs text-blue-900">
                         {isNew
-                          ? "Expand cluster capacity by adopting this device."
+                          ? 'Expand cluster capacity by adopting this device.'
                           : null}
                       </div>
 
@@ -382,8 +382,8 @@ export function Devices() {
                           disabled={adoptDeviceMutation.isPending || !isNew}
                         >
                           {adoptDeviceMutation.isPending
-                            ? "Adopting..."
-                            : "Adopt Device"}
+                            ? 'Adopting...'
+                            : 'Adopt Device'}
                         </Button>
                       ) : (
                         <Button variant="outline" asChild>
@@ -432,7 +432,7 @@ export function Devices() {
                       }}
                       disabled={
                         isResetting ||
-                        ("isMaster" in selected && selected.isMaster)
+                        ('isMaster' in selected && selected.isMaster)
                       }
                     >
                       <RotateCcw />
@@ -474,7 +474,7 @@ function ResetDeviceDialog({
 
   const handleDelete = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    assert(typeof device?.port === "number", "Port is required");
+    assert(typeof device?.port === 'number', 'Port is required');
     await resetDeviceMutation.mutateAsync({
       name: device.name,
       ip: device.ip,
@@ -512,7 +512,7 @@ function ResetDeviceDialog({
             onClick={handleDelete}
             disabled={resetDeviceMutation.isPending}
           >
-            {resetDeviceMutation.isPending ? "Resetting..." : "Reset Device"}
+            {resetDeviceMutation.isPending ? 'Resetting...' : 'Reset Device'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -521,10 +521,10 @@ function ResetDeviceDialog({
 }
 
 function kibiBytesToGigabytes(size: unknown): string {
-  if (!size || typeof size !== "string") return "Unknown";
-  if (!size.includes("Ki")) return "Unknown";
+  if (!size || typeof size !== 'string') return 'Unknown';
+  if (!size.includes('Ki')) return 'Unknown';
 
-  const sizeInteger = Number.parseInt(size.replace("Ki", ""));
+  const sizeInteger = Number.parseInt(size.replace('Ki', ''));
 
   const gigabytes = sizeInteger / 976600;
 
@@ -532,67 +532,67 @@ function kibiBytesToGigabytes(size: unknown): string {
 }
 
 function NodeDetails({ node }: { node: Device }) {
-  const UNKNOWN = "Unknown";
+  const UNKNOWN = 'Unknown';
 
-  const osImage = node.nodeInfo.osImage ? ` (${node.nodeInfo.osImage})` : "";
+  const osImage = node.nodeInfo.osImage ? ` (${node.nodeInfo.osImage})` : '';
   const storage = kibiBytesToGigabytes(
-    _.get(node, ["capacity", "ephemeral-storage"]),
+    _.get(node, ['capacity', 'ephemeral-storage']),
   );
 
   const memory = kibiBytesToGigabytes(node.capacity?.memory);
 
   const sections = [
     {
-      title: "Info",
+      title: 'Info',
       items: [
         {
-          label: "Name",
+          label: 'Name',
           value: node.name,
           icon: Tag,
-          color: "group-hover:text-blue-500",
+          color: 'group-hover:text-blue-500',
         },
         {
-          label: "Architecture",
+          label: 'Architecture',
           value: node.nodeInfo.architecture || UNKNOWN,
           icon: Cpu,
-          color: "group-hover:text-purple-500",
+          color: 'group-hover:text-purple-500',
         },
         {
-          label: "Operating System",
+          label: 'Operating System',
           value:
             `${_.capitalize(node.nodeInfo.operatingSystem)}${osImage}` ||
             UNKNOWN,
           icon: Monitor,
-          color: "group-hover:text-orange-500",
+          color: 'group-hover:text-orange-500',
         },
         {
-          label: "IP Address",
+          label: 'IP Address',
           value: node.ip,
           icon: Network,
-          color: "group-hover:text-indigo-500",
+          color: 'group-hover:text-indigo-500',
         },
       ],
     },
     {
-      title: "Capacity",
+      title: 'Capacity',
       items: [
         {
-          label: "CPU",
+          label: 'CPU',
           value: node.capacity?.cpu || UNKNOWN,
           icon: Cpu,
-          color: "group-hover:text-purple-500",
+          color: 'group-hover:text-purple-500',
         },
         {
-          label: "Storage",
+          label: 'Storage',
           value: storage,
           icon: HardDrive,
-          color: "group-hover:text-green-500",
+          color: 'group-hover:text-green-500',
         },
         {
-          label: "Memory",
+          label: 'Memory',
           value: memory,
           icon: MemoryStick,
-          color: "group-hover:text-red-500",
+          color: 'group-hover:text-red-500',
         },
       ],
     },

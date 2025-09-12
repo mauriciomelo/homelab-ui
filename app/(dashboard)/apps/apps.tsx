@@ -1,4 +1,4 @@
-"use client";
+'use client';
 import {
   Table,
   TableBody,
@@ -7,24 +7,24 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { ApplicationForm } from "./application-form";
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
-import { APP_STATUS } from "@/app/api/schemas";
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+import { ApplicationForm } from './application-form';
+import { useTRPC } from '@/trpc/client';
+import { useQuery } from '@tanstack/react-query';
+import { APP_STATUS } from '@/app/api/schemas';
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
-import { useState } from "react";
-import { App } from "@/app/api/applications";
-import { Status } from "@/components/ui/status";
-import { PageContent } from "@/components/page-content";
-import { AppIcon, appStatusProps } from "@/components/app-icon";
+} from '@/components/ui/sheet';
+import { useState } from 'react';
+import { App } from '@/app/api/applications';
+import { Status } from '@/components/ui/status';
+import { PageContent } from '@/components/page-content';
+import { AppIcon, appStatusProps } from '@/components/app-icon';
 
 export function Apps() {
   const trpc = useTRPC();
@@ -55,7 +55,7 @@ export function Apps() {
               <TableRow
                 key={app.spec.name}
                 className={cn({
-                  "animate-pulse": app.status === APP_STATUS.PENDING,
+                  'animate-pulse': app.status === APP_STATUS.PENDING,
                 })}
               >
                 <TableCell className="w-2">

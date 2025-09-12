@@ -1,33 +1,33 @@
-"use client";
-import { DeviceStatus, DEVICE_STATUS } from "@/app/api/schemas";
-import { Status } from "@/components/ui/status";
-import { ComponentProps } from "react";
+'use client';
+import { DeviceStatus, DEVICE_STATUS } from '@/app/api/schemas';
+import { Status } from '@/components/ui/status';
+import { ComponentProps } from 'react';
 
 export function statusLedProps(
-  status: DeviceStatus
+  status: DeviceStatus,
 ): ComponentProps<typeof Status> {
   if (status === DEVICE_STATUS.HEALTHY) {
     return {
-      color: "green",
+      color: 'green',
       animate: false,
     };
   }
 
   if (status === DEVICE_STATUS.UNHEALTHY) {
     return {
-      color: "red",
+      color: 'red',
       animate: true,
     };
   }
   if (status === DEVICE_STATUS.NEW) {
     return {
-      color: "blue",
+      color: 'blue',
       animate: true,
     };
   }
 
   return {
-    color: "gray",
+    color: 'gray',
     animate: false,
   };
 }

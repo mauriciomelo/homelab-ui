@@ -1,20 +1,20 @@
-import "server-only";
-import fs from "fs";
-import YAML from "yaml";
-import * as z from "zod";
-import { getAppConfig } from "../(dashboard)/apps/config";
-import path from "path";
-import { AppFormSchema } from "../(dashboard)/apps/formSchema";
-import * as _ from "lodash";
-import git from "isomorphic-git";
-import http from "isomorphic-git/http/node";
+import 'server-only';
+import fs from 'fs';
+import YAML from 'yaml';
+import * as z from 'zod';
+import { getAppConfig } from '../(dashboard)/apps/config';
+import path from 'path';
+import { AppFormSchema } from '../(dashboard)/apps/formSchema';
+import * as _ from 'lodash';
+import git from 'isomorphic-git';
+import http from 'isomorphic-git/http/node';
 import {
   APP_STATUS,
   deploymentSchema,
   ingressSchema,
   kustomizationSchema,
-} from "./schemas";
-import * as k from "./k8s";
+} from './schemas';
+import * as k from './k8s';
 
 export async function getApps() {
   const appDir = getAppsDir();
@@ -29,10 +29,10 @@ export async function getApps() {
 export async function restartApp(name: string) {
   const patch = [
     {
-      op: "replace",
-      path: "/spec/template/metadata/annotations",
+      op: 'replace',
+      path: '/spec/template/metadata/annotations',
       value: {
-        "kubectl.kubernetes.io/restartedAt": new Date().toISOString(),
+        'kubectl.kubernetes.io/restartedAt': new Date().toISOString(),
       },
     },
   ];
@@ -48,11 +48,11 @@ async function getAppByName(name: string) {
 
   const kustomizationFile = await fs.promises.readFile(
     `${appPath}/kustomization.yaml`,
-    "utf-8",
+    'utf-8',
   );
   const ingressFile = await fs.promises.readFile(
     `${appPath}/ingress.yaml`,
-    "utf-8",
+    'utf-8',
   );
 
   const kustomizationData = kustomizationSchema.parse(
@@ -192,14 +192,14 @@ export async function updateApp(spec: AppFormSchema) {
     fs,
     http,
     dir: getAppConfig().PROJECT_DIR,
-    remote: "origin",
-    ref: "main",
+    remote: 'origin',
+    ref: 'main',
     onAuth: () => ({ username: getAppConfig().GITHUB_TOKEN }),
   });
 
   await reconcileFluxGitRepository({
-    name: "flux-system",
-    namespace: "flux-system",
+    name: 'flux-system',
+    namespace: 'flux-system',
   });
 
   return { success: true };
@@ -253,7 +253,7 @@ async function getFile<T>({
   path: string;
   schema: z.ZodType<T>;
 }): Promise<{ data: T; raw: unknown }> {
-  const fileText = await fs.promises.readFile(path, "utf-8");
+  const fileText = await fs.promises.readFile(path, 'utf-8');
 
   const raw = YAML.parse(fileText);
   return { data: schema.parse(raw), raw };
@@ -272,9 +272,9 @@ function getAppsDir() {
   const config = getAppConfig();
   return path.join(
     config.PROJECT_DIR,
-    "clusters",
+    'clusters',
     config.CLUSTER_NAME,
-    "my-applications",
+    'my-applications',
   );
 }
 
@@ -292,10 +292,10 @@ export async function reconcileFluxGitRepository({
 }): Promise<void> {
   const patch = [
     {
-      op: "add",
-      path: "/metadata/annotations",
+      op: 'add',
+      path: '/metadata/annotations',
       value: {
-        "reconcile.fluxcd.io/requestedAt": new Date().toISOString(),
+        'reconcile.fluxcd.io/requestedAt': new Date().toISOString(),
       },
     },
   ];
@@ -303,9 +303,9 @@ export async function reconcileFluxGitRepository({
   try {
     await k.customObjectsApi().patchNamespacedCustomObject({
       namespace,
-      group: "source.toolkit.fluxcd.io",
-      version: "v1",
-      plural: "gitrepositories",
+      group: 'source.toolkit.fluxcd.io',
+      version: 'v1',
+      plural: 'gitrepositories',
       name,
       body: patch,
     });
@@ -314,6 +314,6 @@ export async function reconcileFluxGitRepository({
       `Successfully triggered reconciliation for GitRepository '${name}' in namespace '${namespace}'.`,
     );
   } catch (err) {
-    console.error("Error triggering reconciliation:", err);
+    console.error('Error triggering reconciliation:', err);
   }
 }

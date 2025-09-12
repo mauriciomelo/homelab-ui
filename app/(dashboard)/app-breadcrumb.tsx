@@ -1,4 +1,4 @@
-"use client";
+'use client';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -6,11 +6,11 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { useSelectedLayoutSegments } from "next/navigation";
-import React from "react";
+} from '@/components/ui/breadcrumb';
+import { useSelectedLayoutSegments } from 'next/navigation';
+import React from 'react';
 
-export function AppBreadcrumb({ className }: React.ComponentProps<"nav">) {
+export function AppBreadcrumb({ className }: React.ComponentProps<'nav'>) {
   const segments = useSelectedLayoutSegments();
 
   return (
@@ -31,7 +31,7 @@ export function AppBreadcrumb({ className }: React.ComponentProps<"nav">) {
               ) : (
                 <BreadcrumbItem>
                   <BreadcrumbLink
-                    href={`/${segments.slice(0, index + 1).join("/")}`}
+                    href={`/${segments.slice(0, index + 1).join('/')}`}
                     className="capitalize"
                   >
                     {segment}
