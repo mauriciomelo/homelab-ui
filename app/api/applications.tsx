@@ -112,17 +112,19 @@ async function getAppByName(name: string) {
 
   const appName = kustomizationData.namespace;
 
+  const allEnvironmentVariables =
+    deployment.data.spec.template.spec.containers[0].env || [];
   return {
     name: appName,
     spec: {
       name: appName,
       image: deployment.data.spec.template.spec.containers[0].image,
-      envVariables: deployment.data.spec.template.spec.containers[0].env.map(
-        (env) => ({
+      envVariables: allEnvironmentVariables
+        ?.filter((env) => 'value' in env)
+        .map((env) => ({
           name: env.name,
           value: env.value,
-        }),
-      ),
+        })),
     } satisfies AppFormSchema,
     pods,
     iconUrl: `https://cdn.simpleicons.org/${appName}`,

@@ -1,3 +1,4 @@
+import { a } from '@react-spring/three';
 import * as z from 'zod';
 
 export const kustomizationSchema = z.object({
@@ -65,12 +66,25 @@ export const deploymentSchema = z.object({
           z.object({
             name: z.string(),
             image: z.string(),
-            env: z.array(
-              z.object({
-                name: z.string(),
-                value: z.string(),
-              }),
-            ),
+            env: z
+              .array(
+                z.union([
+                  z.object({
+                    name: z.string(),
+                    value: z.string(),
+                  }),
+                  z.object({
+                    name: z.string(),
+                    valueFrom: z.object({
+                      secretKeyRef: z.object({
+                        key: z.string(),
+                        name: z.string(),
+                      }),
+                    }),
+                  }),
+                ]),
+              )
+              .optional(),
           }),
         ),
       }),
