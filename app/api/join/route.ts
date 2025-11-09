@@ -7,10 +7,13 @@ const joinSchema = z.object({
   serverUrl: z.url().min(1).max(300),
 });
 
-export async function POST(req: Request) {
-  const body = await req.json();
-  const { token, serverUrl } = joinSchema.parse(body);
-
+export function join({
+  token,
+  controlPlaneUrl,
+}: {
+  token: string;
+  controlPlaneUrl: string;
+}) {
   // Get the absolute path to join_cluster.sh to avoid privilege escalation issues
   const scriptPath = path.resolve(process.cwd(), 'join_cluster.sh');
 
@@ -21,7 +24,7 @@ export async function POST(req: Request) {
     // TODO: make sure the token is sanitized to avoid injection attacks
     const cmd = spawn(
       'sudo',
-      [scriptPath, `--token=${token}`, `--url=${serverUrl}`],
+      [scriptPath, `--token=${token}`, `--url=${controlPlaneUrl}`],
       {
         shell: false,
       },
@@ -49,5 +52,12 @@ export async function POST(req: Request) {
     });
   });
 
+  return res;
+}
+
+export async function POST(req: Request) {
+  const body = await req.json();
+  const { token, serverUrl } = joinSchema.parse(body);
+  const res = join({ token, controlPlaneUrl: serverUrl });
   return Response.json(await res);
 }

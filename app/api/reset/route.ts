@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 
-export async function POST() {
+export function reset() {
   const res = new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
@@ -30,6 +30,9 @@ export async function POST() {
       });
     });
   });
+  return res;
+}
 
-  return Response.json(await res);
+export async function POST() {
+  return Response.json(await reset());
 }
