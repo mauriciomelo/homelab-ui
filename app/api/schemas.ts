@@ -1,4 +1,3 @@
-import { a } from '@react-spring/three';
 import * as z from 'zod';
 
 export const kustomizationSchema = z.object({

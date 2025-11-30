@@ -110,6 +110,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      install:
+        specifier: ^0.13.0
+        version: 0.13.0
       isomorphic-git:
         specifier: ^1.30.1
         version: 1.30.1
@@ -153,8 +156,8 @@ importers:
         specifier: ^2.8.0
         version: 2.8.0
       zod:
-        specifier: ^3.25.57
-        version: 3.25.57
+        specifier: ^4.1.13
+        version: 4.1.13
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3
@@ -3130,6 +3133,10 @@ packages:
   inherits@2.0.4:
     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
 
+  install@0.13.0:
+    resolution: {integrity: sha512-zDml/jzr2PKU9I8J/xyZBQn8rPCAY//UOYNmR01XwNwyfhEWObo2SWfSl1+0tm1u6PhxLwDnfsT/6jB7OUxqFA==}
+    engines: {node: '>= 0.10'}
+
   internal-slot@1.1.0:
     resolution: {integrity: sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw==}
     engines: {node: '>= 0.4'}
@@ -4767,6 +4774,9 @@ packages:
 
   zod@3.25.57:
     resolution: {integrity: sha512-6tgzLuwVST5oLUxXTmBqoinKMd3JeesgbgseXeFasKKj8Q1FCZrHnbqJOyiEvr4cVAlbug+CgIsmJ8cl/pU5FA==}
+
+  zod@4.1.13:
+    resolution: {integrity: sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig==}
 
   zustand@4.5.7:
     resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
@@ -7884,6 +7894,8 @@ snapshots:
 
   inherits@2.0.4: {}
 
+  install@0.13.0: {}
+
   internal-slot@1.1.0:
     dependencies:
       es-errors: 1.3.0
@@ -9560,6 +9572,8 @@ snapshots:
       zod: 3.25.57
 
   zod@3.25.57: {}
+
+  zod@4.1.13: {}
 
   zustand@4.5.7(@types/react@19.1.2)(react@19.1.0):
     dependencies:

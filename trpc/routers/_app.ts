@@ -53,7 +53,7 @@ export const appRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(1).max(100),
-        ip: z.string().ip(),
+        ip: z.ipv4(),
         port: z.number().min(1).max(65535),
       }),
     )
@@ -86,7 +86,7 @@ export const appRouter = createTRPCRouter({
     .input(
       z.object({
         name: z.string().min(1).max(100),
-        ip: z.string().ip(),
+        ip: z.ipv4(),
         port: z.number().min(1).max(65535),
       }),
     )

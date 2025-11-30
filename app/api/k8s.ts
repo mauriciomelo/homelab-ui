@@ -6,6 +6,12 @@ export function coreApi() {
   return kc.makeApiClient(k8s.CoreV1Api);
 }
 
+export function apiextensionsV1Api() {
+  const kc = new k8s.KubeConfig();
+  kc.loadFromDefault();
+  return kc.makeApiClient(k8s.ApiextensionsV1Api);
+}
+
 export function customObjectsApi() {
   const kc = new k8s.KubeConfig();
   kc.loadFromDefault();
