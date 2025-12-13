@@ -23,7 +23,17 @@ export async function getApps() {
     .filter((entry) => entry.isDirectory())
     .map((entry) => getAppByName(entry.name));
 
-  return Promise.all(appListPromises);
+  const settled = await Promise.allSettled(appListPromises);
+
+  settled.forEach((result) => {
+    if (result.status === 'rejected') {
+      console.error('Error fetching app:', result.reason);
+    }
+  });
+
+  const fulfilled = settled.filter((result) => result.status === 'fulfilled');
+
+  return fulfilled.map((result) => result.value);
 }
 
 export async function restartApp(name: string) {
@@ -115,7 +125,6 @@ async function getAppByName(name: string) {
   const allEnvironmentVariables =
     deployment.data.spec.template.spec.containers[0].env || [];
   return {
-    name: appName,
     spec: {
       name: appName,
       image: deployment.data.spec.template.spec.containers[0].image,

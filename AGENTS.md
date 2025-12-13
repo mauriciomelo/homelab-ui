@@ -2,7 +2,7 @@
 
 ## Setup commands
 
-- Run tests without watch mode to avoid getting stuck: `pnpm test --watch=false`
+- Run tests without watch mode to avoid getting stuck: `pnpm test --watch=false` or ``pnpm test:browser --watch=false` for browser tests.
 
 ## Testing instructions
 

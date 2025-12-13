@@ -12,7 +12,6 @@ test('AppsPage', async () => {
   // Mock the tRPC apps endpoint with proper typing using satisfies
   const mockAppsResponse: App[] = [
     {
-      name: 'myapp',
       spec: {
         name: 'myapp',
         image: 'nginx:latest',

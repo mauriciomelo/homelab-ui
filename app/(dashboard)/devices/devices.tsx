@@ -83,7 +83,7 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   const restartAppMutation = useMutation(trpc.restartApp.mutationOptions());
 
   const transitions = useTransition(items, {
-    keys: (item) => item.name,
+    keys: (item) => item.spec.name,
     from: { opacity: 0, scale: 0 },
     enter: { opacity: 1, scale: 1 },
     leave: { opacity: 0, scale: 0 },
@@ -101,7 +101,9 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
             </ContextMenuTrigger>
             <ContextMenuContent>
               <ContextMenuItem
-                onClick={() => restartAppMutation.mutate({ name: item.name })}
+                onClick={() =>
+                  restartAppMutation.mutate({ name: item.spec.name })
+                }
               >
                 Restart App
               </ContextMenuItem>
