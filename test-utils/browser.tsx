@@ -3,11 +3,15 @@ import { render } from 'vitest-browser-react';
 import { test as testBase } from 'vitest';
 import { worker } from './mocks/browser';
 import { HttpResponse } from 'msw';
+import Cursor from '@/app/(dashboard)/apps/Cursor';
 
 export function renderWithProviders(ui: React.ReactElement) {
   return render(ui, {
     wrapper: ({ children }) => (
-      <TRPCReactProvider>{children}</TRPCReactProvider>
+      <>
+        <Cursor />
+        <TRPCReactProvider>{children}</TRPCReactProvider>
+      </>
     ),
   });
 }
@@ -15,6 +19,8 @@ export function renderWithProviders(ui: React.ReactElement) {
 interface CustomFixtures {
   worker: { use: typeof worker.use };
 }
+
+export * from './userEvent';
 
 export const test = testBase.extend<CustomFixtures>({
   worker: [

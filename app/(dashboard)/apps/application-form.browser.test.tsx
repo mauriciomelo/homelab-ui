@@ -3,6 +3,7 @@ import * as actions from './actions';
 import { describe, expect, vi } from 'vitest';
 import { http } from 'msw';
 import {
+  userEvent,
   renderWithProviders,
   test,
   trpcJsonResponse,
@@ -10,6 +11,7 @@ import {
 import { baseApp } from '@/test-utils/fixtures';
 import { produce } from 'immer';
 import { Apps } from './apps';
+import { page } from 'vitest/browser';
 
 vi.mock('server-only', () => ({}));
 vi.mock('./actions', () => {
@@ -20,14 +22,14 @@ vi.mock('./actions', () => {
 
 describe('Apps Page', () => {
   test('renders the Apps component with table', async () => {
-    const screen = await renderWithProviders(<Apps />);
+    await renderWithProviders(<Apps />);
 
     // Check if table is rendered
-    const table = screen.getByRole('table');
+    const table = page.getByRole('table');
     expect(table).toBeDefined();
 
     // Check table caption
-    const caption = screen.getByText('A list of your installed Apps.');
+    const caption = page.getByText('A list of your installed Apps.');
     expect(caption).toBeDefined();
   });
 
@@ -44,13 +46,14 @@ describe('Apps Page', () => {
         ]);
       }),
     );
-    const screen = await renderWithProviders(<Apps />);
+    await renderWithProviders(<Apps />);
 
-    expect(screen.getByText('myapp')).toBeDefined();
-    expect(screen.getByText('homeassistant')).toBeDefined();
+    expect(page.getByText('myapp')).toBeDefined();
+    expect(page.getByText('homeassistant')).toBeDefined();
   });
 
   test('opens form sheet when clicking on an app row', async ({ worker }) => {
+    const user = userEvent.setup();
     worker.use(
       http.get('*/api/trpc/apps', () => {
         return trpcJsonResponse([
@@ -61,20 +64,18 @@ describe('Apps Page', () => {
       }),
     );
 
-    const screen = await renderWithProviders(<Apps />);
+    await renderWithProviders(<Apps />);
 
-    const appRow = screen.getByText('myapp');
-    await appRow.click();
+    await user.click(page.getByText('myapp'));
 
-    expect(
-      screen.getByText("Edit the App's configuration."),
-    ).toBeInTheDocument();
+    expect(page.getByText("Edit the App's configuration.")).toBeDefined();
   });
 });
 
 describe('ApplicationForm', () => {
   describe('update application', () => {
     test('populates form fields with initial data', async ({ worker }) => {
+      const user = userEvent.setup();
       worker.use(
         http.get('*/api/trpc/apps', () => {
           return trpcJsonResponse([
@@ -89,19 +90,17 @@ describe('ApplicationForm', () => {
         }),
       );
 
-      const screen = await renderWithProviders(<Apps />);
-      const { getByPlaceholder } = screen;
+      await renderWithProviders(<Apps />);
 
       // Open the form sheet
-      const appRow = screen.getByText('my-app');
-      await appRow.click();
+      await user.click(page.getByText('my-app'));
 
-      const nameInput = getByPlaceholder('App Name');
-      const imageInput = getByPlaceholder(
+      const nameInput = page.getByPlaceholder('App Name');
+      const imageInput = page.getByPlaceholder(
         'nginx:latest or registry.example.com/my-app:v1.0.0',
       );
-      const envNameInput = getByPlaceholder('VARIABLE_NAME');
-      const envValueInput = getByPlaceholder('value');
+      const envNameInput = page.getByPlaceholder('VARIABLE_NAME');
+      const envValueInput = page.getByPlaceholder('value');
 
       await expect.element(nameInput).toHaveValue('my-app');
       await expect.element(imageInput).toHaveValue('postgres:16');
@@ -110,6 +109,7 @@ describe('ApplicationForm', () => {
     });
 
     test('adds new environment variable', async ({ worker }) => {
+      const user = userEvent.setup();
       worker.use(
         http.get('*/api/trpc/apps', () => {
           return trpcJsonResponse([
@@ -122,25 +122,21 @@ describe('ApplicationForm', () => {
         }),
       );
 
-      const renderScreen = await renderWithProviders(<Apps />);
+      await renderWithProviders(<Apps />);
 
       // Open the form sheet
-      const appRow = renderScreen.getByText('test-app');
-      await appRow.click();
+      await user.click(page.getByText('test-app'));
 
-      const addButton = renderScreen.getByText('Add Environment Variable');
-      await addButton.click();
+      await user.click(page.getByText('Add Environment Variable'));
 
       await expect
-        .poll(
-          () =>
-            renderScreen.getByPlaceholder('VARIABLE_NAME').elements().length,
-        )
+        .poll(() => page.getByPlaceholder('VARIABLE_NAME').elements().length)
         .toBe(2);
     });
 
     test('handles successful update', async ({ worker }) => {
       vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      const user = userEvent.setup();
 
       worker.use(
         http.get('*/api/trpc/apps', () => {
@@ -154,29 +150,26 @@ describe('ApplicationForm', () => {
         }),
       );
 
-      const screen = await renderWithProviders(<Apps />);
-      const { getByPlaceholder, getByText } = screen;
+      await renderWithProviders(<Apps />);
 
-      // Open the form sheet
-      const appRow = screen.getByText('test-app');
-      await appRow.click();
+      // Open the form sheet for the app
+      await user.click(await page.getByText('test-app'));
 
-      const imageInput = getByPlaceholder(
+      const imageInput = page.getByPlaceholder(
         'nginx:latest or registry.example.com/my-app:v1.0.0',
       );
-      const nameInput = getByPlaceholder('VARIABLE_NAME');
-      const valueInput = getByPlaceholder('value');
+      const nameInput = page.getByPlaceholder('VARIABLE_NAME');
+      const valueInput = page.getByPlaceholder('value');
 
-      await imageInput.fill('redis:7-alpine');
-      await nameInput.fill('NEW_VAR');
-      await valueInput.fill('new_value');
+      await user.fill(imageInput, 'redis:7-alpine');
 
-      await expect.element(imageInput).toHaveValue('redis:7-alpine');
+      await user.fill(nameInput, 'NEW_VAR');
+      await user.fill(valueInput, 'new_value');
+
       await expect.element(nameInput).toHaveValue('NEW_VAR');
       await expect.element(valueInput).toHaveValue('new_value');
 
-      const submitButton = getByText('Update');
-      await submitButton.click();
+      await user.click(page.getByText('Update'));
 
       await expect
         .poll(() => vi.mocked(actions.updateApp))
@@ -188,6 +181,7 @@ describe('ApplicationForm', () => {
     });
 
     test('app name field is readonly', async ({ worker }) => {
+      const user = userEvent.setup();
       worker.use(
         http.get('*/api/trpc/apps', () => {
           return trpcJsonResponse([
@@ -200,20 +194,19 @@ describe('ApplicationForm', () => {
         }),
       );
 
-      const screen = await renderWithProviders(<Apps />);
-      const { getByPlaceholder } = screen;
+      await renderWithProviders(<Apps />);
 
       // Open the form sheet
-      const appRow = screen.getByText('locked-app');
-      await appRow.click();
+      await user.click(page.getByText('locked-app'));
 
-      const nameInput = getByPlaceholder('App Name');
+      const nameInput = page.getByPlaceholder('App Name');
       await expect.element(nameInput).toHaveAttribute('readonly');
     });
 
     test('renders multiple environment variables correctly', async ({
       worker,
     }) => {
+      const user = userEvent.setup();
       worker.use(
         http.get('*/api/trpc/apps', () => {
           return trpcJsonResponse([
@@ -230,15 +223,13 @@ describe('ApplicationForm', () => {
         }),
       );
 
-      const screen = await renderWithProviders(<Apps />);
-      const { getByPlaceholder, getByText } = screen;
+      await renderWithProviders(<Apps />);
 
       // Open the form sheet
-      const appRow = await getByText('test-app');
-      await appRow.click();
+      await user.click(page.getByText('test-app'));
 
-      const nameInputs = getByPlaceholder('VARIABLE_NAME').elements();
-      const valueInputs = getByPlaceholder('value').elements();
+      const nameInputs = page.getByPlaceholder('VARIABLE_NAME').elements();
+      const valueInputs = page.getByPlaceholder('value').elements();
 
       await expect.poll(() => nameInputs.length).toBe(3);
       await expect.poll(() => valueInputs.length).toBe(3);

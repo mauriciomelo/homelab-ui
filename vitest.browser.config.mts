@@ -11,8 +11,9 @@ export default defineConfig({
     browser: {
       enabled: true,
       provider: playwright(),
+      // Use the same browser context for all tests
       instances: [
-        { browser: 'chromium', viewport: { width: 1280, height: 720 } },
+        { browser: 'chromium', viewport: { width: 1440, height: 920 } },
       ],
     },
   },

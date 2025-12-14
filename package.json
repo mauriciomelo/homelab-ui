@@ -11,7 +11,8 @@
     "test": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test:browser": "vitest --config=vitest.browser.config.mts"
+    "test:browser": "vitest --config=vitest.browser.config.mts --browser.headless --watch=false",
+    "test:playground": "vitest --config=vitest.browser.config.mts --standalone"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
