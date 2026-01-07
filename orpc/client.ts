@@ -10,7 +10,7 @@ export const remoteServerSchema = z.object({
 });
 
 const link = new RPCLink({
-  url: (context, path, input) => {
+  url: (context) => {
     const isRemote = remoteServerSchema.safeParse(context);
     if (isRemote.success) {
       return `${isRemote.data.remoteServerUrl}/rpc`;

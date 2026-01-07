@@ -1,6 +1,6 @@
 import '../../globals.css';
 import * as actions from './actions';
-import { describe, expect, vi } from 'vitest';
+import { beforeEach, describe, expect, vi } from 'vitest';
 import { http } from 'msw';
 import {
   userEvent,
@@ -26,11 +26,11 @@ describe('Apps Page', () => {
 
     // Check if table is rendered
     const table = page.getByRole('table');
-    expect(table).toBeDefined();
+    expect(table).toBeInTheDocument();
 
     // Check table caption
     const caption = page.getByText('A list of your installed Apps.');
-    expect(caption).toBeDefined();
+    expect(caption).toBeInTheDocument();
   });
 
   test('displays list of applications', async ({ worker }) => {
@@ -48,8 +48,10 @@ describe('Apps Page', () => {
     );
     await renderWithProviders(<Apps />);
 
-    expect(page.getByText('myapp')).toBeDefined();
-    expect(page.getByText('homeassistant')).toBeDefined();
+    await expect.poll(() => page.getByText('myapp')).toBeInTheDocument();
+    await expect
+      .poll(() => page.getByText('homeassistant'))
+      .toBeInTheDocument();
   });
 
   test('opens form sheet when clicking on an app row', async ({ worker }) => {
@@ -68,11 +70,75 @@ describe('Apps Page', () => {
 
     await user.click(page.getByText('myapp'));
 
-    expect(page.getByText("Edit the App's configuration.")).toBeDefined();
+    expect(page.getByText("Edit the App's configuration.")).toBeInTheDocument();
   });
 });
 
 describe('ApplicationForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('displays validation error when CPU is 0', async ({ worker }) => {
+    const user = userEvent.setup();
+    worker.use(
+      http.get('*/api/trpc/apps', () => {
+        return trpcJsonResponse([
+          produce(baseApp, (app) => {
+            app.spec.name = 'test-app';
+            app.spec.resource.limits = { cpu: '500m', memory: '512Mi' };
+          }),
+        ]);
+      }),
+    );
+
+    await renderWithProviders(<Apps />);
+    await user.click(await page.getByText('test-app'));
+
+    await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+    await user.click(page.getByRole('option', { name: 'Custom' }));
+
+    const cpuInput = page.getByTestId('resource-limits-cpu-input');
+    await user.fill(cpuInput, '');
+
+    const updateButton = page.getByText('Update');
+    await user.click(updateButton);
+
+    await expect
+      .poll(() => page.getByText(/CPU must be greater than 0/))
+      .toBeInTheDocument();
+  });
+
+  test('displays validation error when Memory is 0', async ({ worker }) => {
+    const user = userEvent.setup();
+    worker.use(
+      http.get('*/api/trpc/apps', () => {
+        return trpcJsonResponse([
+          produce(baseApp, (app) => {
+            app.spec.name = 'test-app';
+            app.spec.resource.limits = { cpu: '500m', memory: '512Mi' };
+          }),
+        ]);
+      }),
+    );
+
+    await renderWithProviders(<Apps />);
+    await user.click(await page.getByText('test-app'));
+
+    await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+    await user.click(page.getByRole('option', { name: 'Custom' }));
+
+    const memoryInput = page.getByTestId('resource-limits-memory-input');
+    await user.fill(memoryInput, '');
+
+    const updateButton = page.getByText('Update');
+    await user.click(updateButton);
+
+    await expect
+      .poll(() => page.getByText(/Memory must be greater than 0/))
+      .toBeInTheDocument();
+  });
+
   describe('update application', () => {
     test('populates form fields with initial data', async ({ worker }) => {
       const user = userEvent.setup();
@@ -177,7 +243,100 @@ describe('ApplicationForm', () => {
           name: 'test-app',
           image: 'redis:7-alpine',
           envVariables: [{ name: 'NEW_VAR', value: 'new_value' }],
+          resource: {
+            limits: { cpu: '1000m', memory: '1Gi' },
+          },
         });
+    });
+
+    test('handles custom resource limits', async ({ worker }) => {
+      vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'test-app';
+        // sizeToResource.small.limits is used to determine 'small' is selected
+        // but baseApp already has string resource limits that need to match
+        app.spec.resource.limits = { cpu: '500m', memory: '512Mi' };
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      // Open the form sheet
+      await user.click(await page.getByText(app.spec.name));
+
+      // Check current resource limits selection
+      await expect(
+        page.getByRole('combobox', { name: 'Resource Limits' }),
+      ).toHaveTextContent('small');
+
+      // Click on the resource limits select to open it
+      await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+
+      // Select Custom option
+      await user.click(page.getByRole('option', { name: 'Custom' }));
+
+      // Wait for custom input fields to appear
+      const cpuInput = page.getByTestId('resource-limits-cpu-input');
+      const memoryInput = page.getByTestId('resource-limits-memory-input');
+
+      await expect.element(cpuInput).toBeInTheDocument();
+      await expect.element(memoryInput).toBeInTheDocument();
+
+      // Fill in custom values
+      await user.fill(cpuInput, '750');
+      await user.fill(memoryInput, '768');
+
+      // Submit the form
+      await user.click(page.getByText('Update'));
+
+      // Verify the action was called with custom values
+      await expect
+        .poll(() => vi.mocked(actions.updateApp))
+        .toHaveBeenCalledWith({
+          ...app.spec,
+          resource: {
+            limits: { cpu: '750m', memory: '768Mi' },
+          },
+        });
+    });
+
+    test('pre-populates custom fields when switching from medium to custom', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'medium-app';
+        app.spec.resource.limits = { cpu: '1', memory: '1Gi' };
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+      await user.click(await page.getByText(app.spec.name));
+
+      await expect(
+        page.getByRole('combobox', { name: 'Resource Limits' }),
+      ).toHaveTextContent('medium');
+
+      await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+      await user.click(page.getByRole('option', { name: 'Custom' }));
+
+      const cpuInput = page.getByTestId('resource-limits-cpu-input');
+      const memoryInput = page.getByTestId('resource-limits-memory-input');
+
+      await expect.element(cpuInput).toHaveValue('1');
+      await expect.element(memoryInput).toHaveValue('1');
+      await expect(page.getByRole('combobox').last()).toHaveTextContent('Gi');
     });
 
     test('app name field is readonly', async ({ worker }) => {

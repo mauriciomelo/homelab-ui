@@ -84,6 +84,12 @@ export const deploymentSchema = z.object({
                 ]),
               )
               .optional(),
+            resources: z.object({
+              limits: z.object({
+                cpu: z.string(),
+                memory: z.string(),
+              }),
+            }),
           }),
         ),
       }),

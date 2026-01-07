@@ -27,27 +27,30 @@ const { mockApiextensionsV1ApiClient, mockCoreApiClient, mockWatch } =
 
 vi.mock('@kubernetes/client-node', async (importOriginal) => {
   const mod = await importOriginal<typeof k8s>();
+  class MockKubeConfig {
+    loadFromDefault = vi.fn();
+    makeApiClient = vi.fn((c) => {
+      if (c === mod.ApiextensionsV1Api) {
+        return mockApiextensionsV1ApiClient;
+      }
+      if (c === mod.CoreV1Api) {
+        return mockCoreApiClient;
+      }
+      return {};
+    });
+  }
   return {
     ...mod,
-    KubeConfig: vi.fn(() => ({
-      loadFromDefault: vi.fn(),
-      makeApiClient: vi.fn((c) => {
-        if (c === mod.ApiextensionsV1Api) {
-          return mockApiextensionsV1ApiClient;
-        }
-        if (c === mod.CoreV1Api) {
-          return mockCoreApiClient;
-        }
-        return {};
-      }),
-    })),
-    Watch: vi.fn(() => mockWatch),
+    KubeConfig: MockKubeConfig,
+    Watch: vi.fn().mockImplementation(function () {
+      return mockWatch;
+    }),
   };
 });
 
 describe('registerAuthClientController', () => {
   beforeEach(async () => {
-    server.listen();
+    // server.listen();
     vi.clearAllMocks();
 
     mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockReset();
@@ -186,7 +189,7 @@ describe('registerAuthClientController', () => {
 
   it('throws an error if reading CRD fails for reasons other than 404', async () => {
     const error = new Error('Kubernetes API error');
-    (error as any).code = 500; // Add a code property to simulate an HTTP error code
+    (error as any).code = 500; // eslint-disable-line @typescript-eslint/no-explicit-any
     mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockRejectedValue(
       error,
     );
@@ -224,7 +227,7 @@ describe('registerAuthClientController', () => {
       http.post(
         `${ZITADEL_URL}/management/v1/projects/project-id/apps/oidc`,
         async ({ request }) => {
-          const body = (await request.json()) as any;
+          const body = (await request.json()) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
           zitadelRequestSpy(body);
           if (
@@ -307,7 +310,7 @@ describe('registerAuthClientController', () => {
       ),
       http.delete(
         `${ZITADEL_URL}/management/v1/projects/project-id/apps/app-id`,
-        ({ params }) => {
+        () => {
           deletedIds.push('app-id');
           return new HttpResponse(null, { status: 200 });
         },

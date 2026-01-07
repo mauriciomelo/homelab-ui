@@ -124,6 +124,7 @@ async function getAppByName(name: string) {
 
   const allEnvironmentVariables =
     deployment.data.spec.template.spec.containers[0].env || [];
+  const resources = deployment.data.spec.template.spec.containers[0].resources;
   return {
     spec: {
       name: appName,
@@ -134,7 +135,8 @@ async function getAppByName(name: string) {
           name: env.name,
           value: env.value,
         })),
-    } satisfies AppFormSchema,
+      resource: resources,
+    },
     pods,
     iconUrl: `https://cdn.simpleicons.org/${appName}`,
     deployment: {
@@ -239,10 +241,13 @@ function adaptAppToResources(app: AppFormSchema) {
             {
               name: app.name,
               image: app.image,
-              env: app.envVariables.map((env) => ({
-                name: env.name,
-                value: env.value,
-              })),
+              env: app.envVariables.map(
+                (env: { name: string; value: string }) => ({
+                  name: env.name,
+                  value: env.value,
+                }),
+              ),
+              resources: app.resource,
             },
           ],
         },

@@ -19,6 +19,38 @@ import { appFormSchema } from './formSchema';
 import { updateApp } from './actions';
 import { Separator } from '@radix-ui/react-separator';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useState } from 'react';
+import { ResourceField } from '@/components/resource-field';
+
+export const sizeToResource = {
+  small: {
+    limits: { cpu: '500m', memory: '512Mi' },
+    label: '0.5 vCPU, 512Mi RAM',
+  },
+  medium: { limits: { cpu: '1', memory: '1Gi' }, label: '1 vCPU, 1Gi RAM' },
+  large: { limits: { cpu: '2', memory: '2Gi' }, label: '2 vCPU, 2Gi RAM' },
+} as const;
+
+type SizeKey = keyof typeof sizeToResource;
+
+function detectSelectedSize(resource: {
+  limits: { cpu: string; memory: string };
+}): SizeKey | 'custom' {
+  const predefinedSize = Object.entries(sizeToResource).find(
+    ([, res]) =>
+      res.limits.cpu === resource.limits.cpu &&
+      res.limits.memory === resource.limits.memory,
+  );
+
+  return predefinedSize ? (predefinedSize[0] as SizeKey) : 'custom';
+}
 
 type FormData = z.infer<typeof appFormSchema>;
 
@@ -26,13 +58,22 @@ export function ApplicationForm(props: {
   data: App['spec'];
   className?: string;
 }) {
+  const resource = props.data.resource || {
+    limits: { cpu: '500m', memory: '512Mi' },
+  };
+
   const form = useForm<FormData>({
     resolver: zodResolver(appFormSchema),
     defaultValues: {
-      name: props.data.name,
-      image: props.data.image,
-      envVariables: props.data.envVariables,
+      name: props.data.name || '',
+      image: props.data.image || '',
+      envVariables: props.data.envVariables || [],
+      resource,
     },
+  });
+
+  const [selectedSize, setSelectedSize] = useState<string>(() => {
+    return detectSelectedSize(resource);
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -100,6 +141,97 @@ export function ApplicationForm(props: {
                 path and tag.
               </FormDescription>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="resource"
+          render={() => (
+            <FormItem>
+              <FormLabel className="flex items-center gap-2 text-base font-medium">
+                Resource Limits
+              </FormLabel>
+              <div className="flex gap-2">
+                <Select
+                  value={selectedSize}
+                  onValueChange={(value) => {
+                    setSelectedSize(value);
+                    if (value !== 'custom') {
+                      form.setValue(
+                        'resource',
+                        sizeToResource[value as keyof typeof sizeToResource],
+                      );
+                    }
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger className="h-auto shrink-0 [&_[data-slot=select-value]]:line-clamp-none">
+                      <SelectValue placeholder="Select resource limits" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {Object.entries(sizeToResource).map(([key, { label }]) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2 text-left">
+                          <span className="font-bold capitalize">{key}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {label}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">
+                      <div className="flex items-center gap-2 text-left">
+                        <span className="font-bold">Custom</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {selectedSize === 'custom' && (
+                  <>
+                    <div className="flex-1">
+                      <FormField
+                        control={form.control}
+                        name="resource.limits.cpu"
+                        render={({ field }) => (
+                          <FormItem>
+                            <ResourceField
+                              id="resource-limits-cpu"
+                              value={field.value}
+                              onChange={field.onChange}
+                              error={form.formState.errors.resource?.limits?.cpu?.message}
+                              dataTestId="resource-limits-cpu-input"
+                              type="cpu"
+                            />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <FormField
+                        control={form.control}
+                        name="resource.limits.memory"
+                        render={({ field }) => (
+                          <FormItem>
+                            <ResourceField
+                              id="resource-limits-memory"
+                              value={field.value}
+                              onChange={field.onChange}
+                              error={form.formState.errors.resource?.limits?.memory?.message}
+                              dataTestId="resource-limits-memory-input"
+                            />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+              <FormDescription>
+                Choose the resource allocation for your app.
+              </FormDescription>
             </FormItem>
           )}
         />
