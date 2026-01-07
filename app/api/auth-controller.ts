@@ -1,5 +1,5 @@
 import * as k8s from '@kubernetes/client-node';
-import { V1Secret } from '@kubernetes/client-node';
+import { V1Secret, V1JSONSchemaProps } from '@kubernetes/client-node';
 import { apiextensionsV1Api, coreApi } from './k8s';
 import assert from 'assert';
 import { ZitadelClient } from './zitadel-client';
@@ -38,7 +38,9 @@ const crd: k8s.V1CustomResourceDefinition = {
         served: true,
         storage: true,
         schema: {
-          openAPIV3Schema: z.toJSONSchema(authClientSchema) as any,
+          openAPIV3Schema: z.toJSONSchema(
+            authClientSchema,
+          ) as V1JSONSchemaProps,
         },
       },
     ],
@@ -58,8 +60,9 @@ async function createCrdIfNotExists() {
   try {
     await client.readCustomResourceDefinition({ name: crd.metadata!.name! });
     console.log('AuthClient CRD already exists');
-  } catch (err: any) {
-    if (err.code === 404) {
+  } catch (err: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((err as any).code === 404) {
       console.log('AuthClient CRD does not exist, creating...');
       await client.createCustomResourceDefinition({ body: crd });
       console.log('AuthClient CRD created');
@@ -164,8 +167,9 @@ async function secretExists({
   try {
     await client.readNamespacedSecret({ name, namespace });
     return true;
-  } catch (err: any) {
-    if (err.code === 404) {
+  } catch (err: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((err as any).code === 404) {
       return false;
     }
     throw err;

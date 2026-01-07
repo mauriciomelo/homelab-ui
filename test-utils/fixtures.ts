@@ -7,6 +7,7 @@ export const baseApp: App = Object.freeze({
     name: 'my-app',
     image: 'postgres:16',
     envVariables: [{ name: 'DB_NAME', value: 'production' }],
+    resource: { limits: { cpu: '1000m', memory: '1Gi' } },
   },
   status: APP_STATUS.RUNNING,
   pods: [],

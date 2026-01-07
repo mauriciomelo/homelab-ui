@@ -1,9 +1,8 @@
-import assert from "assert";
-import { Bonjour } from "bonjour-service";
-import os from "node:os";
-import * as z from "zod/v4";
-import { getOptionalConfig } from "./app/(dashboard)/apps/config";
-import { memo } from "react";
+import assert from 'assert';
+import { Bonjour } from 'bonjour-service';
+import os from 'node:os';
+import * as z from 'zod/v4';
+import { getOptionalConfig } from './app/(dashboard)/apps/config';
 
 const bonjour = new Bonjour();
 
@@ -11,7 +10,7 @@ const hostname = os.hostname();
 
 const serviceName = `${hostname}_node`;
 
-const CLUSTER_NODE = "cluster-node";
+const CLUSTER_NODE = 'cluster-node';
 
 const servicePayloadSchema = z.object({
   kind: z.string().min(1),
@@ -25,14 +24,14 @@ const servicePayloadSchema = z.object({
 type ServicePayload = z.infer<typeof servicePayloadSchema>;
 
 export function publishService() {
-  console.log("Initializing mDNS service advertiser...");
+  console.log('Initializing mDNS service advertiser...');
   console.log(`Publishing service with name: ${serviceName}`);
 
   const config = getOptionalConfig();
 
   const service = bonjour.publish({
     name: serviceName,
-    type: "http",
+    type: 'http',
     host: `${serviceName}.local`,
     txt: {
       kind: CLUSTER_NODE,
@@ -45,19 +44,19 @@ export function publishService() {
     port: config.PORT,
   });
 
-  service.on("up", () => {
-    console.log("----------------------------------------------------");
+  service.on('up', () => {
+    console.log('----------------------------------------------------');
     console.log(`Service is up and running!`);
     console.log(`Name: "${serviceName}"`);
     console.log(`Type: _${service.type}._tcp.local`);
     console.log(`Host: ${service.host} -> (resolves to this machine's IP)`);
     console.log(`Port: ${service.port}`);
-    console.log("You can now see this service in a Bonjour/mDNS browser.");
-    console.log("----------------------------------------------------");
+    console.log('You can now see this service in a Bonjour/mDNS browser.');
+    console.log('----------------------------------------------------');
   });
 
-  service.on("error", (error) => {
-    console.error("Error publishing service:", error);
+  service.on('error', (error) => {
+    console.error('Error publishing service:', error);
     process.exit(1);
   });
 }
@@ -83,10 +82,10 @@ export function getDiscoveredNodes() {
   return nodesMap;
 }
 
-bonjour.find({ type: "http" }, function (service) {
+bonjour.find({ type: 'http' }, function (service) {
   if (service.txt && service.txt.kind === CLUSTER_NODE) {
     try {
-      assert(service.referer?.address, "Service referer address is undefined");
+      assert(service.referer?.address, 'Service referer address is undefined');
       const payload = servicePayloadSchema.parse(service.txt);
 
       const node: DiscoveredNode = {
@@ -105,16 +104,16 @@ bonjour.find({ type: "http" }, function (service) {
 
       nodesMap.set(node.ip, node);
     } catch (error) {
-      console.error("Error processing service:", error);
+      console.error('Error processing service:', error);
     }
   }
 });
 
-process.on("SIGINT", () => {
-  console.log("\nStopping mDNS service...");
+process.on('SIGINT', () => {
+  console.log('\nStopping mDNS service...');
   bonjour.unpublishAll(() => {
     bonjour.destroy();
-    console.log("mDNS service stopped.");
+    console.log('mDNS service stopped.');
     process.exit(0);
   });
 });

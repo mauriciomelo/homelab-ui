@@ -21,6 +21,7 @@ test('AppsPage', async () => {
             value: 'production',
           },
         ],
+        resource: { limits: { cpu: '1000m', memory: '1Gi' } },
       },
       pods: [
         {

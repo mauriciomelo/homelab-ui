@@ -45,7 +45,7 @@ export default function Cursor() {
       ref={dotRef}
       id="__mouse_dot__"
       className={cn(
-        `pointer-events-none fixed top-0 left-0 z-[9999999] size-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-3 border-gray-200 bg-blue-950 opacity-40 transition-[top,left,scale] duration-200 ease-linear`,
+        `pointer-events-none fixed top-0 left-0 z-[9999999] size-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-3 border-gray-200 bg-blue-950 opacity-40 transition-[top,left,scale] duration-50 ease-linear`,
       )}
     />
   );

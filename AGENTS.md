@@ -1,11 +1,13 @@
 # Agent Guidelines
 
-## Setup commands
+## General guidelines
 
-- Run tests without watch mode to avoid getting stuck: `pnpm test --watch=false` or ``pnpm test:browser --watch=false` for browser tests.
+- After making changes, remember to run `pnpm run dance` to verify changes. This command runs linting, type checking, and tests.
 
 ## Testing instructions
 
+- Run tests without watch mode (e.g., `pnpm run test:ci` commands) to avoid getting stuck.
+- Run a test in isolation by providing a name like `pnpm run test:ci -t "handles custom resource limits"`
 - **Test Descriptions:** Use the present tense. Do NOT use "should".
   - ✅ Preferred: `it('handles ADDED event', () => { ... })`
   - ❌ Avoid: `it('should handle ADDED event', () => { ... })`

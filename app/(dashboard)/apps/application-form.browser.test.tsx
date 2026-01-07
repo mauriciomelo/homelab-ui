@@ -1,6 +1,6 @@
 import '../../globals.css';
 import * as actions from './actions';
-import { describe, expect, vi } from 'vitest';
+import { beforeEach, describe, expect, vi } from 'vitest';
 import { http } from 'msw';
 import {
   userEvent,
@@ -73,6 +73,9 @@ describe('Apps Page', () => {
 });
 
 describe('ApplicationForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
   describe('update application', () => {
     test('populates form fields with initial data', async ({ worker }) => {
       const user = userEvent.setup();
@@ -177,7 +180,100 @@ describe('ApplicationForm', () => {
           name: 'test-app',
           image: 'redis:7-alpine',
           envVariables: [{ name: 'NEW_VAR', value: 'new_value' }],
+          resource: {
+            limits: { cpu: '1000m', memory: '1Gi' },
+          },
         });
+    });
+
+    test('handles custom resource limits', async ({ worker }) => {
+      vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'test-app';
+        // sizeToResource.small.limits is used to determine 'small' is selected
+        // but baseApp already has string resource limits that need to match
+        app.spec.resource.limits = { cpu: '500m', memory: '512Mi' };
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      // Open the form sheet
+      await user.click(await page.getByText(app.spec.name));
+
+      // Check current resource limits selection
+      await expect(
+        page.getByRole('combobox', { name: 'Resource Limits' }),
+      ).toHaveTextContent('small');
+
+      // Click on the resource limits select to open it
+      await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+
+      // Select Custom option
+      await user.click(page.getByRole('option', { name: 'Custom' }));
+
+      // Wait for custom input fields to appear
+      const cpuInput = page.getByTestId('resource-limits-cpu-input');
+      const memoryInput = page.getByTestId('resource-limits-memory-input');
+
+      await expect.element(cpuInput).toBeDefined();
+      await expect.element(memoryInput).toBeDefined();
+
+      // Fill in custom values
+      await user.fill(cpuInput, '750');
+      await user.fill(memoryInput, '768');
+
+      // Submit the form
+      await user.click(page.getByText('Update'));
+
+      // Verify the action was called with custom values
+      await expect
+        .poll(() => vi.mocked(actions.updateApp))
+        .toHaveBeenCalledWith({
+          ...app.spec,
+          resource: {
+            limits: { cpu: '750m', memory: '768Mi' },
+          },
+        });
+    });
+
+    test('pre-populates custom fields when switching from medium to custom', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'medium-app';
+        app.spec.resource.limits = { cpu: '1', memory: '1Gi' };
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+      await user.click(await page.getByText(app.spec.name));
+
+      await expect(
+        page.getByRole('combobox', { name: 'Resource Limits' }),
+      ).toHaveTextContent('medium');
+
+      await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+      await user.click(page.getByRole('option', { name: 'Custom' }));
+
+      const cpuInput = page.getByTestId('resource-limits-cpu-input');
+      const memoryInput = page.getByTestId('resource-limits-memory-input');
+
+      await expect.element(cpuInput).toHaveValue('1');
+      await expect.element(memoryInput).toHaveValue('1');
+      await expect(page.getByRole('combobox').last()).toHaveTextContent('Gi');
     });
 
     test('app name field is readonly', async ({ worker }) => {
