@@ -15,7 +15,7 @@ export const appFormSchema = z.object({
       value: z.string().min(1, 'Variable value is required'),
     }),
   ),
-  resource: z.object({
+  resources: z.object({
     limits: z.object({
       cpu: z
         .string()

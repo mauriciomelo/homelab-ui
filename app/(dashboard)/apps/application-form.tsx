@@ -40,13 +40,13 @@ export const sizeToResource = {
 
 type SizeKey = keyof typeof sizeToResource;
 
-function detectSelectedSize(resource: {
+function detectSelectedSize(resources: {
   limits: { cpu: string; memory: string };
 }): SizeKey | 'custom' {
   const predefinedSize = Object.entries(sizeToResource).find(
     ([, res]) =>
-      res.limits.cpu === resource.limits.cpu &&
-      res.limits.memory === resource.limits.memory,
+      res.limits.cpu === resources.limits.cpu &&
+      res.limits.memory === resources.limits.memory,
   );
 
   return predefinedSize ? (predefinedSize[0] as SizeKey) : 'custom';
@@ -58,7 +58,7 @@ export function ApplicationForm(props: {
   data: App['spec'];
   className?: string;
 }) {
-  const resource = props.data.resource || {
+  const resource = props.data.resources || {
     limits: { cpu: '500m', memory: '512Mi' },
   };
 
@@ -68,7 +68,7 @@ export function ApplicationForm(props: {
       name: props.data.name || '',
       image: props.data.image || '',
       envVariables: props.data.envVariables || [],
-      resource,
+      resources: resource,
     },
   });
 
@@ -147,7 +147,7 @@ export function ApplicationForm(props: {
 
         <FormField
           control={form.control}
-          name="resource"
+          name="resources"
           render={() => (
             <FormItem>
               <FormLabel className="flex items-center gap-2 text-base font-medium">
@@ -160,7 +160,7 @@ export function ApplicationForm(props: {
                     setSelectedSize(value);
                     if (value !== 'custom') {
                       form.setValue(
-                        'resource',
+                        'resources',
                         sizeToResource[value as keyof typeof sizeToResource],
                       );
                     }
@@ -194,14 +194,17 @@ export function ApplicationForm(props: {
                     <div className="flex-1">
                       <FormField
                         control={form.control}
-                        name="resource.limits.cpu"
+                        name="resources.limits.cpu"
                         render={({ field }) => (
                           <FormItem>
                             <ResourceField
                               id="resource-limits-cpu"
                               value={field.value}
                               onChange={field.onChange}
-                              error={form.formState.errors.resource?.limits?.cpu?.message}
+                              error={
+                                form.formState.errors.resources?.limits?.cpu
+                                  ?.message
+                              }
                               dataTestId="resource-limits-cpu-input"
                               type="cpu"
                             />
@@ -212,14 +215,17 @@ export function ApplicationForm(props: {
                     <div className="flex-1">
                       <FormField
                         control={form.control}
-                        name="resource.limits.memory"
+                        name="resources.limits.memory"
                         render={({ field }) => (
                           <FormItem>
                             <ResourceField
                               id="resource-limits-memory"
                               value={field.value}
                               onChange={field.onChange}
-                              error={form.formState.errors.resource?.limits?.memory?.message}
+                              error={
+                                form.formState.errors.resources?.limits?.memory
+                                  ?.message
+                              }
                               dataTestId="resource-limits-memory-input"
                             />
                           </FormItem>

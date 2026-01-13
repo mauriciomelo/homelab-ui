@@ -86,7 +86,7 @@ describe('ApplicationForm', () => {
         return trpcJsonResponse([
           produce(baseApp, (app) => {
             app.spec.name = 'test-app';
-            app.spec.resource.limits = { cpu: '500m', memory: '512Mi' };
+            app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
           }),
         ]);
       }),
@@ -116,7 +116,7 @@ describe('ApplicationForm', () => {
         return trpcJsonResponse([
           produce(baseApp, (app) => {
             app.spec.name = 'test-app';
-            app.spec.resource.limits = { cpu: '500m', memory: '512Mi' };
+            app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
           }),
         ]);
       }),
@@ -243,7 +243,7 @@ describe('ApplicationForm', () => {
           name: 'test-app',
           image: 'redis:7-alpine',
           envVariables: [{ name: 'NEW_VAR', value: 'new_value' }],
-          resource: {
+          resources: {
             limits: { cpu: '1000m', memory: '1Gi' },
           },
         });
@@ -254,9 +254,9 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
         app.spec.name = 'test-app';
-        // sizeToResource.small.limits is used to determine 'small' is selected
+        // sizeToResources.small.limits is used to determine 'small' is selected
         // but baseApp already has string resource limits that need to match
-        app.spec.resource.limits = { cpu: '500m', memory: '512Mi' };
+        app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
       });
 
       worker.use(
@@ -300,7 +300,7 @@ describe('ApplicationForm', () => {
         .poll(() => vi.mocked(actions.updateApp))
         .toHaveBeenCalledWith({
           ...app.spec,
-          resource: {
+          resources: {
             limits: { cpu: '750m', memory: '768Mi' },
           },
         });
@@ -312,7 +312,7 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
         app.spec.name = 'medium-app';
-        app.spec.resource.limits = { cpu: '1', memory: '1Gi' };
+        app.spec.resources.limits = { cpu: '1', memory: '1Gi' };
       });
 
       worker.use(

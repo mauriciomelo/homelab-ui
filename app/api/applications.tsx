@@ -15,6 +15,7 @@ import {
   kustomizationSchema,
 } from './schemas';
 import * as k from './k8s';
+import { Volume } from 'memfs';
 
 export async function getApps() {
   const appDir = getAppsDir();
@@ -135,7 +136,7 @@ async function getAppByName(name: string) {
           name: env.name,
           value: env.value,
         })),
-      resource: resources,
+      resources,
     },
     pods,
     iconUrl: `https://cdn.simpleicons.org/${appName}`,
@@ -163,7 +164,9 @@ async function getAppByName(name: string) {
   };
 }
 
-export async function updateApp(spec: AppFormSchema) {
+type MinimalFs = typeof fs | Volume;
+
+export async function updateApp(spec: AppFormSchema, fsModule: MinimalFs = fs) {
   const appDir = getAppDir(spec.name);
 
   const deploymentFilePath = `${appDir}/deployment.yaml`;
@@ -173,6 +176,7 @@ export async function updateApp(spec: AppFormSchema) {
   const previousDeployment = await getFile({
     path: deploymentFilePath,
     schema: deploymentSchema,
+    fsModule,
   });
 
   const updatedDeployment = _.merge(
@@ -180,19 +184,19 @@ export async function updateApp(spec: AppFormSchema) {
     newPartialDeployment,
   );
 
-  await fs.promises.writeFile(
+  await fsModule.promises.writeFile(
     deploymentFilePath,
     YAML.stringify(updatedDeployment),
   );
 
   await git.add({
-    fs,
+    fs: fsModule,
     dir: getAppConfig().PROJECT_DIR,
     filepath: path.relative(getAppConfig().PROJECT_DIR, appDir),
   });
 
   await git.commit({
-    fs,
+    fs: fsModule,
     dir: getAppConfig().PROJECT_DIR,
     message: `Update app ${spec.name}`,
     author: {
@@ -202,7 +206,7 @@ export async function updateApp(spec: AppFormSchema) {
   });
 
   await git.push({
-    fs,
+    fs: fsModule,
     http,
     dir: getAppConfig().PROJECT_DIR,
     remote: 'origin',
@@ -247,7 +251,7 @@ function adaptAppToResources(app: AppFormSchema) {
                   value: env.value,
                 }),
               ),
-              resources: app.resource,
+              resources: app.resources,
             },
           ],
         },
@@ -265,13 +269,15 @@ export type App = Awaited<ReturnType<typeof getAppByName>>;
 async function getFile<T>({
   path,
   schema,
+  fsModule,
 }: {
   path: string;
   schema: z.ZodType<T>;
+  fsModule?: MinimalFs;
 }): Promise<{ data: T; raw: unknown }> {
-  const fileText = await fs.promises.readFile(path, 'utf-8');
+  const fileText = await (fsModule || fs).promises.readFile(path, 'utf-8');
 
-  const raw = YAML.parse(fileText);
+  const raw = YAML.parse(fileText.toString());
   return { data: schema.parse(raw), raw };
 }
 

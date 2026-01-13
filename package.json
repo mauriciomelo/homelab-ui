@@ -84,6 +84,7 @@
     "eslint-config-next": "16.0.7",
     "eslint-config-prettier": "^10.1.5",
     "jsdom": "^26.1.0",
+    "memfs": "^4.51.1",
     "msw": "^2.11.2",
     "playwright": "^1.57.0",
     "tailwindcss": "^4",
