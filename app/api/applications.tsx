@@ -16,6 +16,11 @@ import {
 } from './schemas';
 import * as k from './k8s';
 
+export type AppResourceType =
+  | z.infer<typeof deploymentSchema>
+  | z.infer<typeof ingressSchema>
+  | z.infer<typeof kustomizationSchema>;
+
 export async function getApps() {
   const appDir = getAppsDir();
   const entries = await fs.promises.readdir(appDir, {
@@ -58,25 +63,24 @@ export async function restartApp(name: string) {
 async function getAppByName(name: string) {
   const appPath = getAppDir(name);
 
-  const kustomizationFile = await fs.promises.readFile(
-    `${appPath}/kustomization.yaml`,
-    'utf-8',
-  );
-  const ingressFile = await fs.promises.readFile(
-    `${appPath}/ingress.yaml`,
-    'utf-8',
-  );
+  const [kustomizationResult, deploymentResult, ingressResult] =
+    await Promise.all([
+      getFile({
+        path: `${appPath}/kustomization.yaml`,
+        schema: kustomizationSchema,
+      }),
+      getFile({
+        path: `${appPath}/deployment.yaml`,
+        schema: deploymentSchema,
+      }),
+      getFile({
+        path: `${appPath}/ingress.yaml`,
+        schema: ingressSchema,
+      }),
+    ]);
 
-  const kustomizationData = kustomizationSchema.parse(
-    YAML.parse(kustomizationFile),
-  );
-
-  const deployment = await getFile({
-    path: `${appPath}/deployment.yaml`,
-    schema: deploymentSchema,
-  });
-
-  const ingressData = ingressSchema.parse(YAML.parse(ingressFile));
+  const kustomizationData = kustomizationResult.data;
+  const ingressData = ingressResult.data;
 
   const [deploymentRes, podsRes] = await Promise.all([
     k.appsApi().readNamespacedDeployment({ name, namespace: name }),
@@ -125,12 +129,13 @@ async function getAppByName(name: string) {
   const appName = kustomizationData.namespace;
 
   const allEnvironmentVariables =
-    deployment.data.spec.template.spec.containers[0].env || [];
-  const resources = deployment.data.spec.template.spec.containers[0].resources;
+    deploymentResult.data.spec.template.spec.containers[0].env || [];
+  const resources =
+    deploymentResult.data.spec.template.spec.containers[0].resources;
   return {
     spec: {
       name: appName,
-      image: deployment.data.spec.template.spec.containers[0].image,
+      image: deploymentResult.data.spec.template.spec.containers[0].image,
       envVariables: allEnvironmentVariables
         ?.filter((env) => 'value' in env)
         .map((env) => ({
@@ -167,7 +172,6 @@ async function getAppByName(name: string) {
 
 export async function updateApp(spec: AppFormSchema) {
   const appDir = getAppDir(spec.name);
-
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
   const newPartialDeployment = adaptAppToResources(spec).deployment;
@@ -182,40 +186,15 @@ export async function updateApp(spec: AppFormSchema) {
     newPartialDeployment,
   );
 
-  await fs.promises.writeFile(
-    deploymentFilePath,
-    YAML.stringify(updatedDeployment),
-  );
+  const deployment = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment' as const,
+    ...updatedDeployment,
+  } satisfies z.infer<typeof deploymentSchema>;
 
-  await git.add({
-    fs,
-    dir: getAppConfig().PROJECT_DIR,
-    filepath: path.relative(getAppConfig().PROJECT_DIR, appDir),
-  });
+  await writeResourcesToFileSystem([deployment]);
 
-  await git.commit({
-    fs,
-    dir: getAppConfig().PROJECT_DIR,
-    message: `Update app ${spec.name}`,
-    author: {
-      name: getAppConfig().USER_NAME,
-      email: getAppConfig().USER_EMAIL,
-    },
-  });
-
-  await git.push({
-    fs,
-    http,
-    dir: getAppConfig().PROJECT_DIR,
-    remote: 'origin',
-    ref: 'main',
-    onAuth: () => ({ username: getAppConfig().GITHUB_TOKEN }),
-  });
-
-  await reconcileFluxGitRepository({
-    name: 'flux-system',
-    namespace: 'flux-system',
-  });
+  await commitAndPushChanges(spec.name, `Update app ${spec.name}`);
 
   return { success: true };
 }
@@ -264,67 +243,22 @@ function adaptAppToResources(app: AppFormSchema) {
 
 export type App = Awaited<ReturnType<typeof getAppByName>>;
 
-export async function createApp(spec: AppFormSchema) {
-  const appDir = getAppDir(spec.name);
-  await fs.promises.mkdir(appDir, { recursive: true });
+async function writeResourcesToFileSystem(resources: AppResourceType[]) {
+  await Promise.all(
+    resources.map(async (resource) => {
+      const appName = resource.metadata.name;
+      const appDir = getAppDir(appName);
+      const filename = `${resource.kind.toLowerCase()}.yaml`;
+      const filePath = `${appDir}/${filename}`;
 
-  const partialDeployment = adaptAppToResources(spec).deployment;
-  const deployment = {
-    apiVersion: 'apps/v1',
-    kind: 'Deployment',
-    metadata: partialDeployment.metadata,
-    spec: {
-      replicas: 1,
-      ...partialDeployment.spec,
-    },
-  };
-  await fs.promises.writeFile(
-    `${appDir}/deployment.yaml`,
-    YAML.stringify(deployment),
+      await fs.promises.mkdir(appDir, { recursive: true });
+      await fs.promises.writeFile(filePath, YAML.stringify(resource));
+    }),
   );
+}
 
-  const kustomization = {
-    apiVersion: 'kustomize.config.k8s.io/v1beta1',
-    kind: 'Kustomization',
-    metadata: { name: spec.name },
-    namespace: spec.name,
-    resources: ['deployment.yaml', 'ingress.yaml'],
-  };
-  await fs.promises.writeFile(
-    `${appDir}/kustomization.yaml`,
-    YAML.stringify(kustomization),
-  );
-
-  const ingress = {
-    apiVersion: 'networking.k8s.io/v1',
-    kind: 'Ingress',
-    metadata: {
-      name: spec.name,
-      annotations: {},
-    },
-    spec: {
-      rules: [
-        {
-          host: `${spec.name}.local`,
-          http: {
-            paths: [
-              {
-                path: '/',
-                pathType: 'Prefix',
-                backend: {
-                  service: { name: spec.name, port: { number: 80 } },
-                },
-              },
-            ],
-          },
-        },
-      ],
-    },
-  };
-  await fs.promises.writeFile(
-    `${appDir}/ingress.yaml`,
-    YAML.stringify(ingress),
-  );
+async function commitAndPushChanges(appName: string, message: string) {
+  const appDir = getAppDir(appName);
 
   await git.add({
     fs,
@@ -335,7 +269,7 @@ export async function createApp(spec: AppFormSchema) {
   await git.commit({
     fs,
     dir: getAppConfig().PROJECT_DIR,
-    message: `Create app ${spec.name}`,
+    message,
     author: {
       name: getAppConfig().USER_NAME,
       email: getAppConfig().USER_EMAIL,
@@ -355,6 +289,59 @@ export async function createApp(spec: AppFormSchema) {
     name: 'flux-system',
     namespace: 'flux-system',
   });
+}
+
+export async function createApp(spec: AppFormSchema) {
+  const partialDeployment = adaptAppToResources(spec).deployment;
+  const deployment = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment' as const,
+    metadata: partialDeployment.metadata,
+    spec: {
+      replicas: 1,
+      selector: partialDeployment.spec.selector,
+      template: partialDeployment.spec.template,
+    },
+  } satisfies z.infer<typeof deploymentSchema>;
+
+  const kustomization = {
+    apiVersion: 'kustomize.config.k8s.io/v1beta1',
+    kind: 'Kustomization' as const,
+    metadata: { name: spec.name },
+    namespace: spec.name,
+    resources: ['deployment.yaml', 'ingress.yaml'],
+  } satisfies z.infer<typeof kustomizationSchema>;
+
+  const ingress = {
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'Ingress' as const,
+    metadata: {
+      name: spec.name,
+      annotations: {},
+    },
+    spec: {
+      rules: [
+        {
+          host: `${spec.name}.local`,
+          http: {
+            paths: [
+              {
+                path: '/',
+                pathType: 'Prefix' as const,
+                backend: {
+                  service: { name: spec.name, port: { number: 80 } },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  } satisfies z.infer<typeof ingressSchema>;
+
+  await writeResourcesToFileSystem([deployment, kustomization, ingress]);
+
+  await commitAndPushChanges(spec.name, `Create app ${spec.name}`);
 
   return { success: true };
 }

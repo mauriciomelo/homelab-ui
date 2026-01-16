@@ -49,6 +49,7 @@ export const deploymentSchema = z.object({
     name: z.string(),
   }),
   spec: z.object({
+    replicas: z.number().optional(),
     selector: z.object({
       matchLabels: z.object({
         app: z.string(),
