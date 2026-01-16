@@ -15,11 +15,12 @@ import {
   kustomizationSchema,
 } from './schemas';
 import * as k from './k8s';
-import { Volume } from 'memfs';
 
 export async function getApps() {
   const appDir = getAppsDir();
-  const entries = await fs.promises.readdir(appDir, { withFileTypes: true });
+  const entries = await fs.promises.readdir(appDir, {
+    withFileTypes: true,
+  });
   const appListPromises = entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => getAppByName(entry.name));
@@ -164,9 +165,7 @@ async function getAppByName(name: string) {
   };
 }
 
-type MinimalFs = typeof fs | Volume;
-
-export async function updateApp(spec: AppFormSchema, fsModule: MinimalFs = fs) {
+export async function updateApp(spec: AppFormSchema) {
   const appDir = getAppDir(spec.name);
 
   const deploymentFilePath = `${appDir}/deployment.yaml`;
@@ -176,7 +175,6 @@ export async function updateApp(spec: AppFormSchema, fsModule: MinimalFs = fs) {
   const previousDeployment = await getFile({
     path: deploymentFilePath,
     schema: deploymentSchema,
-    fsModule,
   });
 
   const updatedDeployment = _.merge(
@@ -184,19 +182,19 @@ export async function updateApp(spec: AppFormSchema, fsModule: MinimalFs = fs) {
     newPartialDeployment,
   );
 
-  await fsModule.promises.writeFile(
+  await fs.promises.writeFile(
     deploymentFilePath,
     YAML.stringify(updatedDeployment),
   );
 
   await git.add({
-    fs: fsModule,
+    fs,
     dir: getAppConfig().PROJECT_DIR,
     filepath: path.relative(getAppConfig().PROJECT_DIR, appDir),
   });
 
   await git.commit({
-    fs: fsModule,
+    fs,
     dir: getAppConfig().PROJECT_DIR,
     message: `Update app ${spec.name}`,
     author: {
@@ -206,7 +204,7 @@ export async function updateApp(spec: AppFormSchema, fsModule: MinimalFs = fs) {
   });
 
   await git.push({
-    fs: fsModule,
+    fs,
     http,
     dir: getAppConfig().PROJECT_DIR,
     remote: 'origin',
@@ -266,16 +264,109 @@ function adaptAppToResources(app: AppFormSchema) {
 
 export type App = Awaited<ReturnType<typeof getAppByName>>;
 
+export async function createApp(spec: AppFormSchema) {
+  const appDir = getAppDir(spec.name);
+  await fs.promises.mkdir(appDir, { recursive: true });
+
+  const partialDeployment = adaptAppToResources(spec).deployment;
+  const deployment = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: partialDeployment.metadata,
+    spec: {
+      replicas: 1,
+      ...partialDeployment.spec,
+    },
+  };
+  await fs.promises.writeFile(
+    `${appDir}/deployment.yaml`,
+    YAML.stringify(deployment),
+  );
+
+  const kustomization = {
+    apiVersion: 'kustomize.config.k8s.io/v1beta1',
+    kind: 'Kustomization',
+    metadata: { name: spec.name },
+    namespace: spec.name,
+    resources: ['deployment.yaml', 'ingress.yaml'],
+  };
+  await fs.promises.writeFile(
+    `${appDir}/kustomization.yaml`,
+    YAML.stringify(kustomization),
+  );
+
+  const ingress = {
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'Ingress',
+    metadata: {
+      name: spec.name,
+      annotations: {},
+    },
+    spec: {
+      rules: [
+        {
+          host: `${spec.name}.local`,
+          http: {
+            paths: [
+              {
+                path: '/',
+                pathType: 'Prefix',
+                backend: {
+                  service: { name: spec.name, port: { number: 80 } },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  };
+  await fs.promises.writeFile(
+    `${appDir}/ingress.yaml`,
+    YAML.stringify(ingress),
+  );
+
+  await git.add({
+    fs,
+    dir: getAppConfig().PROJECT_DIR,
+    filepath: path.relative(getAppConfig().PROJECT_DIR, appDir),
+  });
+
+  await git.commit({
+    fs,
+    dir: getAppConfig().PROJECT_DIR,
+    message: `Create app ${spec.name}`,
+    author: {
+      name: getAppConfig().USER_NAME,
+      email: getAppConfig().USER_EMAIL,
+    },
+  });
+
+  await git.push({
+    fs,
+    http,
+    dir: getAppConfig().PROJECT_DIR,
+    remote: 'origin',
+    ref: 'main',
+    onAuth: () => ({ username: getAppConfig().GITHUB_TOKEN }),
+  });
+
+  await reconcileFluxGitRepository({
+    name: 'flux-system',
+    namespace: 'flux-system',
+  });
+
+  return { success: true };
+}
+
 async function getFile<T>({
   path,
   schema,
-  fsModule,
 }: {
   path: string;
   schema: z.ZodType<T>;
-  fsModule?: MinimalFs;
 }): Promise<{ data: T; raw: unknown }> {
-  const fileText = await (fsModule || fs).promises.readFile(path, 'utf-8');
+  const fileText = await fs.promises.readFile(path, 'utf-8');
 
   const raw = YAML.parse(fileText.toString());
   return { data: schema.parse(raw), raw };
