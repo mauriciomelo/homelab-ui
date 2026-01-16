@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { useState } from 'react';
 import { ResourceField } from '@/components/resource-field';
+import { createApp } from './actions';
 
 export const sizeToResource = {
   small: {
@@ -53,26 +54,29 @@ function detectSelectedSize(resources: {
 }
 
 type FormData = z.infer<typeof appFormSchema>;
+type FormMode = 'edit' | 'create';
 
 export function ApplicationForm(props: {
-  data: App['spec'];
+  data?: App['spec'];
+  mode?: FormMode;
   className?: string;
 }) {
-  const resource = props.data.resources || {
-    limits: { cpu: '500m', memory: '512Mi' },
-  };
+  const mode = props.mode ?? 'edit';
 
   const form = useForm<FormData>({
     resolver: zodResolver(appFormSchema),
     defaultValues: {
-      name: props.data.name || '',
-      image: props.data.image || '',
-      envVariables: props.data.envVariables || [],
-      resources: resource,
+      name: props.data?.name || '',
+      image: props.data?.image || '',
+      envVariables: props.data?.envVariables || [{ name: '', value: '' }],
+      resources: props.data?.resources || {
+        limits: sizeToResource.small.limits,
+      },
     },
   });
 
   const [selectedSize, setSelectedSize] = useState<string>(() => {
+    const resource = form.getValues('resources');
     return detectSelectedSize(resource);
   });
 
@@ -96,7 +100,8 @@ export function ApplicationForm(props: {
       <form
         className={cn('space-y-4', props.className)}
         onSubmit={form.handleSubmit(async (data) => {
-          const result = await updateApp(data);
+          const result =
+            mode === 'create' ? await createApp(data) : await updateApp(data);
           console.log(result);
         })}
       >
@@ -112,7 +117,7 @@ export function ApplicationForm(props: {
                 <Input
                   placeholder="App Name"
                   className="font-mono text-sm"
-                  readOnly
+                  readOnly={mode === 'edit'}
                   {...field}
                 />
               </FormControl>
@@ -325,12 +330,12 @@ export function ApplicationForm(props: {
           {form.formState.isSubmitting ? (
             <Button type="submit" className="flex-1" disabled>
               <Loader2Icon className="animate-spin" />
-              Updating...
+              {mode === 'create' ? 'Creating...' : 'Updating...'}
             </Button>
           ) : (
             <Button type="submit" className="flex-1">
               <Rocket className="mr-2 h-4 w-4" />
-              Update
+              {mode === 'create' ? 'Create' : 'Update'}
             </Button>
           )}
         </div>

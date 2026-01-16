@@ -25,15 +25,42 @@ import { App } from '@/app/api/applications';
 import { Status } from '@/components/ui/status';
 import { PageContent } from '@/components/page-content';
 import { AppIcon, appStatusProps } from '@/components/app-icon';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+
+type FormMode = 'edit' | 'create' | null;
 
 export function Apps() {
   const trpc = useTRPC();
   const apps = useQuery({ ...trpc.apps.queryOptions(), refetchInterval: 2000 });
   const [selectedApp, setSelectedApp] = useState<App | null>(null);
+  const [formMode, setFormMode] = useState<FormMode>(null);
+
+  const handleCreateApp = () => {
+    setSelectedApp(null);
+    setFormMode('create');
+  };
+
+  const handleEditApp = (app: App) => {
+    setSelectedApp(app);
+    setFormMode('edit');
+  };
+
+  const handleCloseForm = () => {
+    setSelectedApp(null);
+    setFormMode(null);
+    apps.refetch();
+  };
 
   return (
     <>
       <PageContent>
+        <div className="mb-4 flex justify-end">
+          <Button onClick={handleCreateApp}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create App
+          </Button>
+        </div>
         <Table className="max-w-7xl table-fixed">
           <TableCaption>A list of your installed Apps.</TableCaption>
           <TableHeader>
@@ -68,7 +95,7 @@ export function Apps() {
                 </TableCell>
                 <TableCell
                   className="cursor-pointer font-medium"
-                  onClick={() => setSelectedApp(app)}
+                  onClick={() => handleEditApp(app)}
                 >
                   <div className="flex min-h-9 items-center">
                     {app.spec.name}
@@ -81,22 +108,32 @@ export function Apps() {
           </TableBody>
         </Table>
         <Sheet
-          open={!!selectedApp}
+          open={formMode !== null}
           onOpenChange={(open) => {
             if (!open) {
-              setSelectedApp(null);
+              handleCloseForm();
             }
           }}
         >
           <SheetContent className="w-[600px] sm:max-w-[600px]">
             <SheetHeader>
-              <SheetTitle>{selectedApp?.spec.name}</SheetTitle>
+              <SheetTitle>
+                {formMode === 'create'
+                  ? 'Create New App'
+                  : selectedApp?.spec.name}
+              </SheetTitle>
               <SheetDescription>
-                Edit the App&apos;s configuration.
+                {formMode === 'create'
+                  ? 'Configure your new application.'
+                  : "Edit the App's configuration."}
               </SheetDescription>
             </SheetHeader>
-            {selectedApp && (
-              <ApplicationForm className="p-4" data={selectedApp.spec} />
+            {formMode && (
+              <ApplicationForm
+                className="p-4"
+                data={selectedApp?.spec}
+                mode={formMode}
+              />
             )}
           </SheetContent>
         </Sheet>

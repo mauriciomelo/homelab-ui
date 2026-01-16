@@ -8,3 +8,9 @@ export async function updateApp(data: unknown) {
   await apps.updateApp(app);
   return { success: true };
 }
+
+export async function createApp(data: unknown) {
+  const app = appFormSchema.parse(data);
+  await apps.createApp(app);
+  return { success: true };
+}

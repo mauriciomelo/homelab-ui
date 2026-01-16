@@ -17,11 +17,27 @@ vi.mock('server-only', () => ({}));
 vi.mock('./actions', () => {
   return {
     updateApp: vi.fn(),
+    createApp: vi.fn(),
   };
 });
 
 describe('Apps Page', () => {
-  test('renders the Apps component with table', async () => {
+  test('renders the Apps component with table', async ({ worker }) => {
+    // macbook  resolution
+    const scale = 1;
+    page.viewport(1440 * scale, 920 * scale);
+    worker.use(
+      http.get('*/api/trpc/apps', () => {
+        return trpcJsonResponse([
+          produce(baseApp, (app) => {
+            app.spec.name = 'myapp';
+          }),
+          produce(baseApp, (app) => {
+            app.spec.name = 'homeassistant';
+          }),
+        ]);
+      }),
+    );
     await renderWithProviders(<Apps />);
 
     // Check if table is rendered
@@ -31,6 +47,13 @@ describe('Apps Page', () => {
     // Check table caption
     const caption = page.getByText('A list of your installed Apps.');
     expect(caption).toBeInTheDocument();
+
+    await expect.poll(() => page.getByText('myapp')).toBeInTheDocument();
+    await expect
+      .poll(() => page.getByText('homeassistant'))
+      .toBeInTheDocument();
+
+    await page.screenshot({});
   });
 
   test('displays list of applications', async ({ worker }) => {
@@ -399,6 +422,52 @@ describe('ApplicationForm', () => {
       await expect.element(valueInputs[1]).toHaveValue('value2');
       await expect.element(nameInputs[2]).toHaveValue('VAR3');
       await expect.element(valueInputs[2]).toHaveValue('value3');
+    });
+  });
+
+  describe('create application', () => {
+    test('handles successful app creation', async ({ worker }) => {
+      vi.mocked(actions.createApp).mockResolvedValue({ success: true });
+      const user = userEvent.setup();
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('Create App'));
+
+      expect(page.getByText('Create New App')).toBeInTheDocument();
+
+      const nameInput = page.getByPlaceholder('App Name');
+      const imageInput = page.getByPlaceholder(
+        'nginx:latest or registry.example.com/my-app:v1.0.0',
+      );
+      const envNameInput = page.getByPlaceholder('VARIABLE_NAME');
+      const envValueInput = page.getByPlaceholder('value');
+
+      await expect.element(nameInput).not.toHaveAttribute('readonly');
+
+      await user.fill(nameInput, 'new-app');
+      await user.fill(imageInput, 'redis:7-alpine');
+      await user.fill(envNameInput, 'REDIS_HOST');
+      await user.fill(envValueInput, 'localhost');
+
+      await user.click(page.getByRole('button', { name: 'Create' }));
+
+      await expect
+        .poll(() => vi.mocked(actions.createApp))
+        .toHaveBeenCalledWith({
+          name: 'new-app',
+          image: 'redis:7-alpine',
+          envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
+          resources: {
+            limits: { cpu: '500m', memory: '512Mi' },
+          },
+        });
     });
   });
 });
