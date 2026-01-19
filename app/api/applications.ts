@@ -132,6 +132,9 @@ async function getAppByName(name: string) {
     deploymentResult.data.spec.template.spec.containers[0].env || [];
   const resources =
     deploymentResult.data.spec.template.spec.containers[0].resources;
+  const ingressPort =
+    ingressData.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.number ||
+    80;
   return {
     spec: {
       name: appName,
@@ -143,6 +146,7 @@ async function getAppByName(name: string) {
           value: env.value,
         })),
       resources,
+      ingress: { port: { number: ingressPort } },
     },
     pods,
     iconUrl: `https://cdn.simpleicons.org/${appName}`,
@@ -236,8 +240,39 @@ function adaptAppToResources(app: AppFormSchema) {
     },
   } satisfies Partial<z.infer<typeof deploymentSchema>>;
 
+  const ingress = {
+    apiVersion: 'networking.k8s.io/v1',
+    kind: 'Ingress' as const,
+    metadata: {
+      name: app.name,
+      annotations: {},
+    },
+    spec: {
+      rules: [
+        {
+          host: `${app.name}.local`,
+          http: {
+            paths: [
+              {
+                path: '/',
+                pathType: 'Prefix' as const,
+                backend: {
+                  service: {
+                    name: app.name,
+                    port: { number: app.ingress.port.number },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+  } satisfies Partial<z.infer<typeof ingressSchema>>;
+
   return {
     deployment,
+    ingress,
   };
 }
 
@@ -292,7 +327,7 @@ async function commitAndPushChanges(appName: string, message: string) {
 }
 
 export async function createApp(spec: AppFormSchema) {
-  const partialDeployment = adaptAppToResources(spec).deployment;
+  const { deployment: partialDeployment, ingress } = adaptAppToResources(spec);
   const deployment = {
     apiVersion: 'apps/v1',
     kind: 'Deployment' as const,
@@ -312,33 +347,6 @@ export async function createApp(spec: AppFormSchema) {
     resources: ['deployment.yaml', 'ingress.yaml'],
   } satisfies z.infer<typeof kustomizationSchema>;
 
-  const ingress = {
-    apiVersion: 'networking.k8s.io/v1',
-    kind: 'Ingress' as const,
-    metadata: {
-      name: spec.name,
-      annotations: {},
-    },
-    spec: {
-      rules: [
-        {
-          host: `${spec.name}.local`,
-          http: {
-            paths: [
-              {
-                path: '/',
-                pathType: 'Prefix' as const,
-                backend: {
-                  service: { name: spec.name, port: { number: 80 } },
-                },
-              },
-            ],
-          },
-        },
-      ],
-    },
-  } satisfies z.infer<typeof ingressSchema>;
-
   await writeResourcesToFileSystem([deployment, kustomization, ingress]);
 
   await commitAndPushChanges(spec.name, `Create app ${spec.name}`);
@@ -346,7 +354,7 @@ export async function createApp(spec: AppFormSchema) {
   return { success: true };
 }
 
-async function getFile<T>({
+export async function getFile<T>({
   path,
   schema,
 }: {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { updateApp, getApps, createApp } from './applications';
+import { updateApp, getApps, createApp, getFile } from './applications';
 import { fs, vol } from 'memfs';
 
 import YAML from 'yaml';
@@ -9,7 +9,7 @@ import { AppFormSchema } from '../(dashboard)/apps/formSchema';
 import { setupMockGitRepo } from '../../test-utils';
 import { baseDeployment } from '../../test-utils/fixtures';
 import { produce } from 'immer';
-import { APP_STATUS } from './schemas';
+import { APP_STATUS, ingressSchema } from './schemas';
 import * as k from './k8s';
 
 vi.mock('server-only', () => ({}));
@@ -117,6 +117,7 @@ describe('updateApp', () => {
         { name: 'DEBUG', value: 'true' },
       ],
       resources: currentDeployment.spec.template.spec.containers[0].resources,
+      ingress: { port: { number: 80 } },
     } satisfies Partial<AppFormSchema>;
 
     await expect(updateApp(newSpec)).resolves.toEqual({
@@ -165,6 +166,7 @@ describe('createApp', () => {
       resources: {
         limits: { cpu, memory },
       },
+      ingress: { port: { number: 80 } },
     });
 
     const apps = await getApps();
@@ -173,9 +175,39 @@ describe('createApp', () => {
     expect(createdApp?.spec.image).toBe(image);
     expect(createdApp?.deployment.spec.replicas).toBe(replicas);
   });
+
+  it('creates ingress with custom port', async () => {
+    const appName = 'custom-port-app';
+    const customPort = 8080;
+
+    await createApp({
+      name: appName,
+      image: 'my-app:latest',
+      envVariables: [],
+      resources: {
+        limits: { cpu: '1', memory: '1Gi' },
+      },
+      ingress: { port: { number: customPort } },
+    });
+
+    const { data: ingress } = await getFile({
+      path: '/test-project/clusters/my-cluster/my-applications/custom-port-app/ingress.yaml',
+      schema: ingressSchema,
+    });
+
+    expect(
+      ingress.spec.rules[0].http.paths[0].backend.service.port.number,
+    ).toBe(customPort);
+  });
 });
 
 describe('getApps', () => {
+  beforeEach(async () => {
+    await setupMockGitRepo({
+      dir: '/test-project',
+      fs,
+    });
+  });
   it('retrieves all applications from file system', async () => {
     const app1Deployment = produce(baseDeployment, (draft) => {
       draft.metadata.name = 'app1';
@@ -228,6 +260,25 @@ describe('getApps', () => {
     expect(apps[1].spec.image).toBe('redis:7');
     expect(apps[1].status).toBe(APP_STATUS.RUNNING);
     expect(apps[1].link).toBe('http://app2.local');
+  });
+
+  it('correctly transforms the spec to files and back ', async () => {
+    const expectedSpec = {
+      name: 'homeassistant',
+      image: 'homeassistant/home-assistant:stable',
+      envVariables: [],
+      resources: {
+        limits: { cpu: '100m', memory: '256Mi' },
+      },
+      ingress: { port: { number: 8081 } },
+    } satisfies AppFormSchema;
+
+    await createApp(expectedSpec);
+
+    const apps = await getApps();
+    const createdApp = apps.find((app) => app.spec.name === expectedSpec.name);
+    expect(createdApp).toBeDefined();
+    expect(createdApp?.spec).toEqual(expectedSpec);
   });
 });
 

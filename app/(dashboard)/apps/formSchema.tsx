@@ -40,6 +40,15 @@ export const appFormSchema = z.object({
         .transform(({ amount, unit }) => `${amount}${unit}`),
     }),
   }),
+  ingress: z.object({
+    port: z.object({
+      number: z
+        .number()
+        .int()
+        .min(1, 'Port must be at least 1')
+        .max(65535, 'Port cannot exceed 65535'),
+    }),
+  }),
 });
 
 export type AppFormSchema = z.infer<typeof appFormSchema>;

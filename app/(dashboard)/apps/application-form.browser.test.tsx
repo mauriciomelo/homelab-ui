@@ -174,6 +174,7 @@ describe('ApplicationForm', () => {
               app.spec.envVariables = [
                 { name: 'DB_NAME', value: 'production' },
               ];
+              app.spec.ingress = { port: { number: 8080 } };
             }),
           ]);
         }),
@@ -190,11 +191,13 @@ describe('ApplicationForm', () => {
       );
       const envNameInput = page.getByPlaceholder('VARIABLE_NAME');
       const envValueInput = page.getByPlaceholder('value');
+      const portInput = page.getByLabelText('Ingress Port');
 
       await expect.element(nameInput).toHaveValue('my-app');
       await expect.element(imageInput).toHaveValue('postgres:16');
       await expect.element(envNameInput).toHaveValue('DB_NAME');
       await expect.element(envValueInput).toHaveValue('production');
+      await expect.element(portInput).toHaveValue(8080);
     });
 
     test('adds new environment variable', async ({ worker }) => {
@@ -234,6 +237,7 @@ describe('ApplicationForm', () => {
               app.spec.name = 'test-app';
               app.spec.image = 'nginx:latest';
               app.spec.envVariables = [{ name: 'OLD_VAR', value: 'old_value' }];
+              app.spec.ingress = { port: { number: 8080 } };
             }),
           ]);
         }),
@@ -249,6 +253,9 @@ describe('ApplicationForm', () => {
       );
       const nameInput = page.getByPlaceholder('VARIABLE_NAME');
       const valueInput = page.getByPlaceholder('value');
+      const portInput = page.getByLabelText('Ingress Port');
+
+      await expect.element(portInput).toHaveValue(8080);
 
       await user.fill(imageInput, 'redis:7-alpine');
 
@@ -269,6 +276,7 @@ describe('ApplicationForm', () => {
           resources: {
             limits: { cpu: '1000m', memory: '1Gi' },
           },
+          ingress: { port: { number: 8080 } },
         });
     });
 
@@ -280,6 +288,7 @@ describe('ApplicationForm', () => {
         // sizeToResources.small.limits is used to determine 'small' is selected
         // but baseApp already has string resource limits that need to match
         app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
+        app.spec.ingress = { port: { number: 8080 } };
       });
 
       worker.use(
@@ -326,6 +335,7 @@ describe('ApplicationForm', () => {
           resources: {
             limits: { cpu: '750m', memory: '768Mi' },
           },
+          ingress: { port: { number: 8080 } },
         });
     });
 
@@ -442,6 +452,9 @@ describe('ApplicationForm', () => {
 
       expect(page.getByText('Create New App')).toBeInTheDocument();
 
+      const portInput = page.getByLabelText('Ingress Port');
+      await expect.element(portInput).toHaveValue(80);
+
       const nameInput = page.getByPlaceholder('App Name');
       const imageInput = page.getByPlaceholder(
         'nginx:latest or registry.example.com/my-app:v1.0.0',
@@ -467,6 +480,7 @@ describe('ApplicationForm', () => {
           resources: {
             limits: { cpu: '500m', memory: '512Mi' },
           },
+          ingress: { port: { number: 80 } },
         });
     });
   });

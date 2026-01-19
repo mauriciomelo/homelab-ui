@@ -72,6 +72,9 @@ export function ApplicationForm(props: {
       resources: props.data?.resources || {
         limits: sizeToResource.small.limits,
       },
+      ingress: {
+        port: { number: props.data?.ingress?.port?.number ?? 80 },
+      },
     },
   });
 
@@ -248,6 +251,33 @@ export function ApplicationForm(props: {
         />
 
         <Separator />
+
+        <FormField
+          control={form.control}
+          name="ingress.port.number"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="flex items-center gap-2 text-base font-medium">
+                Ingress Port
+              </FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  data-testid="ingress-port-input"
+                  placeholder="80"
+                  className="w-32 font-mono text-sm"
+                  {...field}
+                />
+              </FormControl>
+              <FormDescription>
+                The port exposed by the Ingress (1-65535)
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="text-base font-medium">Environment Variables</div>
 
