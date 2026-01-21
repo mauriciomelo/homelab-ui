@@ -21,7 +21,7 @@ describe('ResourceField', () => {
       />,
     );
 
-    const input = page.getByLabelText('Memory');
+    const input = page.getByRole('textbox', { name: 'Memory' });
     // open slider popover
     await user.click(input);
 
@@ -39,7 +39,7 @@ describe('ResourceField', () => {
       <StatefulResourceField id="cpu" label="CPU" value="1" type="cpu" />,
     );
 
-    const input = page.getByLabelText('CPU');
+    const input = page.getByRole('textbox', { name: 'CPU' });
     // open slider popover
     await user.click(input);
 
@@ -59,7 +59,7 @@ describe('ResourceField', () => {
         <StatefulResourceField id="cpu" label="CPU" value="500m" type="cpu" />,
       );
 
-      const input = page.getByLabelText('CPU');
+      const input = page.getByRole('textbox', { name: 'CPU' });
       expect(input).toBeInTheDocument();
 
       await expect.element(input).toHaveValue('500');
@@ -107,7 +107,7 @@ describe('ResourceField', () => {
         />,
       );
 
-      const input = page.getByLabelText('Memory');
+      const input = page.getByRole('textbox', { name: 'Memory' });
       await user.click(input);
 
       // Popover contains quick adjust text and current value/unit
@@ -130,7 +130,7 @@ describe('ResourceField', () => {
         />,
       );
 
-      const input = page.getByLabelText('Memory');
+      const input = page.getByRole('textbox', { name: 'Memory' });
       // open popover
       await user.click(input);
 
@@ -148,7 +148,9 @@ describe('ResourceField', () => {
 
       // popover should display the updated value/unit
       await expect.element(input).toHaveValue('32');
-      await expect(page.getByRole('combobox').last()).toHaveTextContent('Gi');
+      await expect(
+        page.getByRole('combobox', { name: 'memory unit' }),
+      ).toHaveTextContent('Gi');
     });
 
     test('displays error message when error prop is provided', async () => {
@@ -162,7 +164,7 @@ describe('ResourceField', () => {
         />,
       );
 
-      const input = page.getByLabelText('Memory');
+      const input = page.getByRole('textbox', { name: 'Memory' });
       expect(input).toBeInTheDocument();
 
       expect(page.getByText('Memory limit is too high')).toBeInTheDocument();
@@ -174,7 +176,7 @@ describe('ResourceField', () => {
         <StatefulResourceField id="cpu" label="CPU" value="500m" type="cpu" />,
       );
 
-      const input = page.getByLabelText('CPU');
+      const input = page.getByRole('textbox', { name: 'CPU' });
       expect(input).toBeInTheDocument();
 
       await expect.element(input).toHaveValue('500');
@@ -205,7 +207,9 @@ describe('ResourceField', () => {
         .poll(() => vi.mocked(onChange).mock.calls.length)
         .toBeGreaterThan(0);
       expect(vi.mocked(onChange).mock.calls[0][0]).toBe('1m');
-      await expect(page.getByRole('combobox').last()).toHaveTextContent('m');
+      await expect(
+        page.getByRole('combobox', { name: 'cpu unit' }),
+      ).toHaveTextContent('m');
     });
 
     test('dragging slider to end sets value to 8', async () => {
@@ -222,7 +226,7 @@ describe('ResourceField', () => {
         />,
       );
 
-      const input = page.getByLabelText('CPU');
+      const input = page.getByRole('textbox', { name: 'CPU' });
       // open popover
       await user.click(input);
 
@@ -240,9 +244,9 @@ describe('ResourceField', () => {
 
       // popover should display the updated value/unit
       await expect.element(input).toHaveValue('8');
-      await expect(page.getByRole('combobox').last()).toHaveTextContent(
-        'cores',
-      );
+      await expect(
+        page.getByRole('combobox', { name: 'cpu unit' }),
+      ).toHaveTextContent('cores');
     });
   });
 });

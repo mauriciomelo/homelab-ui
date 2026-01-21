@@ -110,14 +110,14 @@ describe('updateApp', () => {
 
     const newSpec = {
       name: appName,
-      image: 'new-image:2.0', // Updated image
-      // Add some env variables
+      image: 'new-image:2.0',
+      ports: [{ name: 'http', containerPort: 80 }],
       envVariables: [
         { name: 'API_KEY', value: 'secret-key' },
         { name: 'DEBUG', value: 'true' },
       ],
       resources: currentDeployment.spec.template.spec.containers[0].resources,
-      ingress: { port: { number: 80 } },
+      ingress: { port: { name: 'http' } },
     } satisfies Partial<AppFormSchema>;
 
     await expect(updateApp(newSpec)).resolves.toEqual({
@@ -162,11 +162,12 @@ describe('createApp', () => {
     await createApp({
       name: appName,
       image,
+      ports: [{ name: 'http', containerPort: 80 }],
       envVariables: [],
       resources: {
         limits: { cpu, memory },
       },
-      ingress: { port: { number: 80 } },
+      ingress: { port: { name: 'http' } },
     });
 
     const apps = await getApps();
@@ -183,11 +184,12 @@ describe('createApp', () => {
     await createApp({
       name: appName,
       image: 'my-app:latest',
+      ports: [{ name: 'http', containerPort: customPort }],
       envVariables: [],
       resources: {
         limits: { cpu: '1', memory: '1Gi' },
       },
-      ingress: { port: { number: customPort } },
+      ingress: { port: { name: 'http' } },
     });
 
     const { data: ingress } = await getFile({
@@ -195,9 +197,9 @@ describe('createApp', () => {
       schema: ingressSchema,
     });
 
-    expect(
-      ingress.spec.rules[0].http.paths[0].backend.service.port.number,
-    ).toBe(customPort);
+    expect(ingress.spec.rules[0].http.paths[0].backend.service.port.name).toBe(
+      'http',
+    );
   });
 });
 
@@ -266,11 +268,12 @@ describe('getApps', () => {
     const expectedSpec = {
       name: 'homeassistant',
       image: 'homeassistant/home-assistant:stable',
+      ports: [{ name: 'http', containerPort: 8081 }],
       envVariables: [],
       resources: {
         limits: { cpu: '100m', memory: '256Mi' },
       },
-      ingress: { port: { number: 8081 } },
+      ingress: { port: { name: 'http' } },
     } satisfies AppFormSchema;
 
     await createApp(expectedSpec);
@@ -310,7 +313,7 @@ function buildIngress({ name }: { name: string }) {
                 path: '/',
                 pathType: 'Prefix',
                 backend: {
-                  service: { name: name, port: { number: 80 } },
+                  service: { name: name, port: { name: 'http' } },
                 },
               },
             ],

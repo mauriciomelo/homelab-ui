@@ -1,6 +1,6 @@
 'use client';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,6 +56,19 @@ function detectSelectedSize(resources: {
 type FormData = z.infer<typeof appFormSchema>;
 type FormMode = 'edit' | 'create';
 
+const defaultAppData: FormData = {
+  name: '',
+  image: '',
+  ports: [{ name: 'http', containerPort: 80 }],
+  envVariables: [{ name: '', value: '' }],
+  resources: {
+    limits: sizeToResource.small.limits,
+  },
+  ingress: {
+    port: { name: 'http' },
+  },
+};
+
 export function ApplicationForm(props: {
   data?: App['spec'];
   mode?: FormMode;
@@ -65,17 +78,7 @@ export function ApplicationForm(props: {
 
   const form = useForm<FormData>({
     resolver: zodResolver(appFormSchema),
-    defaultValues: {
-      name: props.data?.name || '',
-      image: props.data?.image || '',
-      envVariables: props.data?.envVariables || [{ name: '', value: '' }],
-      resources: props.data?.resources || {
-        limits: sizeToResource.small.limits,
-      },
-      ingress: {
-        port: { number: props.data?.ingress?.port?.number ?? 80 },
-      },
-    },
+    defaultValues: props.data ?? defaultAppData,
   });
 
   const [selectedSize, setSelectedSize] = useState<string>(() => {
@@ -88,6 +91,17 @@ export function ApplicationForm(props: {
     name: 'envVariables',
   });
 
+  const {
+    fields: portFields,
+    append: appendPort,
+    remove: removePort,
+  } = useFieldArray({
+    control: form.control,
+    name: 'ports',
+  });
+
+  const ports = useWatch({ control: form.control, name: 'ports' });
+
   const addEnvVariable = () => {
     append({ name: '', value: '' });
   };
@@ -95,6 +109,16 @@ export function ApplicationForm(props: {
   const removeEnvVariable = (index: number) => {
     if (fields.length > 1) {
       remove(index);
+    }
+  };
+
+  const addPort = () => {
+    appendPort({ name: '', containerPort: 80 });
+  };
+
+  const handleRemovePort = (index: number) => {
+    if (portFields.length > 1) {
+      removePort(index);
     }
   };
 
@@ -252,31 +276,138 @@ export function ApplicationForm(props: {
 
         <Separator />
 
+        <div className="text-base font-medium">Ports</div>
+
         <FormField
           control={form.control}
-          name="ingress.port.number"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="flex items-center gap-2 text-base font-medium">
-                Ingress Port
-              </FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={1}
-                  max={65535}
-                  data-testid="ingress-port-input"
-                  placeholder="80"
-                  className="w-32 font-mono text-sm"
-                  {...field}
-                />
-              </FormControl>
-              <FormDescription>
-                The port exposed by the Ingress (1-65535)
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
+          name="ports"
+          render={() => {
+            const fieldClassName = 'font-mono text-sm m-0';
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-2">
+                  <span className="w-60 text-xs font-medium text-gray-500">
+                    Port Name
+                  </span>
+                  <span className="flex-1 text-xs font-medium text-gray-500">
+                    Port Number
+                  </span>
+                  <div className="w-9" />
+                </div>
+                {portFields.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex items-start gap-2 rounded-md border border-gray-200 p-2"
+                  >
+                    <FormField
+                      control={form.control}
+                      name={`ports.${index}.name`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              placeholder="http"
+                              data-testid={`port-name-${index}`}
+                              className={cn(fieldClassName, 'w-60')}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`ports.${index}.containerPort`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1 grow">
+                          <FormControl>
+                            <Input
+                              placeholder="80"
+                              data-testid={`port-number-${index}`}
+                              className={cn(fieldClassName)}
+                              type="number"
+                              {...field}
+                              onChange={(event) =>
+                                field.onChange(+event.target.value)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => handleRemovePort(index)}
+                      disabled={portFields.length === 1}
+                      className="shrink-0"
+                      data-testid={`remove-port-${index}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addPort}
+                  className="w-full"
+                  data-testid="add-port-btn"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Port
+                </Button>
+              </div>
+            );
+          }}
+        />
+
+        <FormField
+          control={form.control}
+          name="ingress.port.name"
+          render={({ field }) => {
+            return (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2 text-base font-medium">
+                  Ingress Port
+                </FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  value={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="ingress-port-select">
+                      <SelectValue placeholder="Select a port" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {ports?.map(
+                      (port, index) =>
+                        port.name && (
+                          <SelectItem
+                            key={index}
+                            value={port.name}
+                            data-testid={`ingress-port-option-${port.name}`}
+                          >
+                            <span className="font-mono">
+                              {port.name} ({port.containerPort})
+                            </span>
+                          </SelectItem>
+                        ),
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  The port name referenced by the Ingress
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
 
         <div className="text-base font-medium">Environment Variables</div>

@@ -7,9 +7,10 @@ export const baseApp: App = Object.freeze({
   spec: {
     name: 'my-app',
     image: 'postgres:16',
+    ports: [{ name: 'http', containerPort: 80 }],
     envVariables: [{ name: 'DB_NAME', value: 'production' }],
     resources: { limits: { cpu: '1000m', memory: '1Gi' } },
-    ingress: { port: { number: 80 } },
+    ingress: { port: { name: 'http' } },
   },
   status: APP_STATUS.RUNNING,
   pods: [],
@@ -49,6 +50,7 @@ export const baseDeployment: z.infer<typeof deploymentSchema> = Object.freeze({
           {
             name: 'test-app',
             image: 'old-image:1.0',
+            ports: [{ name: 'http', containerPort: 80 }],
             env: [],
             resources: {
               limits: {

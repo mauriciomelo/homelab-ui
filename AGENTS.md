@@ -6,8 +6,7 @@
 
 ## Testing instructions
 
-- Run tests without watch mode (e.g., `pnpm run test:ci` commands) to avoid getting stuck.
-- Run a test in isolation by providing a name like `pnpm run test:ci -t "handles custom resource limits"`
+- Run tests with `pnpm run dance`. This command runs linting, type checking, and all tests.
 - **Test Descriptions:** Use the present tense. Do NOT use "should".
   - ✅ Preferred: `it('handles ADDED event', () => { ... })`
   - ❌ Avoid: `it('should handle ADDED event', () => { ... })`

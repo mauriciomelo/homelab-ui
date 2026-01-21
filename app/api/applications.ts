@@ -132,13 +132,19 @@ async function getAppByName(name: string) {
     deploymentResult.data.spec.template.spec.containers[0].env || [];
   const resources =
     deploymentResult.data.spec.template.spec.containers[0].resources;
-  const ingressPort =
-    ingressData.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.number ||
-    80;
+  const containerPorts =
+    deploymentResult.data.spec.template.spec.containers[0].ports || [];
+  const ingressPortName =
+    ingressData.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name ||
+    'http';
   return {
     spec: {
       name: appName,
       image: deploymentResult.data.spec.template.spec.containers[0].image,
+      ports: containerPorts.map((port) => ({
+        name: port.name,
+        containerPort: port.containerPort,
+      })),
       envVariables: allEnvironmentVariables
         ?.filter((env) => 'value' in env)
         .map((env) => ({
@@ -146,7 +152,7 @@ async function getAppByName(name: string) {
           value: env.value,
         })),
       resources,
-      ingress: { port: { number: ingressPort } },
+      ingress: { port: { name: ingressPortName } },
     },
     pods,
     iconUrl: `https://cdn.simpleicons.org/${appName}`,
@@ -226,6 +232,10 @@ function adaptAppToResources(app: AppFormSchema) {
             {
               name: app.name,
               image: app.image,
+              ports: app.ports.map((port) => ({
+                name: port.name,
+                containerPort: port.containerPort,
+              })),
               env: app.envVariables.map(
                 (env: { name: string; value: string }) => ({
                   name: env.name,
@@ -259,7 +269,7 @@ function adaptAppToResources(app: AppFormSchema) {
                 backend: {
                   service: {
                     name: app.name,
-                    port: { number: app.ingress.port.number },
+                    port: { name: app.ingress.port.name },
                   },
                 },
               },

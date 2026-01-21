@@ -129,11 +129,13 @@ export function Apps() {
               </SheetDescription>
             </SheetHeader>
             {formMode && (
-              <ApplicationForm
-                className="p-4"
-                data={selectedApp?.spec}
-                mode={formMode}
-              />
+              <div className="flex-1 overflow-y-auto">
+                <ApplicationForm
+                  className="p-4"
+                  data={selectedApp?.spec}
+                  mode={formMode}
+                />
+              </div>
             )}
           </SheetContent>
         </Sheet>

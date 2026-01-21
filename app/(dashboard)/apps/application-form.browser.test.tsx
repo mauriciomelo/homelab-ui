@@ -174,7 +174,7 @@ describe('ApplicationForm', () => {
               app.spec.envVariables = [
                 { name: 'DB_NAME', value: 'production' },
               ];
-              app.spec.ingress = { port: { number: 8080 } };
+              app.spec.ingress = { port: { name: 'http' } };
             }),
           ]);
         }),
@@ -191,13 +191,154 @@ describe('ApplicationForm', () => {
       );
       const envNameInput = page.getByPlaceholder('VARIABLE_NAME');
       const envValueInput = page.getByPlaceholder('value');
-      const portInput = page.getByLabelText('Ingress Port');
-
+      
       await expect.element(nameInput).toHaveValue('my-app');
       await expect.element(imageInput).toHaveValue('postgres:16');
       await expect.element(envNameInput).toHaveValue('DB_NAME');
       await expect.element(envValueInput).toHaveValue('production');
-      await expect.element(portInput).toHaveValue(8080);
+      
+      const portSelect = page.getByTestId('ingress-port-select');
+      await expect.element(portSelect).toHaveTextContent('http');
+
+      const portNameInput = page.getByTestId('port-name-0');
+      const portNumberInput = page.getByTestId('port-number-0');
+
+      await expect.element(portNameInput).toHaveValue('http');
+      await expect.element(portNumberInput).toHaveValue(80);
+    });
+
+    test('renders multiple ports correctly', async ({ worker }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([
+            produce(baseApp, (app) => {
+              app.spec.name = 'test-app';
+              app.spec.ports = [
+                { name: 'http', containerPort: 80 },
+                { name: 'metrics', containerPort: 9090 },
+              ];
+            }),
+          ]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      // Open the form sheet
+      await user.click(page.getByText('test-app'));
+
+      const portNameInput0 = page.getByTestId('port-name-0');
+      const portNumberInput0 = page.getByTestId('port-number-0');
+      const portNameInput1 = page.getByTestId('port-name-1');
+      const portNumberInput1 = page.getByTestId('port-number-1');
+
+      await expect.element(portNameInput0).toHaveValue('http');
+      await expect.element(portNumberInput0).toHaveValue(80);
+      await expect.element(portNameInput1).toHaveValue('metrics');
+      await expect.element(portNumberInput1).toHaveValue(9090);
+    });
+
+    test('adds new port', async ({ worker }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([
+            produce(baseApp, (app) => {
+              app.spec.name = 'test-app';
+              app.spec.ports = [{ name: 'http', containerPort: 80 }];
+            }),
+          ]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      // Open the form sheet
+      await user.click(page.getByText('test-app'));
+
+      await user.click(page.getByTestId('add-port-btn'));
+
+      await expect
+        .poll(() => page.getByTestId('port-name-1'))
+        .toBeInTheDocument();
+    });
+
+    test('removes port', async ({ worker }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([
+            produce(baseApp, (app) => {
+              app.spec.name = 'test-app';
+              app.spec.ports = [
+                { name: 'http', containerPort: 80 },
+                { name: 'metrics', containerPort: 9090 },
+              ];
+            }),
+          ]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      // Open the form sheet
+      await user.click(page.getByText('test-app'));
+
+      // Verify we have 2 ports initially
+      await expect.element(page.getByTestId('port-name-0')).toBeInTheDocument();
+      await expect.element(page.getByTestId('port-name-1')).toBeInTheDocument();
+
+      // Click remove on the second port
+      await user.click(page.getByTestId('remove-port-1'));
+
+      // Verify second port is gone
+      await expect
+        .poll(() => page.getByTestId('port-name-1').elements().length)
+        .toBe(0);
+      
+      // Verify first port is still there
+      await expect.element(page.getByTestId('port-name-0')).toBeInTheDocument();
+    });
+
+    test('updates ingress port options when ports change', async ({ worker }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([
+            produce(baseApp, (app) => {
+              app.spec.name = 'test-app';
+              app.spec.ports = [{ name: 'http', containerPort: 80 }];
+            }),
+          ]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      // Open the form sheet
+      await user.click(page.getByText('test-app'));
+
+      // Check initial ingress port
+      const portSelect = page.getByTestId('ingress-port-select');
+      await expect.element(portSelect).toHaveTextContent('http');
+
+      // Add a new port
+      await user.click(page.getByTestId('add-port-btn'));
+      const newPortNameInput = page.getByTestId('port-name-1');
+      await user.fill(newPortNameInput, 'metrics');
+
+      // Open select
+      await user.click(portSelect);
+
+      // Check if new option is available
+      await expect
+        .element(page.getByTestId('ingress-port-option-metrics'))
+        .toBeInTheDocument();
+
+      // Select the new port
+      await user.click(page.getByTestId('ingress-port-option-metrics'));
+      await expect.element(portSelect).toHaveTextContent('metrics');
     });
 
     test('adds new environment variable', async ({ worker }) => {
@@ -237,7 +378,7 @@ describe('ApplicationForm', () => {
               app.spec.name = 'test-app';
               app.spec.image = 'nginx:latest';
               app.spec.envVariables = [{ name: 'OLD_VAR', value: 'old_value' }];
-              app.spec.ingress = { port: { number: 8080 } };
+              app.spec.ingress = { port: { name: 'http' } };
             }),
           ]);
         }),
@@ -253,9 +394,9 @@ describe('ApplicationForm', () => {
       );
       const nameInput = page.getByPlaceholder('VARIABLE_NAME');
       const valueInput = page.getByPlaceholder('value');
-      const portInput = page.getByLabelText('Ingress Port');
+      const portSelect = page.getByTestId('ingress-port-select');
 
-      await expect.element(portInput).toHaveValue(8080);
+      await expect.element(portSelect).toHaveTextContent('http');
 
       await user.fill(imageInput, 'redis:7-alpine');
 
@@ -272,11 +413,12 @@ describe('ApplicationForm', () => {
         .toHaveBeenCalledWith({
           name: 'test-app',
           image: 'redis:7-alpine',
+          ports: [{ name: 'http', containerPort: 80 }],
           envVariables: [{ name: 'NEW_VAR', value: 'new_value' }],
           resources: {
             limits: { cpu: '1000m', memory: '1Gi' },
           },
-          ingress: { port: { number: 8080 } },
+          ingress: { port: { name: 'http' } },
         });
     });
 
@@ -288,7 +430,7 @@ describe('ApplicationForm', () => {
         // sizeToResources.small.limits is used to determine 'small' is selected
         // but baseApp already has string resource limits that need to match
         app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
-        app.spec.ingress = { port: { number: 8080 } };
+        app.spec.ingress = { port: { name: 'http' } };
       });
 
       worker.use(
@@ -335,7 +477,7 @@ describe('ApplicationForm', () => {
           resources: {
             limits: { cpu: '750m', memory: '768Mi' },
           },
-          ingress: { port: { number: 8080 } },
+          ingress: { port: { name: 'http' } },
         });
     });
 
@@ -369,7 +511,9 @@ describe('ApplicationForm', () => {
 
       await expect.element(cpuInput).toHaveValue('1');
       await expect.element(memoryInput).toHaveValue('1');
-      await expect(page.getByRole('combobox').last()).toHaveTextContent('Gi');
+      await expect(
+        page.getByRole('combobox', { name: 'memory unit' }),
+      ).toHaveTextContent('Gi');
     });
 
     test('app name field is readonly', async ({ worker }) => {
@@ -433,6 +577,66 @@ describe('ApplicationForm', () => {
       await expect.element(nameInputs[2]).toHaveValue('VAR3');
       await expect.element(valueInputs[2]).toHaveValue('value3');
     });
+
+    test('displays validation error when port names are not unique', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([
+            produce(baseApp, (app) => {
+              app.spec.name = 'test-app';
+              app.spec.ports = [{ name: 'http', containerPort: 80 }];
+            }),
+          ]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+      await user.click(await page.getByText('test-app'));
+
+      await user.click(page.getByTestId('add-port-btn'));
+      const newPortNameInput = page.getByTestId('port-name-1');
+      await user.fill(newPortNameInput, 'http');
+
+      await user.click(page.getByText('Update'));
+
+      await expect
+        .poll(() => page.getByText(/Port name must be unique/))
+        .toBeInTheDocument();
+    });
+
+    test('displays validation error when port numbers are not unique', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([
+            produce(baseApp, (app) => {
+              app.spec.name = 'test-app';
+              app.spec.ports = [{ name: 'http', containerPort: 80 }];
+            }),
+          ]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+      await user.click(await page.getByText('test-app'));
+
+      await user.click(page.getByTestId('add-port-btn'));
+      const newPortNameInput = page.getByTestId('port-name-1');
+      await user.fill(newPortNameInput, 'metrics');
+      const newPortNumberInput = page.getByTestId('port-number-1');
+      await user.fill(newPortNumberInput, '80');
+
+      await user.click(page.getByText('Update'));
+
+      await expect
+        .poll(() => page.getByText(/Port number must be unique/))
+        .toBeInTheDocument();
+    });
   });
 
   describe('create application', () => {
@@ -452,8 +656,8 @@ describe('ApplicationForm', () => {
 
       expect(page.getByText('Create New App')).toBeInTheDocument();
 
-      const portInput = page.getByLabelText('Ingress Port');
-      await expect.element(portInput).toHaveValue(80);
+      const portSelect = page.getByTestId('ingress-port-select');
+      await expect.element(portSelect).toHaveTextContent('http');
 
       const nameInput = page.getByPlaceholder('App Name');
       const imageInput = page.getByPlaceholder(
@@ -476,11 +680,12 @@ describe('ApplicationForm', () => {
         .toHaveBeenCalledWith({
           name: 'new-app',
           image: 'redis:7-alpine',
+          ports: [{ name: 'http', containerPort: 80 }],
           envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
           resources: {
             limits: { cpu: '500m', memory: '512Mi' },
           },
-          ingress: { port: { number: 80 } },
+          ingress: { port: { name: 'http' } },
         });
     });
   });

@@ -30,7 +30,7 @@ export const ingressSchema = z.object({
                 service: z.object({
                   name: z.string(),
                   port: z.object({
-                    number: z.number(),
+                    name: z.string(),
                   }),
                 }),
               }),
@@ -66,6 +66,12 @@ export const deploymentSchema = z.object({
           z.object({
             name: z.string(),
             image: z.string(),
+            ports: z.array(
+              z.object({
+                name: z.string(),
+                containerPort: z.number(),
+              }),
+            ),
             env: z
               .array(
                 z.union([

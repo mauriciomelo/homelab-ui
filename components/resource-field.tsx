@@ -146,7 +146,10 @@ export function ResourceField({
               onValueChange={handleUnitChange}
               disabled={disabled}
             >
-              <SelectTrigger className="w-[85px] rounded-l-none border-0 shadow-none focus:ring-0 focus:ring-offset-0">
+              <SelectTrigger
+                aria-label={`${type} unit`}
+                className="w-[85px] rounded-l-none border-0 shadow-none focus:ring-0 focus:ring-offset-0"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
