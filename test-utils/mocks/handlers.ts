@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { APP_STATUS } from '@/app/api/schemas';
+import { APP_STATUS } from '@/app/constants';
 
 export const handlers = [
   http.get('*/trpc/apps', () => {

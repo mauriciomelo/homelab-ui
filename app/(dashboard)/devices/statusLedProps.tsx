@@ -1,5 +1,5 @@
 'use client';
-import { DeviceStatus, DEVICE_STATUS } from '@/app/api/schemas';
+import { DeviceStatus, DEVICE_STATUS } from '@/app/constants';
 import { Status } from '@/components/ui/status';
 import { ComponentProps } from 'react';
 

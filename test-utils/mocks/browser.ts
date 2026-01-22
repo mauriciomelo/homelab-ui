@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { setupWorker } from 'msw/browser';
-import { APP_STATUS } from '@/app/api/schemas';
+import { APP_STATUS } from '@/app/constants';
 
 const appsData = [
   {

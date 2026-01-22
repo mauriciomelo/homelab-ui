@@ -1,5 +1,6 @@
 import type { App } from '@/app/api/applications';
-import { APP_STATUS, deploymentSchema } from '@/app/api/schemas';
+import { APP_STATUS } from '@/app/constants';
+import { deploymentSchema } from '@/app/api/schemas';
 import z from 'zod';
 
 export const baseApp: App = Object.freeze({

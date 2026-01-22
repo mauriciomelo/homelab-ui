@@ -1,4 +1,4 @@
-import { APP_STATUS, AppStatus } from '@/app/api/schemas';
+import { APP_STATUS, AppStatus } from '@/app/constants';
 import {
   Tooltip,
   TooltipContent,

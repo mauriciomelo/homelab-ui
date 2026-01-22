@@ -4,12 +4,12 @@ import YAML from 'yaml';
 import * as z from 'zod';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import path from 'path';
-import { AppFormSchema } from '../(dashboard)/apps/formSchema';
+import { AppSchema } from './schemas';
 import * as _ from 'lodash';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
+import { APP_STATUS } from '@/app/constants';
 import {
-  APP_STATUS,
   deploymentSchema,
   ingressSchema,
   kustomizationSchema,
@@ -180,7 +180,7 @@ async function getAppByName(name: string) {
   };
 }
 
-export async function updateApp(spec: AppFormSchema) {
+export async function updateApp(spec: AppSchema) {
   const appDir = getAppDir(spec.name);
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
@@ -209,7 +209,7 @@ export async function updateApp(spec: AppFormSchema) {
   return { success: true };
 }
 
-function adaptAppToResources(app: AppFormSchema) {
+function adaptAppToResources(app: AppSchema) {
   const deployment = {
     metadata: {
       name: app.name,
@@ -336,7 +336,7 @@ async function commitAndPushChanges(appName: string, message: string) {
   });
 }
 
-export async function createApp(spec: AppFormSchema) {
+export async function createApp(spec: AppSchema) {
   const { deployment: partialDeployment, ingress } = adaptAppToResources(spec);
   const deployment = {
     apiVersion: 'apps/v1',

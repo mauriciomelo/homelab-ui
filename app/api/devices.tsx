@@ -1,6 +1,6 @@
 import 'server-only';
 import * as _ from 'lodash';
-import { DEVICE_STATUS } from './schemas';
+import { DEVICE_STATUS } from '@/app/constants';
 import crypto from 'crypto';
 import assert from 'assert';
 import * as k8s from './k8s';

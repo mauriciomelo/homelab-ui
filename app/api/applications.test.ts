@@ -5,11 +5,12 @@ import { fs, vol } from 'memfs';
 import YAML from 'yaml';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import git, { PushResult } from 'isomorphic-git';
-import { AppFormSchema } from '../(dashboard)/apps/formSchema';
+import { AppSchema } from './schemas';
 import { setupMockGitRepo } from '../../test-utils';
 import { baseDeployment } from '../../test-utils/fixtures';
 import { produce } from 'immer';
-import { APP_STATUS, ingressSchema } from './schemas';
+import { APP_STATUS } from '@/app/constants';
+import { ingressSchema } from './schemas';
 import * as k from './k8s';
 
 vi.mock('server-only', () => ({}));
@@ -118,7 +119,7 @@ describe('updateApp', () => {
       ],
       resources: currentDeployment.spec.template.spec.containers[0].resources,
       ingress: { port: { name: 'http' } },
-    } satisfies Partial<AppFormSchema>;
+    } satisfies Partial<AppSchema>;
 
     await expect(updateApp(newSpec)).resolves.toEqual({
       success: true,
@@ -274,7 +275,7 @@ describe('getApps', () => {
         limits: { cpu: '100m', memory: '256Mi' },
       },
       ingress: { port: { name: 'http' } },
-    } satisfies AppFormSchema;
+    } satisfies AppSchema;
 
     await createApp(expectedSpec);
 

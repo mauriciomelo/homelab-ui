@@ -16,7 +16,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { DEVICE_STATUS } from '@/app/api/schemas';
+import { DEVICE_STATUS } from '@/app/constants';
 import { useMemo, useState } from 'react';
 import { Status } from '@/components/ui/status';
 import { Button } from '@/components/ui/button';

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { ApplicationForm } from './application-form';
 import { useTRPC } from '@/trpc/client';
 import { useQuery } from '@tanstack/react-query';
-import { APP_STATUS } from '@/app/api/schemas';
+import { APP_STATUS } from '@/app/constants';
 import {
   Sheet,
   SheetContent,

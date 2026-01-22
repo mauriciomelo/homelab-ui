@@ -6,7 +6,7 @@ import {
 } from '@/lib/resource-utils';
 import { z } from 'zod';
 
-export const appFormSchema = z
+export const appSchema = z
   .object({
     name: z.string().min(1, 'App name is required'),
     image: z.string().min(1, 'App image is required'),
@@ -101,4 +101,4 @@ export const appFormSchema = z
     },
   );
 
-export type AppFormSchema = z.infer<typeof appFormSchema>;
+export type AppSchema = z.infer<typeof appSchema>;

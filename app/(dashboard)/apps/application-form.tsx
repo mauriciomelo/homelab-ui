@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Loader2Icon, Plus, Rocket, Trash2 } from 'lucide-react';
 import type { App } from '@/app/api/applications';
-import { appFormSchema } from './formSchema';
+import { appSchema } from '@/app/api/schemas';
 import { updateApp } from './actions';
 import { Separator } from '@radix-ui/react-separator';
 import { cn } from '@/lib/utils';
@@ -53,7 +53,7 @@ function detectSelectedSize(resources: {
   return predefinedSize ? (predefinedSize[0] as SizeKey) : 'custom';
 }
 
-type FormData = z.infer<typeof appFormSchema>;
+type FormData = z.infer<typeof appSchema>;
 type FormMode = 'edit' | 'create';
 
 const defaultAppData: FormData = {
@@ -77,7 +77,7 @@ export function ApplicationForm(props: {
   const mode = props.mode ?? 'edit';
 
   const form = useForm<FormData>({
-    resolver: zodResolver(appFormSchema),
+    resolver: zodResolver(appSchema),
     defaultValues: props.data ?? defaultAppData,
   });
 

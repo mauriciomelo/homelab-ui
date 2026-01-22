@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSpring, animated } from '@react-spring/three';
-import { DeviceStatus } from '@/app/api/schemas';
+import { DeviceStatus } from '@/app/constants';
 import { statusLedProps } from './statusLedProps';
 
 export const MINI_PC_MODEL = '/models/minipc.gltf';
