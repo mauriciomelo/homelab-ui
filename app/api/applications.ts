@@ -15,7 +15,7 @@ import {
   kustomizationSchema,
 } from './schemas';
 import * as k from './k8s';
-import { toManifests } from './app-k8s-adapter';
+import { fromManifests, toManifests } from './app-k8s-adapter';
 
 export type AppResourceType =
   | z.infer<typeof deploymentSchema>
@@ -64,23 +64,17 @@ export async function restartApp(name: string) {
 async function getAppByName(name: string) {
   const appPath = getAppDir(name);
 
-  const [kustomizationResult, deploymentResult, ingressResult] =
-    await Promise.all([
-      getFile({
-        path: `${appPath}/kustomization.yaml`,
-        schema: kustomizationSchema,
-      }),
-      getFile({
-        path: `${appPath}/deployment.yaml`,
-        schema: deploymentSchema,
-      }),
-      getFile({
-        path: `${appPath}/ingress.yaml`,
-        schema: ingressSchema,
-      }),
-    ]);
+  const [deploymentResult, ingressResult] = await Promise.all([
+    getFile({
+      path: `${appPath}/deployment.yaml`,
+      schema: deploymentSchema,
+    }),
+    getFile({
+      path: `${appPath}/ingress.yaml`,
+      schema: ingressSchema,
+    }),
+  ]);
 
-  const kustomizationData = kustomizationResult.data;
   const ingressData = ingressResult.data;
 
   const [deploymentRes, podsRes] = await Promise.all([
@@ -127,34 +121,13 @@ async function getAppByName(name: string) {
         pods.map((pod) => pod.status?.phase || APP_STATUS.UNKNOWN),
       );
 
-  const appName = kustomizationData.namespace;
-
-  const allEnvironmentVariables =
-    deploymentResult.data.spec.template.spec.containers[0].env || [];
-  const resources =
-    deploymentResult.data.spec.template.spec.containers[0].resources;
-  const containerPorts =
-    deploymentResult.data.spec.template.spec.containers[0].ports || [];
-  const ingressPortName =
-    ingressData.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name ||
-    'http';
+  const spec = fromManifests({
+    deployment: deploymentResult.data,
+    ingress: ingressData,
+  });
+  const appName = spec.name;
   return {
-    spec: {
-      name: appName,
-      image: deploymentResult.data.spec.template.spec.containers[0].image,
-      ports: containerPorts.map((port) => ({
-        name: port.name,
-        containerPort: port.containerPort,
-      })),
-      envVariables: allEnvironmentVariables
-        ?.filter((env) => 'value' in env)
-        .map((env) => ({
-          name: env.name,
-          value: env.value,
-        })),
-      resources,
-      ingress: { port: { name: ingressPortName } },
-    },
+    spec,
     pods,
     iconUrl: `https://cdn.simpleicons.org/${appName}`,
     deployment: {
@@ -181,11 +154,11 @@ async function getAppByName(name: string) {
   };
 }
 
-export async function updateApp(spec: AppSchema) {
-  const appDir = getAppDir(spec.name);
+export async function updateApp(app: AppSchema) {
+  const appDir = getAppDir(app.name);
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
-  const { deployment: nextDeployment } = toManifests(spec);
+  const { deployment: nextDeployment } = toManifests(app);
 
   const previousDeployment = await getFile({
     path: deploymentFilePath,
@@ -198,25 +171,46 @@ export async function updateApp(spec: AppSchema) {
     ...updatedDeployment,
   } satisfies z.infer<typeof deploymentSchema>;
 
-  await writeResourcesToFileSystem([deployment]);
+  await writeResourcesToFileSystem(app.name, [deployment]);
 
-  await commitAndPushChanges(spec.name, `Update app ${spec.name}`);
+  await commitAndPushChanges(app.name, `Update app ${app.name}`);
 
   return { success: true };
 }
 
 export type App = Awaited<ReturnType<typeof getAppByName>>;
 
-async function writeResourcesToFileSystem(resources: AppResourceType[]) {
+async function writeResourcesToFileSystem(
+  appName: string,
+  resources: AppResourceType[],
+) {
+  const files = resources.map((resource) => {
+    const filename = `${resource.kind.toLowerCase()}.yaml`;
+    return { filename, textContent: YAML.stringify(resource) };
+  });
+
+  const kustomization = {
+    apiVersion: 'kustomize.config.k8s.io/v1beta1',
+    kind: 'Kustomization' as const,
+    metadata: { name: appName },
+    namespace: appName,
+    resources: ['deployment.yaml', 'ingress.yaml'],
+  } satisfies z.infer<typeof kustomizationSchema>;
+
+  const kustomizationFile = {
+    filename: 'kustomization.yaml',
+    textContent: YAML.stringify(kustomization),
+  };
+
+  const allFiles = [...files, kustomizationFile];
+
   await Promise.all(
-    resources.map(async (resource) => {
-      const appName = resource.metadata.name;
+    allFiles.map(async (resource) => {
       const appDir = getAppDir(appName);
-      const filename = `${resource.kind.toLowerCase()}.yaml`;
-      const filePath = `${appDir}/${filename}`;
+      const filePath = `${appDir}/${resource.filename}`;
 
       await fs.promises.mkdir(appDir, { recursive: true });
-      await fs.promises.writeFile(filePath, YAML.stringify(resource));
+      await fs.promises.writeFile(filePath, resource.textContent);
     }),
   );
 }
@@ -255,23 +249,12 @@ async function commitAndPushChanges(appName: string, message: string) {
   });
 }
 
-export async function createApp(spec: AppSchema) {
-  const { deployment, ingress, kustomization } = toManifests(spec);
-  const deploymentWithReplicas = {
-    ...deployment,
-    spec: {
-      ...deployment.spec,
-      replicas: 1,
-    },
-  } satisfies z.infer<typeof deploymentSchema>;
+export async function createApp(app: AppSchema) {
+  const { deployment, ingress } = toManifests(app);
 
-  await writeResourcesToFileSystem([
-    deploymentWithReplicas,
-    kustomization,
-    ingress,
-  ]);
+  await writeResourcesToFileSystem(app.name, [deployment, ingress]);
 
-  await commitAndPushChanges(spec.name, `Create app ${spec.name}`);
+  await commitAndPushChanges(app.name, `Create app ${app.name}`);
 
   return { success: true };
 }

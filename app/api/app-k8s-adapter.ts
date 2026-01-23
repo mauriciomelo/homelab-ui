@@ -1,18 +1,14 @@
 import * as z from 'zod';
 
-import { AppSchema } from './schemas';
-import {
-  deploymentSchema,
-  ingressSchema,
-  kustomizationSchema,
-} from './schemas';
+import { appSchema, AppSchema } from './schemas';
+import { deploymentSchema, ingressSchema } from './schemas';
 
 /**
  * Generates Kubernetes manifests (Deployment, Ingress, Kustomization, etc.)
  * from the base app schema.
  */
 export function toManifests(app: AppSchema) {
-  const deployment = {
+  const deployment: z.infer<typeof deploymentSchema> = {
     apiVersion: 'apps/v1',
     kind: 'Deployment' as const,
     metadata: {
@@ -49,9 +45,9 @@ export function toManifests(app: AppSchema) {
         },
       },
     },
-  } satisfies z.infer<typeof deploymentSchema>;
+  };
 
-  const ingress = {
+  const ingress: z.infer<typeof ingressSchema> = {
     apiVersion: 'networking.k8s.io/v1',
     kind: 'Ingress' as const,
     metadata: {
@@ -79,19 +75,43 @@ export function toManifests(app: AppSchema) {
         },
       ],
     },
-  } satisfies z.infer<typeof ingressSchema>;
-
-  const kustomization = {
-    apiVersion: 'kustomize.config.k8s.io/v1beta1',
-    kind: 'Kustomization' as const,
-    metadata: { name: app.name },
-    namespace: app.name,
-    resources: ['deployment.yaml', 'ingress.yaml'],
-  } satisfies z.infer<typeof kustomizationSchema>;
+  };
 
   return {
     deployment,
     ingress,
-    kustomization,
   };
+}
+
+/**
+ * Builds the base app schema from Kubernetes manifests.
+ */
+export function fromManifests({
+  deployment,
+  ingress,
+}: ReturnType<typeof toManifests>): AppSchema {
+  const container = deployment.spec.template.spec.containers[0];
+  const appName = deployment.metadata.name;
+  const ingressPortName =
+    ingress.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name ||
+    'http';
+
+  const app = {
+    name: appName,
+    image: container.image,
+    ports: (container.ports || []).map((port) => ({
+      name: port.name,
+      containerPort: port.containerPort,
+    })),
+    envVariables: (container.env || [])
+      .filter((env) => 'value' in env)
+      .map((env) => ({
+        name: env.name,
+        value: env.value,
+      })),
+    resources: container.resources,
+    ingress: { port: { name: ingressPortName } },
+  };
+
+  return appSchema.parse(app);
 }

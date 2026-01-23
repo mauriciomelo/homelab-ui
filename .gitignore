@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 certificates
+
+# vitest browser screenshots
+/app/(dashboard)/apps/__screenshots__
