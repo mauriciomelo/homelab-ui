@@ -5,7 +5,6 @@ import {
   MEMORY_UNITS,
 } from '@/lib/resource-utils';
 import { z } from 'zod';
-
 export const appSchema = z
   .object({
     name: z.string().min(1, 'App name is required'),

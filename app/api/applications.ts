@@ -15,6 +15,7 @@ import {
   kustomizationSchema,
 } from './schemas';
 import * as k from './k8s';
+import { toManifests } from './app-k8s-adapter';
 
 export type AppResourceType =
   | z.infer<typeof deploymentSchema>
@@ -184,21 +185,16 @@ export async function updateApp(spec: AppSchema) {
   const appDir = getAppDir(spec.name);
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
-  const newPartialDeployment = adaptAppToResources(spec).deployment;
+  const { deployment: nextDeployment } = toManifests(spec);
 
   const previousDeployment = await getFile({
     path: deploymentFilePath,
     schema: deploymentSchema,
   });
 
-  const updatedDeployment = _.merge(
-    previousDeployment.raw,
-    newPartialDeployment,
-  );
+  const updatedDeployment = _.merge(previousDeployment.raw, nextDeployment);
 
   const deployment = {
-    apiVersion: 'apps/v1',
-    kind: 'Deployment' as const,
     ...updatedDeployment,
   } satisfies z.infer<typeof deploymentSchema>;
 
@@ -207,83 +203,6 @@ export async function updateApp(spec: AppSchema) {
   await commitAndPushChanges(spec.name, `Update app ${spec.name}`);
 
   return { success: true };
-}
-
-function adaptAppToResources(app: AppSchema) {
-  const deployment = {
-    metadata: {
-      name: app.name,
-    },
-
-    spec: {
-      selector: {
-        matchLabels: {
-          app: app.name,
-        },
-      },
-      template: {
-        metadata: {
-          labels: {
-            app: app.name,
-          },
-        },
-        spec: {
-          containers: [
-            {
-              name: app.name,
-              image: app.image,
-              ports: app.ports.map((port) => ({
-                name: port.name,
-                containerPort: port.containerPort,
-              })),
-              env: app.envVariables.map(
-                (env: { name: string; value: string }) => ({
-                  name: env.name,
-                  value: env.value,
-                }),
-              ),
-              resources: app.resources,
-            },
-          ],
-        },
-      },
-    },
-  } satisfies Partial<z.infer<typeof deploymentSchema>>;
-
-  const ingress = {
-    apiVersion: 'networking.k8s.io/v1',
-    kind: 'Ingress' as const,
-    metadata: {
-      name: app.name,
-      annotations: {},
-    },
-    spec: {
-      rules: [
-        {
-          host: `${app.name}.local`,
-          http: {
-            paths: [
-              {
-                path: '/',
-                pathType: 'Prefix' as const,
-                backend: {
-                  service: {
-                    name: app.name,
-                    port: { name: app.ingress.port.name },
-                  },
-                },
-              },
-            ],
-          },
-        },
-      ],
-    },
-  } satisfies Partial<z.infer<typeof ingressSchema>>;
-
-  return {
-    deployment,
-    ingress,
-  };
 }
 
 export type App = Awaited<ReturnType<typeof getAppByName>>;
@@ -337,27 +256,20 @@ async function commitAndPushChanges(appName: string, message: string) {
 }
 
 export async function createApp(spec: AppSchema) {
-  const { deployment: partialDeployment, ingress } = adaptAppToResources(spec);
-  const deployment = {
-    apiVersion: 'apps/v1',
-    kind: 'Deployment' as const,
-    metadata: partialDeployment.metadata,
+  const { deployment, ingress, kustomization } = toManifests(spec);
+  const deploymentWithReplicas = {
+    ...deployment,
     spec: {
+      ...deployment.spec,
       replicas: 1,
-      selector: partialDeployment.spec.selector,
-      template: partialDeployment.spec.template,
     },
   } satisfies z.infer<typeof deploymentSchema>;
 
-  const kustomization = {
-    apiVersion: 'kustomize.config.k8s.io/v1beta1',
-    kind: 'Kustomization' as const,
-    metadata: { name: spec.name },
-    namespace: spec.name,
-    resources: ['deployment.yaml', 'ingress.yaml'],
-  } satisfies z.infer<typeof kustomizationSchema>;
-
-  await writeResourcesToFileSystem([deployment, kustomization, ingress]);
+  await writeResourcesToFileSystem([
+    deploymentWithReplicas,
+    kustomization,
+    ingress,
+  ]);
 
   await commitAndPushChanges(spec.name, `Create app ${spec.name}`);
 

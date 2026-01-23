@@ -77,7 +77,8 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "^5.0.2",
-    "@vitest/browser-playwright": "^4.0.15",
+    "@vitest/browser-playwright": "^4.0.18",
+    "@vitest/browser-preview": "^4.0.18",
     "@vitest/coverage-v8": "^4.0.17",
     "concurrently": "^9.2.1",
     "electron": "^37.2.0",
@@ -92,7 +93,7 @@
     "tw-animate-css": "^1.2.9",
     "typescript": "^5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.15",
+    "vitest": "^4.0.18",
     "vitest-browser-react": "^2.0.2"
   },
   "pnpm": {
