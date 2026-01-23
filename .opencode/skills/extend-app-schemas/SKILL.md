@@ -11,10 +11,10 @@ This skill helps you extend the application schema to support new Kubernetes fea
 
 The application uses a two-level schema system:
 
-1. **Application Schema** (`app/(dashboard)/apps/formSchema.tsx`) - User-facing form validation using Zod
-2. **Kubernetes Resource Schemas** (`app/api/schemas.ts`) - YAML output validation for deployment, ingress, and kustomization
+1. **Application Schema** (`app/api/schemas/app-schema.ts`) - User-facing form validation using Zod
+2. **Kubernetes Resource Schemas** (`app/api/schemas/index.ts`) - YAML output validation for deployment, ingress, and kustomization
 
-The conversion happens in `app/api/applications.ts` via the `adaptAppToResources()` function, which transforms the application schema into Kubernetes resource specifications.
+The conversion happens in `app/api/app-k8s-adapter.ts` via the `toManifests()` and `fromManifests()` functions, which transform the application schema into Kubernetes manifests.
 
 ## Extension Workflow
 
@@ -22,15 +22,15 @@ When extending the application schema, follow these steps:
 
 ### Step 1: Add Field to Application Schema
 
-Update `app/(dashboard)/apps/formSchema.tsx` to include your new field in the schema definition.
+Update `app/api/schemas/app-schema.ts` to include your new field in the schema definition.
 
 ### Step 2: Update Resource Conversion
 
-Modify the `adaptAppToResources()` function in `app/api/applications.ts` to map your new field to the appropriate Kubernetes resource.
+Modify the `toManifests()` function in `app/api/app-k8s-adapter.ts` to map your new field to the appropriate Kubernetes resource.
 
 ### Step 3: Extend K8s Schema (If Needed)
 
-If your extension requires fields not already defined in the Kubernetes schemas, update the appropriate schema in `app/api/schemas.ts`.
+If your extension requires fields not already defined in the Kubernetes schemas, update the appropriate schema in `app/api/schemas/index.ts`.
 
 ### Step 3.5: Verify Backend Before UI
 
@@ -73,9 +73,9 @@ This command runs linting, type checking, and all tests.
 
 ## Read the following files for reference:
 
-`app/\(dashboard\)/apps/formSchema.tsx`
+`app/api/schemas/app-schema.ts`
 `app/api/applications.ts`
-`app/api/schemas.ts`
+`app/api/schemas/index.ts`
 `app/api/applications.test.ts`
 `app/\(dashboard\)/apps/application-form.browser.test.tsx`
 
