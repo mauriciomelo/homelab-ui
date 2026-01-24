@@ -5,6 +5,9 @@ import {
   MEMORY_UNITS,
 } from '@/lib/resource-utils';
 import { z } from 'zod';
+import { authClientSchema } from './auth-client-schema';
+
+const additionalResourceSchema = z.union([authClientSchema]);
 export const appSchema = z
   .object({
     name: z.string().min(1, 'App name is required'),
@@ -87,6 +90,7 @@ export const appSchema = z
         name: z.string().min(1, 'Ingress port name is required'),
       }),
     }),
+    additionalResources: z.array(additionalResourceSchema).optional(),
   })
   .refine(
     (data) => {

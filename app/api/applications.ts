@@ -10,14 +10,16 @@ import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
 import { APP_STATUS } from '@/app/constants';
 import {
+  authClientSchema,
   deploymentSchema,
   ingressSchema,
   kustomizationSchema,
 } from './schemas';
 import * as k from './k8s';
-import { fromManifests, toManifests } from './app-k8s-adapter';
+import { AppManifests, fromManifests, toManifests } from './app-k8s-adapter';
 
 export type AppResourceType =
+  | z.infer<typeof authClientSchema>
   | z.infer<typeof deploymentSchema>
   | z.infer<typeof ingressSchema>
   | z.infer<typeof kustomizationSchema>;
@@ -62,20 +64,8 @@ export async function restartApp(name: string) {
 }
 
 async function getAppByName(name: string) {
-  const appPath = getAppDir(name);
-
-  const [deploymentResult, ingressResult] = await Promise.all([
-    getFile({
-      path: `${appPath}/deployment.yaml`,
-      schema: deploymentSchema,
-    }),
-    getFile({
-      path: `${appPath}/ingress.yaml`,
-      schema: ingressSchema,
-    }),
-  ]);
-
-  const ingressData = ingressResult.data;
+  const { ingress, deployment, additionalResources } =
+    await getManifestsFromAppFiles(name);
 
   const [deploymentRes, podsRes] = await Promise.all([
     k.appsApi().readNamespacedDeployment({ name, namespace: name }),
@@ -122,8 +112,9 @@ async function getAppByName(name: string) {
       );
 
   const spec = fromManifests({
-    deployment: deploymentResult.data,
-    ingress: ingressData,
+    deployment: deployment,
+    ingress: ingress,
+    additionalResources: additionalResources,
   });
   const appName = spec.name;
   return {
@@ -150,7 +141,7 @@ async function getAppByName(name: string) {
       },
     },
     status: appStatus,
-    link: `http://${ingressData.spec.rules[0].host}`,
+    link: `http://${ingress.spec.rules[0].host}`,
   };
 }
 
@@ -180,12 +171,24 @@ export async function updateApp(app: AppSchema) {
 
 export type App = Awaited<ReturnType<typeof getAppByName>>;
 
+function getFileName(resource: AppResourceType) {
+  if (
+    resource.kind === 'Deployment' ||
+    resource.kind === 'Ingress' ||
+    resource.kind === 'Kustomization'
+  ) {
+    return `${resource.kind.toLowerCase()}.yaml`;
+  }
+
+  return `${resource.metadata.name}.${resource.kind.toLowerCase()}.yaml`;
+}
+
 async function writeResourcesToFileSystem(
   appName: string,
   resources: AppResourceType[],
 ) {
   const files = resources.map((resource) => {
-    const filename = `${resource.kind.toLowerCase()}.yaml`;
+    const filename = getFileName(resource);
     return { filename, textContent: YAML.stringify(resource) };
   });
 
@@ -194,11 +197,11 @@ async function writeResourcesToFileSystem(
     kind: 'Kustomization' as const,
     metadata: { name: appName },
     namespace: appName,
-    resources: ['deployment.yaml', 'ingress.yaml'],
+    resources: files.map((file) => file.filename),
   } satisfies z.infer<typeof kustomizationSchema>;
 
   const kustomizationFile = {
-    filename: 'kustomization.yaml',
+    filename: getFileName(kustomization),
     textContent: YAML.stringify(kustomization),
   };
 
@@ -250,9 +253,13 @@ async function commitAndPushChanges(appName: string, message: string) {
 }
 
 export async function createApp(app: AppSchema) {
-  const { deployment, ingress } = toManifests(app);
+  const { deployment, ingress, additionalResources } = toManifests(app);
 
-  await writeResourcesToFileSystem(app.name, [deployment, ingress]);
+  await writeResourcesToFileSystem(app.name, [
+    deployment,
+    ingress,
+    ...additionalResources,
+  ]);
 
   await commitAndPushChanges(app.name, `Create app ${app.name}`);
 
@@ -270,6 +277,66 @@ export async function getFile<T>({
 
   const raw = YAML.parse(fileText.toString());
   return { data: schema.parse(raw), raw };
+}
+
+async function getManifestsFromAppFiles(
+  appName: string,
+): Promise<AppManifests> {
+  const appPath = getAppDir(appName);
+  const requiredFiles = new Set(['deployment.yaml', 'ingress.yaml']);
+
+  const kustomizationResult = await getFile({
+    path: `${appPath}/kustomization.yaml`,
+    schema: kustomizationSchema,
+  });
+
+  const kustomizationResources = new Set(kustomizationResult.data.resources);
+
+  const additionalResourcesFileNames =
+    kustomizationResources.difference(requiredFiles);
+
+  const deploymentResult = await getFile({
+    path: `${appPath}/deployment.yaml`,
+    schema: deploymentSchema,
+  });
+
+  const ingressResult = await getFile({
+    path: `${appPath}/ingress.yaml`,
+    schema: ingressSchema,
+  });
+
+  function schemaForFile(filename: string) {
+    // change this to a regex like *.authclient.yaml
+    if (filename.match(/\.authclient\.yaml$/)) {
+      return authClientSchema;
+    }
+
+    return undefined;
+  }
+
+  const additionalResources = await Promise.all(
+    Array.from(additionalResourcesFileNames).map(async (resourceFile) => {
+      const schema = schemaForFile(resourceFile);
+      if (!schema) {
+        return;
+      }
+
+      const { data } = await getFile({
+        path: `${appPath}/${resourceFile}`,
+        schema: authClientSchema,
+      });
+
+      return data;
+    }),
+  );
+
+  return {
+    deployment: deploymentResult.data,
+    ingress: ingressResult.data,
+    additionalResources: additionalResources.filter(
+      (resource) => resource !== undefined,
+    ),
+  };
 }
 
 export function getPodsAggregatedStatus(statuses: string[]) {

@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-import { appSchema, AppSchema } from './schemas';
+import { AppSchema } from './schemas';
 import { deploymentSchema, ingressSchema } from './schemas';
 
 /**
@@ -80,8 +80,11 @@ export function toManifests(app: AppSchema) {
   return {
     deployment,
     ingress,
+    additionalResources: app.additionalResources ?? [],
   };
 }
+
+export type AppManifests = ReturnType<typeof toManifests>;
 
 /**
  * Builds the base app schema from Kubernetes manifests.
@@ -89,14 +92,15 @@ export function toManifests(app: AppSchema) {
 export function fromManifests({
   deployment,
   ingress,
-}: ReturnType<typeof toManifests>): AppSchema {
+  additionalResources = [],
+}: AppManifests): AppSchema {
   const container = deployment.spec.template.spec.containers[0];
   const appName = deployment.metadata.name;
   const ingressPortName =
     ingress.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name ||
     'http';
 
-  const app = {
+  const app: AppSchema = {
     name: appName,
     image: container.image,
     ports: (container.ports || []).map((port) => ({
@@ -111,7 +115,8 @@ export function fromManifests({
       })),
     resources: container.resources,
     ingress: { port: { name: ingressPortName } },
+    additionalResources: additionalResources,
   };
 
-  return appSchema.parse(app);
+  return app;
 }

@@ -5,13 +5,14 @@ import { fs, vol } from 'memfs';
 import YAML from 'yaml';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import git, { PushResult } from 'isomorphic-git';
-import { AppSchema } from './schemas';
+import { AppSchema, authClientSchema } from './schemas';
 import { setupMockGitRepo } from '../../test-utils';
-import { baseDeployment } from '../../test-utils/fixtures';
+import { baseApp, baseDeployment } from '../../test-utils/fixtures';
 import { produce } from 'immer';
 import { APP_STATUS } from '@/app/constants';
 import { ingressSchema } from './schemas';
 import * as k from './k8s';
+import z from 'zod';
 
 vi.mock('server-only', () => ({}));
 
@@ -202,6 +203,39 @@ describe('createApp', () => {
       'http',
     );
   });
+
+  it('creates auth client resources', async () => {
+    const expectedAuthClient = {
+      apiVersion: 'tesselar.io/v1',
+      kind: 'AuthClient',
+      metadata: { name: 'myauthclient' },
+      spec: {
+        redirectUris: ['https://auth-app.local/callback'],
+        postLogoutRedirectUris: ['https://auth-app.local/logout'],
+      },
+    } satisfies z.infer<typeof authClientSchema>;
+
+    const appName = 'myapp';
+
+    const app = produce(baseApp.spec, (draft) => {
+      draft.name = appName;
+      draft.additionalResources = [expectedAuthClient];
+    });
+
+    await createApp(app);
+
+    const { data: persistedAuthClient } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/myauthclient.authclient.yaml`,
+      schema: authClientSchema,
+    });
+
+    expect(persistedAuthClient).toEqual(expectedAuthClient);
+
+    const apps = await getApps();
+    const createdApp = apps.find((app) => app.spec.name === app.spec.name);
+
+    expect(createdApp?.spec.additionalResources).toEqual([expectedAuthClient]);
+  });
 });
 
 describe('getApps', () => {
@@ -266,16 +300,17 @@ describe('getApps', () => {
   });
 
   it('correctly transforms the spec to files and back ', async () => {
-    const expectedSpec = {
-      name: 'homeassistant',
-      image: 'homeassistant/home-assistant:stable',
-      ports: [{ name: 'http', containerPort: 8081 }],
-      envVariables: [],
-      resources: {
+    const expectedSpec = produce(baseApp.spec, (draft) => {
+      draft.name = 'homeassistant';
+      draft.image = 'homeassistant/home-assistant:stable';
+      draft.ports = [{ name: 'http', containerPort: 8081 }];
+      draft.envVariables = [];
+      draft.resources = {
         limits: { cpu: '100m', memory: '256Mi' },
-      },
-      ingress: { port: { name: 'http' } },
-    } satisfies AppSchema;
+      };
+      draft.ingress = { port: { name: 'http' } };
+      draft.additionalResources = [];
+    }) satisfies AppSchema;
 
     await createApp(expectedSpec);
 
