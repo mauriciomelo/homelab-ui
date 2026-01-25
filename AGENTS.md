@@ -12,6 +12,13 @@
   - ❌ Avoid: `it('should handle ADDED event', () => { ... })`
 - **Mocking:** Prefer MSW (Mock Service Worker) for API/http mocking over manually mocking `fetch` or API clients. This ensures tests more accurately reflect real-world usage.
 - **Test Style:** Favor integration-style tests over isolated unit tests, especially for React components. Testing user behavior and interactions creates more resilient tests than testing implementation details.
+- **Selectors:** Prefer user-centric queries like `getByRole`, `getByLabelText`, `getByText`. Avoid `getByTestId` unless there is no accessible alternative, but prefer to edit the target component to add accessibility attributes if necessary.
+
+  ```typescript
+  page.getByRole('button', { name: 'Create' });
+  page.getByLabelText('Redirect URI');
+  ```
+
 - **Test Data:** When creating test data, check if there's a reusable fixture in `test-utils/fixtures.ts`. Create a new one if appropriate. Use immer's `produce` function to create variations of existing fixtures by only overriding the relevant fields for that test. Always use `produce` to override fields, even if the base fixture is acceptable as-is, to make explicit what fields are important for that test. This makes tests easier to understand by clearly showing the setup state. Example following the AAA (Arrange, Act, Assert) pattern:
 
   ```typescript

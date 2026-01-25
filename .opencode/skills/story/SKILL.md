@@ -14,10 +14,12 @@ The file should be created in markdown format with the filename `0000-story-name
 White here a brief description of the context or background for the story. Make sure to cover the reasoning behind the story. This should be a short paragraph.
 </todo>
 
-## Task List / ACs
+## Acceptance Criteria
 
 <todo>
-White here a brief description of the context or background for the story. Make sure to cover the reasoning behind the story. This should be a short paragraph.
+Write clear, concise, and testable acceptance criteria focused on user outcomes (the "what"), not implementation details (the "how").
+Group or split criteria as needed so each item can be verified independently (with an automated test ideally).
+Avoid technical steps, internal APIs, or file references in the ACs.
 You do not need to add testing tasks to the Task List, since it's implied that all tasks should include tests (unless it's not applicable). Add testing notes in the Tech Notes section instead.
 </todo>
 

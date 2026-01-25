@@ -191,12 +191,12 @@ describe('ApplicationForm', () => {
       );
       const envNameInput = page.getByPlaceholder('VARIABLE_NAME');
       const envValueInput = page.getByPlaceholder('value');
-      
+
       await expect.element(nameInput).toHaveValue('my-app');
       await expect.element(imageInput).toHaveValue('postgres:16');
       await expect.element(envNameInput).toHaveValue('DB_NAME');
       await expect.element(envValueInput).toHaveValue('production');
-      
+
       const portSelect = page.getByTestId('ingress-port-select');
       await expect.element(portSelect).toHaveTextContent('http');
 
@@ -205,6 +205,215 @@ describe('ApplicationForm', () => {
 
       await expect.element(portNameInput).toHaveValue('http');
       await expect.element(portNumberInput).toHaveValue(80);
+    });
+
+    test('renders existing auth clients', async ({ worker }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([
+            produce(baseApp, (app) => {
+              app.spec.name = 'auth-app';
+              app.spec.additionalResources = [
+                {
+                  apiVersion: 'tesselar.io/v1',
+                  kind: 'AuthClient',
+                  metadata: { name: 'authclient-main' },
+                  spec: {
+                    redirectUris: ['https://example.com/callback'],
+                    postLogoutRedirectUris: ['https://example.com/logout'],
+                  },
+                },
+              ];
+            }),
+          ]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('auth-app'));
+
+      await expect
+        .element(page.getByText('Additional Resources'))
+        .toBeInTheDocument();
+      const authClientNameInput = page.getByLabelText('Auth Client Name');
+      const redirectUriInput = page.getByLabelText('Redirect URI');
+      const postLogoutUriInput = page.getByLabelText('Post-logout URI');
+
+      await expect.element(authClientNameInput).toHaveValue('authclient-main');
+      await expect
+        .element(redirectUriInput)
+        .toHaveValue('https://example.com/callback');
+      await expect
+        .element(postLogoutUriInput)
+        .toHaveValue('https://example.com/logout');
+    });
+
+    test('adds auth client from additional resources', async ({ worker }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'auth-app';
+        app.spec.additionalResources = [];
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('auth-app'));
+
+      await user.click(page.getByRole('button', { name: 'Add Resource' }));
+      await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
+
+      await expect
+        .poll(() => page.getByLabelText('Auth Client Name'))
+        .toBeInTheDocument();
+      await expect
+        .poll(() => page.getByLabelText('Redirect URI'))
+        .toBeInTheDocument();
+    });
+
+    test('sets a default auth client name', async ({ worker }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'default-auth-app';
+        app.spec.additionalResources = [];
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('default-auth-app'));
+
+      await user.click(page.getByRole('button', { name: 'Add Resource' }));
+      await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
+
+      await expect
+        .poll(() => page.getByLabelText('Auth Client Name'))
+        .toHaveValue('authclient');
+    });
+
+    test('adds optional post-logout redirect uris', async ({ worker }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'logout-auth-app';
+        app.spec.additionalResources = [];
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('logout-auth-app'));
+
+      await user.click(page.getByRole('button', { name: 'Add Resource' }));
+      await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
+
+      const postLogoutInput = page.getByLabelText('Post-logout URI');
+      await user.click(postLogoutInput);
+      await user.keyboard(
+        'https://example.com/logout, https://example.com/logout-next',
+      );
+
+      await expect
+        .element(postLogoutInput)
+        .toHaveValue(
+          'https://example.com/logout, https://example.com/logout-next',
+        );
+    });
+
+    test('shows validation error for invalid redirect uri', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'invalid-auth-app';
+        app.spec.additionalResources = [];
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('invalid-auth-app'));
+
+      await user.click(page.getByRole('button', { name: 'Add Resource' }));
+      await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
+
+      const redirectInput = page.getByLabelText('Redirect URI');
+      await user.click(redirectInput);
+      await user.keyboard('https://example.com/callback, not-a-url');
+
+      await user.click(page.getByText('Update'));
+
+      await expect
+        .poll(
+          () =>
+            page.getByText('Redirect URI must be a valid URL').elements()
+              .length,
+        )
+        .toBe(1);
+    });
+
+    test('manages multiple auth clients', async ({ worker }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'multi-auth-app';
+        app.spec.additionalResources = [];
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('multi-auth-app'));
+
+      await user.click(page.getByRole('button', { name: 'Add Resource' }));
+      await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
+
+      await user.click(page.getByRole('button', { name: 'Add Resource' }));
+      await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
+
+      await expect
+        .poll(() => page.getByLabelText('Auth Client Name').elements().length)
+        .toBe(2);
+
+      const authClientNames = page.getByLabelText('Auth Client Name');
+      await user.fill(authClientNames.nth(0), 'primary-client');
+      await user.fill(authClientNames.nth(1), 'secondary-client');
+
+      await user.click(
+        page.getByRole('button', { name: 'Remove Auth Client' }).nth(0),
+      );
+
+      await expect
+        .poll(() => page.getByLabelText('Auth Client Name').elements().length)
+        .toBe(1);
+      await expect
+        .element(page.getByLabelText('Auth Client Name'))
+        .toHaveValue('secondary-client');
     });
 
     test('renders multiple ports correctly', async ({ worker }) => {
@@ -296,12 +505,14 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => page.getByTestId('port-name-1').elements().length)
         .toBe(0);
-      
+
       // Verify first port is still there
       await expect.element(page.getByTestId('port-name-0')).toBeInTheDocument();
     });
 
-    test('updates ingress port options when ports change', async ({ worker }) => {
+    test('updates ingress port options when ports change', async ({
+      worker,
+    }) => {
       const user = userEvent.setup();
       worker.use(
         http.get('*/api/trpc/apps', () => {

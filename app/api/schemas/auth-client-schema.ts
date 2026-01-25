@@ -8,11 +8,23 @@ export const authClientSchema = z.object({
   }),
   spec: z.object({
     redirectUris: z
-      .array(z.string().min(1, 'Redirect URI is required'))
+      .array(
+        z
+          .string()
+          .min(1, 'Redirect URI is required')
+          .url('Redirect URI must be a valid URL'),
+      )
       .min(1, 'At least one redirect URI is required'),
     postLogoutRedirectUris: z
-      .array(z.string().min(1, 'Post logout redirect URI is required'))
+      .array(
+        z
+          .string()
+          .min(1, 'Post logout redirect URI is required')
+          .url('Post logout redirect URI must be a valid URL'),
+      )
       .min(1, 'At least one post logout redirect URI is required')
       .optional(),
   }),
 });
+
+export type AuthClientSchema = z.infer<typeof authClientSchema>;
