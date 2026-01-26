@@ -282,6 +282,62 @@ describe('createApp', () => {
       expectedPersistentVolumeClaim,
     ]);
   });
+
+  it('links volume mounts to persistent volume claims', async () => {
+    const expectedPersistentVolumeClaim = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: { name: 'app-data' },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        storageClassName: 'longhorn',
+        resources: {
+          requests: {
+            storage: '10Gi',
+          },
+        },
+      },
+    } satisfies z.infer<typeof persistentVolumeClaimSchema>;
+
+    const appName = 'volume-app';
+
+    const app = produce(baseApp.spec, (draft) => {
+      draft.name = appName;
+      draft.additionalResources = [expectedPersistentVolumeClaim];
+      draft.envVariables = [];
+      draft.volumeMounts = [
+        {
+          mountPath: '/data',
+          name: expectedPersistentVolumeClaim.metadata.name,
+        },
+      ];
+    });
+
+    await createApp(app);
+
+    const apps = await getApps();
+    const createdApp = apps.find((app) => app.spec.name === appName);
+
+    expect(createdApp?.spec.volumeMounts).toEqual(app.volumeMounts);
+  });
+
+  it('rejects volume mounts without matching persistent volume claims', async () => {
+    const app = produce(baseApp.spec, (draft) => {
+      draft.name = 'invalid-volume-app';
+      draft.additionalResources = [];
+      draft.envVariables = [];
+      draft.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
+    });
+
+    await expect(createApp(app)).rejects.toMatchObject({
+      issues: [
+        {
+          path: ['volumeMounts', 0, 'name'],
+          message: 'Volume mount must reference a persistent volume claim',
+        },
+      ],
+    });
+  });
 });
 
 describe('getApps', () => {

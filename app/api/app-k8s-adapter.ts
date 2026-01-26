@@ -37,8 +37,11 @@ export function toManifests(app: AppSchema) {
               })),
               env: app.envVariables,
               resources: app.resources,
+              volumeMounts: app.volumeMounts,
             },
           ],
+
+          volumes: deriveVolumesFromMounts(app.volumeMounts),
         },
       },
     },
@@ -104,7 +107,25 @@ export function fromManifests({
     resources: container.resources,
     ingress: { port: { name: ingressPortName } },
     additionalResources: additionalResources,
+    volumeMounts: container.volumeMounts,
   };
 
   return app;
+}
+
+function deriveVolumesFromMounts(volumeMounts: AppSchema['volumeMounts']) {
+  if (!volumeMounts) {
+    return;
+  }
+
+  const claimNameSet = new Set(
+    volumeMounts.map((volumeMount) => volumeMount.name),
+  );
+
+  return Array.from(claimNameSet).map((volumeMountName) => ({
+    name: volumeMountName,
+    persistentVolumeClaim: {
+      claimName: volumeMountName,
+    },
+  }));
 }

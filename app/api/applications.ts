@@ -4,7 +4,7 @@ import YAML from 'yaml';
 import * as z from 'zod';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import path from 'path';
-import { AppSchema } from './schemas';
+import { AppSchema, appSchema } from './schemas';
 import * as _ from 'lodash';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
@@ -152,10 +152,11 @@ async function getAppByName(name: string) {
 }
 
 export async function updateApp(app: AppSchema) {
-  const appDir = getAppDir(app.name);
+  const parsedApp = appSchema.parse(app);
+  const appDir = getAppDir(parsedApp.name);
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
-  const { deployment: nextDeployment } = toManifests(app);
+  const { deployment: nextDeployment } = toManifests(parsedApp);
 
   const previousDeployment = await getFile({
     path: deploymentFilePath,
@@ -168,9 +169,9 @@ export async function updateApp(app: AppSchema) {
     ...updatedDeployment,
   } satisfies z.infer<typeof deploymentSchema>;
 
-  await writeResourcesToFileSystem(app.name, [deployment]);
+  await writeResourcesToFileSystem(parsedApp.name, [deployment]);
 
-  await commitAndPushChanges(app.name, `Update app ${app.name}`);
+  await commitAndPushChanges(parsedApp.name, `Update app ${parsedApp.name}`);
 
   return { success: true };
 }
@@ -259,15 +260,16 @@ async function commitAndPushChanges(appName: string, message: string) {
 }
 
 export async function createApp(app: AppSchema) {
-  const { deployment, ingress, additionalResources } = toManifests(app);
+  const parsedApp = appSchema.parse(app);
+  const { deployment, ingress, additionalResources } = toManifests(parsedApp);
 
-  await writeResourcesToFileSystem(app.name, [
+  await writeResourcesToFileSystem(parsedApp.name, [
     deployment,
     ingress,
     ...additionalResources,
   ]);
 
-  await commitAndPushChanges(app.name, `Create app ${app.name}`);
+  await commitAndPushChanges(parsedApp.name, `Create app ${parsedApp.name}`);
 
   return { success: true };
 }

@@ -27,6 +27,10 @@ const envVariableSchema = z.union([
     }),
   }),
 ]);
+const volumeMountSchema = z.object({
+  mountPath: z.string().min(1, 'Mount path is required'),
+  name: z.string().min(1, 'PVC name is required'),
+});
 
 export const appSchema = z
   .object({
@@ -75,6 +79,7 @@ export const appSchema = z
         });
       }),
     envVariables: z.array(envVariableSchema),
+    volumeMounts: z.array(volumeMountSchema).optional(),
     resources: z.object({
       limits: z.object({
         cpu: z
@@ -126,6 +131,14 @@ export const appSchema = z
         path: ['envVariables', index, 'value'],
       });
     });
+
+    validateBrokenVolumeMountReferences(data).forEach(({ index }) => {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Volume mount must reference a persistent volume claim',
+        path: ['volumeMounts', index, 'name'],
+      });
+    });
   });
 
 export type AppSchema = z.infer<typeof appSchema>;
@@ -143,6 +156,22 @@ function validateBrokenEnvReferences(data: AppSchema) {
       if (!authClientNames.has(secretName)) {
         return [{ index, secretName }];
       }
+    }
+
+    return [];
+  });
+}
+
+function validateBrokenVolumeMountReferences(data: AppSchema) {
+  const pvcNames = new Set(
+    data.additionalResources
+      ?.filter((resource) => resource.kind === 'PersistentVolumeClaim')
+      .map((resource) => resource.metadata.name) ?? [],
+  );
+
+  return (data.volumeMounts ?? []).flatMap((volumeMount, index) => {
+    if (!pvcNames.has(volumeMount.name)) {
+      return [{ index, name: volumeMount.name }];
     }
 
     return [];

@@ -49,6 +49,14 @@ export const deploymentSchema = z.object({
                 ]),
               )
               .optional(),
+            volumeMounts: z
+              .array(
+                z.object({
+                  name: z.string(),
+                  mountPath: z.string(),
+                }),
+              )
+              .optional(),
             resources: z.object({
               limits: z.object({
                 cpu: z.string(),
@@ -57,6 +65,16 @@ export const deploymentSchema = z.object({
             }),
           }),
         ),
+        volumes: z
+          .array(
+            z.object({
+              name: z.string(),
+              persistentVolumeClaim: z.object({
+                claimName: z.string(),
+              }),
+            }),
+          )
+          .optional(),
       }),
     }),
   }),
