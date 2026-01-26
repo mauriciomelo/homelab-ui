@@ -5,6 +5,17 @@ import { useEffect, useRef } from 'react';
  * Cursor component that displays a custom cursor dot
  * that follows the mouse movements for visual feedback on browser tests.
  */
+
+const VIRTUAL_CURSOR_ID = '__mouse_dot__';
+
+export function hideCursor() {
+  document.getElementById(VIRTUAL_CURSOR_ID)?.classList.add('hidden');
+}
+
+export function showCursor() {
+  document.getElementById(VIRTUAL_CURSOR_ID)?.classList.remove('hidden');
+}
+
 export default function Cursor() {
   const dotRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +54,7 @@ export default function Cursor() {
   return (
     <div
       ref={dotRef}
-      id="__mouse_dot__"
+      id={VIRTUAL_CURSOR_ID}
       className={cn(
         `pointer-events-none fixed top-0 left-0 z-[9999999] size-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-3 border-gray-200 bg-blue-950 opacity-40 transition-[top,left,scale] duration-50 ease-linear`,
       )}

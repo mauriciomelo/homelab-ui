@@ -15,6 +15,7 @@
     "dance": "concurrently -n \"lint,test,tsc\" \"pnpm run lint\" \"pnpm run test:ci --silent passed-only\" \"pnpm run tsc\""
   },
   "dependencies": {
+    "@hookform/lenses": "^0.9.0",
     "@hookform/resolvers": "^5.1.1",
     "@kubernetes/client-node": "^1.3.0",
     "@lucide/lab": "^0.1.2",

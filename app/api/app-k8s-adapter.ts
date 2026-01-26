@@ -35,10 +35,7 @@ export function toManifests(app: AppSchema) {
                 name: port.name,
                 containerPort: port.containerPort,
               })),
-              env: app.envVariables.map((env) => ({
-                name: env.name,
-                value: env.value,
-              })),
+              env: app.envVariables,
               resources: app.resources,
             },
           ],
@@ -97,22 +94,13 @@ export function fromManifests({
   const container = deployment.spec.template.spec.containers[0];
   const appName = deployment.metadata.name;
   const ingressPortName =
-    ingress.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name ||
-    'http';
+    ingress.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name;
 
   const app: AppSchema = {
     name: appName,
     image: container.image,
-    ports: (container.ports || []).map((port) => ({
-      name: port.name,
-      containerPort: port.containerPort,
-    })),
-    envVariables: (container.env || [])
-      .filter((env) => 'value' in env)
-      .map((env) => ({
-        name: env.name,
-        value: env.value,
-      })),
+    ports: container.ports,
+    envVariables: container.env || [],
     resources: container.resources,
     ingress: { port: { name: ingressPortName } },
     additionalResources: additionalResources,

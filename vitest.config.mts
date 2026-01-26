@@ -10,8 +10,8 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          setupFiles: ['./vitest.unit.setup.ts'],
           name: 'unit',
+          setupFiles: ['./vitest.unit.setup.ts'],
           environment: 'jsdom',
           exclude: [...configDefaults.exclude, './**/*.browser.test.tsx'],
         },
@@ -20,6 +20,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'browser',
+          setupFiles: ['./vitest.browser.setup.ts'],
           include: ['./**/*browser.test.tsx'],
           browser: {
             enabled: true,

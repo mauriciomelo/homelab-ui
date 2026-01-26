@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useFormState, useWatch } from 'react-hook-form';
-import type { Control } from 'react-hook-form';
+import { type Lens } from '@hookform/lenses';
 import { Button } from '@/components/ui/button';
 import {
   FormControl,
@@ -14,38 +14,36 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { KeyRound, Trash2 } from 'lucide-react';
-import { AppSchema } from '@/app/api/schemas';
+import { Shield, Trash2 } from 'lucide-react';
+import { AppSchema, AuthClientSchema } from '@/app/api/schemas';
 
 const formatUriList = (value?: string[]) =>
-  value?.length ? value.join(', ') : '';
+  value?.length ? value.join(',\n') : '';
 
 const parseUriList = (value: string) =>
   value
-    .split(',')
+    .split(/,|\n/)
     .map((entry) => entry.trim())
     .filter(Boolean);
 
 export function AuthClientCard({
-  control,
+  lens,
   index,
   onRemove,
 }: {
-  control: Control<AppSchema>;
+  lens: Lens<AuthClientSchema>;
   index: number;
   onRemove: (index: number) => void;
 }) {
-  const resource = useWatch({
-    control,
-    name: `additionalResources.${index}`,
-  });
+  const { control, name } = lens.interop();
+  const resource = useWatch({ control, name });
   const [redirectUrisInput, setRedirectUrisInput] = useState(() =>
     formatUriList(resource?.spec?.redirectUris),
   );
   const [postLogoutUrisInput, setPostLogoutUrisInput] = useState(() =>
     formatUriList(resource?.spec?.postLogoutRedirectUris),
   );
-  const { errors } = useFormState({ control });
+  const { errors } = useFormState<AppSchema>();
   const redirectErrors =
     errors.additionalResources?.[index]?.spec?.redirectUris;
   const postLogoutErrors =
@@ -58,12 +56,22 @@ export function AuthClientCard({
     (error) => !!error?.message,
   )?.message;
 
+  const nameInterop = lens.focus('metadata').focus('name').interop();
+  const redirectUrisInterop = lens
+    .focus('spec')
+    .focus('redirectUris')
+    .interop();
+  const postLogoutUrisInterop = lens
+    .focus('spec')
+    .focus('postLogoutRedirectUris')
+    .interop();
+
   return (
     <div className="border-border/70 bg-background space-y-4 rounded-lg border p-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <KeyRound className="text-muted-foreground h-4 w-4" />
+            <Shield className="text-muted-foreground h-4 w-4" />
             <span>Auth Client</span>
           </div>
           <p className="text-muted-foreground text-xs">
@@ -82,8 +90,8 @@ export function AuthClientCard({
         </Button>
       </div>
       <FormField
-        control={control}
-        name={`additionalResources.${index}.metadata.name`}
+        control={nameInterop.control}
+        name={nameInterop.name}
         render={({ field }) => (
           <FormItem className="space-y-2">
             <FormLabel>Auth Client Name</FormLabel>
@@ -95,8 +103,8 @@ export function AuthClientCard({
         )}
       />
       <FormField
-        control={control}
-        name={`additionalResources.${index}.spec.redirectUris`}
+        control={redirectUrisInterop.control}
+        name={redirectUrisInterop.name}
         render={({ field }) => (
           <FormItem className="space-y-2">
             <FormLabel>Redirect URI</FormLabel>
@@ -128,8 +136,8 @@ export function AuthClientCard({
         )}
       />
       <FormField
-        control={control}
-        name={`additionalResources.${index}.spec.postLogoutRedirectUris`}
+        control={postLogoutUrisInterop.control}
+        name={postLogoutUrisInterop.name}
         render={({ field }) => (
           <FormItem className="space-y-2">
             <FormLabel>Post-logout URI</FormLabel>

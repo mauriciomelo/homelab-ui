@@ -8,6 +8,22 @@ import { z } from 'zod';
 import { authClientSchema } from './auth-client-schema';
 
 const additionalResourceSchema = z.union([authClientSchema]);
+const envVariableSchema = z.union([
+  z.object({
+    name: z.string().min(1, 'Variable name is required'),
+    value: z.string().min(1, 'Variable value is required'),
+  }),
+  z.object({
+    name: z.string().min(1, 'Variable name is required'),
+    valueFrom: z.object({
+      secretKeyRef: z.object({
+        name: z.string().min(1, 'Secret name is required'),
+        key: z.string().min(1, 'Secret key is required'),
+      }),
+    }),
+  }),
+]);
+
 export const appSchema = z
   .object({
     name: z.string().min(1, 'App name is required'),
@@ -37,7 +53,7 @@ export const appSchema = z
         ports.forEach((port, index) => {
           if (port.name && names.has(port.name)) {
             ctx.addIssue({
-              code: z.ZodIssueCode.custom,
+              code: 'custom',
               message: 'Port name must be unique',
               path: [index, 'name'],
             });
@@ -46,7 +62,7 @@ export const appSchema = z
 
           if (port.containerPort && numbers.has(port.containerPort)) {
             ctx.addIssue({
-              code: z.ZodIssueCode.custom,
+              code: 'custom',
               message: 'Port number must be unique',
               path: [index, 'containerPort'],
             });
@@ -54,12 +70,7 @@ export const appSchema = z
           numbers.add(port.containerPort);
         });
       }),
-    envVariables: z.array(
-      z.object({
-        name: z.string().min(1, 'Variable name is required'),
-        value: z.string().min(1, 'Variable value is required'),
-      }),
-    ),
+    envVariables: z.array(envVariableSchema),
     resources: z.object({
       limits: z.object({
         cpu: z
@@ -102,6 +113,53 @@ export const appSchema = z
         'Ingress port name must reference a port in the defined ports list',
       path: ['ingress', 'port', 'name'],
     },
-  );
+  )
+  .superRefine((data, ctx) => {
+    validateBrokenEnvReferences(data).forEach(({ index }) => {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Secret reference must match an existing resource',
+        path: ['envVariables', index, 'value'],
+      });
+    });
+  });
 
 export type AppSchema = z.infer<typeof appSchema>;
+
+function validateBrokenEnvReferences(data: AppSchema) {
+  const authClientNames = new Set(
+    deriveResourceReferences(data.additionalResources).map(
+      (reference) => reference.name,
+    ),
+  );
+
+  return data.envVariables.flatMap((envVariable, index) => {
+    if ('valueFrom' in envVariable) {
+      const secretName = envVariable.valueFrom.secretKeyRef.name;
+      if (!authClientNames.has(secretName)) {
+        return [{ index, secretName }];
+      }
+    }
+
+    return [];
+  });
+}
+
+export function deriveResourceReferences(
+  resources: AppSchema['additionalResources'],
+) {
+  const references = resources
+    ?.map((resource) => {
+      if (resource.kind === 'AuthClient') {
+        return {
+          name: resource.metadata.name,
+          kind: resource.kind,
+          keys: ['client-id', 'client-secret'] as const,
+        };
+      }
+      return null;
+    })
+    .filter((resource) => resource !== null);
+
+  return references ?? [];
+}

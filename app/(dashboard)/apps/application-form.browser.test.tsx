@@ -633,6 +633,136 @@ describe('ApplicationForm', () => {
         });
     });
 
+    test('links environment variable to auth client secret', async ({
+      worker,
+    }) => {
+      vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'auth-secret-app';
+        app.spec.additionalResources = [
+          {
+            apiVersion: 'tesselar.io/v1',
+            kind: 'AuthClient',
+            metadata: { name: 'authclient' },
+            spec: {
+              redirectUris: ['https://example.com/callback'],
+            },
+          },
+        ];
+        app.spec.envVariables = [
+          { name: 'OAUTH_CLIENT_SECRET', value: 'placeholder' },
+        ];
+        app.spec.ingress = { port: { name: 'http' } };
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(await page.getByText('auth-secret-app'));
+
+      const linkButton = page.getByRole('button', { name: 'Link secret' });
+      await user.click(linkButton);
+      await user.click(
+        page.getByRole('menuitem', {
+          name: 'Client Secret authclient',
+        }),
+      );
+
+      await user.click(page.getByText('Update'));
+
+      await expect
+        .poll(() => vi.mocked(actions.updateApp))
+        .toHaveBeenCalledWith({
+          name: 'auth-secret-app',
+          image: 'postgres:16',
+          ports: [{ name: 'http', containerPort: 80 }],
+          envVariables: [
+            {
+              name: 'OAUTH_CLIENT_SECRET',
+              valueFrom: {
+                secretKeyRef: {
+                  name: 'authclient',
+                  key: 'client-secret',
+                },
+              },
+            },
+          ],
+          resources: {
+            limits: { cpu: '1000m', memory: '1Gi' },
+          },
+          ingress: { port: { name: 'http' } },
+          additionalResources: [
+            {
+              apiVersion: 'tesselar.io/v1',
+              kind: 'AuthClient',
+              metadata: { name: 'authclient' },
+              spec: {
+                redirectUris: ['https://example.com/callback'],
+              },
+            },
+          ],
+        });
+    });
+
+    test('shows validation error when auth client link is removed', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'auth-client-removed-app';
+        app.spec.additionalResources = [
+          {
+            apiVersion: 'tesselar.io/v1',
+            kind: 'AuthClient',
+            metadata: { name: 'authclient-main' },
+            spec: {
+              redirectUris: ['https://example.com/callback'],
+            },
+          },
+        ];
+        app.spec.envVariables = [
+          {
+            name: 'OAUTH_CLIENT_ID',
+            valueFrom: {
+              secretKeyRef: {
+                name: 'authclient-main',
+                key: 'client-id',
+              },
+            },
+          },
+        ];
+        app.spec.ingress = { port: { name: 'http' } };
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(await page.getByText('auth-client-removed-app'));
+
+      await user.click(
+        page.getByRole('button', { name: 'Remove Auth Client' }),
+      );
+
+      await user.click(page.getByText('Update'));
+
+      await expect
+        .poll(() =>
+          page.getByText('Secret reference must match an existing resource'),
+        )
+        .toBeInTheDocument();
+    });
+
     test('handles custom resource limits', async ({ worker }) => {
       vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
       const user = userEvent.setup();

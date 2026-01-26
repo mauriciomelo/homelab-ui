@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useController, useFormState, useWatch } from 'react-hook-form';
-import type { Control } from 'react-hook-form';
+import { type Lens } from '@hookform/lenses';
 import {
   FormControl,
   FormDescription,
@@ -65,16 +65,19 @@ function isSizeKey(value: string): value is SizeKey {
 }
 
 export function ResourceLimitsField({
-  control,
+  lens,
 }: {
-  control: Control<AppSchema>;
+  lens: Lens<AppSchema['resources']>;
 }) {
-  const resources = useWatch({ control, name: 'resources' });
-  const resourcesField = useController({ control, name: 'resources' }).field;
+  const { control, name } = lens.interop();
+  const resources = useWatch({ control, name });
+  const resourcesField = useController({ control, name }).field;
   const [selectedSize, setSelectedSize] = useState<SizeKey | 'custom'>(() =>
     detectSelectedSize(resources),
   );
-  const { errors } = useFormState({ control });
+  const { errors } = useFormState<AppSchema>();
+  const cpuInterop = lens.focus('limits').focus('cpu').interop();
+  const memoryInterop = lens.focus('limits').focus('memory').interop();
 
   return (
     <FormItem>
@@ -124,8 +127,8 @@ export function ResourceLimitsField({
           <>
             <div className="flex-1">
               <FormField
-                control={control}
-                name="resources.limits.cpu"
+                control={cpuInterop.control}
+                name={cpuInterop.name}
                 render={({ field }) => (
                   <FormItem>
                     <ResourceField
@@ -142,8 +145,8 @@ export function ResourceLimitsField({
             </div>
             <div className="flex-1">
               <FormField
-                control={control}
-                name="resources.limits.memory"
+                control={memoryInterop.control}
+                name={memoryInterop.name}
                 render={({ field }) => (
                   <FormItem>
                     <ResourceField

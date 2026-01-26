@@ -12,6 +12,9 @@ importers:
 
   .:
     dependencies:
+      '@hookform/lenses':
+        specifier: ^0.9.0
+        version: 0.9.0(react-hook-form@7.58.1(react@19.2.3))(react@19.2.3)
       '@hookform/resolvers':
         specifier: ^5.1.1
         version: 5.1.1(react-hook-form@7.58.1(react@19.2.3))
@@ -625,6 +628,13 @@ packages:
 
   '@floating-ui/utils@0.2.9':
     resolution: {integrity: sha512-MDWhGtE+eHw5JW7lq4qhc5yRLS11ERl1c7Z6Xd0a58DozHES6EnNNwUWbMiG4J9Cgj053Bhk8zvlhFYKVhULwg==}
+
+  '@hookform/lenses@0.9.0':
+    resolution: {integrity: sha512-lg/0FeKekRmBCPwPjI5+N63u1vNXrbEMfKen+KSoBo7QpKQEm8gYPvandXAMNxCExco9xXlIP52r+o7BS7cWQQ==}
+    engines: {bun: '>=1.2'}
+    peerDependencies:
+      react: ^16.8.0 || ^17 || ^18 || ^19
+      react-hook-form: ^7.55.0
 
   '@hookform/resolvers@5.1.1':
     resolution: {integrity: sha512-J/NVING3LMAEvexJkyTLjruSm7aOFx7QX21pzkiJfMoNG0wl5aFEjLTl7ay7IQb9EWY6AkrBy7tHL2Alijpdcg==}
@@ -5575,6 +5585,11 @@ snapshots:
       react-dom: 19.2.3(react@19.2.3)
 
   '@floating-ui/utils@0.2.9': {}
+
+  '@hookform/lenses@0.9.0(react-hook-form@7.58.1(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      react: 19.2.3
+      react-hook-form: 7.58.1(react@19.2.3)
 
   '@hookform/resolvers@5.1.1(react-hook-form@7.58.1(react@19.2.3))':
     dependencies:
