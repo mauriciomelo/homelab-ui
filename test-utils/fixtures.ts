@@ -1,6 +1,9 @@
 import type { App } from '@/app/api/applications';
 import { APP_STATUS } from '@/app/constants';
-import { deploymentSchema } from '@/app/api/schemas';
+import {
+  deploymentSchema,
+  persistentVolumeClaimSchema,
+} from '@/app/api/schemas';
 import z from 'zod';
 
 export const baseApp: App = Object.freeze({
@@ -61,6 +64,23 @@ export const baseDeployment: z.infer<typeof deploymentSchema> = Object.freeze({
             },
           },
         ],
+      },
+    },
+  },
+});
+
+export const basePersistentVolumeClaim: z.infer<
+  typeof persistentVolumeClaimSchema
+> = Object.freeze({
+  apiVersion: 'v1' as const,
+  kind: 'PersistentVolumeClaim',
+  metadata: { name: 'data' },
+  spec: {
+    accessModes: ['ReadWriteOnce'],
+    storageClassName: 'longhorn' as const,
+    resources: {
+      requests: {
+        storage: '1Gi',
       },
     },
   },

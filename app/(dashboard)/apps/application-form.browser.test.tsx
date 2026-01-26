@@ -8,7 +8,7 @@ import {
   test,
   trpcJsonResponse,
 } from '@/test-utils/browser';
-import { baseApp } from '@/test-utils/fixtures';
+import { baseApp, basePersistentVolumeClaim } from '@/test-utils/fixtures';
 import { produce } from 'immer';
 import { Apps } from './apps';
 import { page } from 'vitest/browser';
@@ -752,24 +752,12 @@ describe('ApplicationForm', () => {
     test('links volume mount to persistent volume', async ({ worker }) => {
       vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
       const user = userEvent.setup();
+      const volumeResource = produce(basePersistentVolumeClaim, (draft) => {
+        draft.metadata.name = 'data';
+      });
       const app = produce(baseApp, (app) => {
         app.spec.name = 'pvc-mount-app';
-        app.spec.additionalResources = [
-          {
-            apiVersion: 'v1',
-            kind: 'PersistentVolumeClaim',
-            metadata: { name: 'data' },
-            spec: {
-              accessModes: ['ReadWriteOnce'],
-              storageClassName: 'longhorn',
-              resources: {
-                requests: {
-                  storage: '1Gi',
-                },
-              },
-            },
-          },
-        ];
+        app.spec.additionalResources = [volumeResource];
         app.spec.volumeMounts = [];
         app.spec.ingress = { port: { name: 'http' } };
       });
@@ -802,22 +790,7 @@ describe('ApplicationForm', () => {
         .toHaveBeenCalledWith({
           ...app.spec,
           volumeMounts: [{ mountPath: '/data', name: 'data' }],
-          additionalResources: [
-            {
-              apiVersion: 'v1',
-              kind: 'PersistentVolumeClaim',
-              metadata: { name: 'data' },
-              spec: {
-                accessModes: ['ReadWriteOnce'],
-                storageClassName: 'longhorn',
-                resources: {
-                  requests: {
-                    storage: '1Gi',
-                  },
-                },
-              },
-            },
-          ],
+          additionalResources: [volumeResource],
         });
     });
 

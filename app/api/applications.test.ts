@@ -11,7 +11,11 @@ import {
   persistentVolumeClaimSchema,
 } from './schemas';
 import { setupMockGitRepo } from '../../test-utils';
-import { baseApp, baseDeployment } from '../../test-utils/fixtures';
+import {
+  baseApp,
+  baseDeployment,
+  basePersistentVolumeClaim,
+} from '../../test-utils/fixtures';
 import { produce } from 'immer';
 import { APP_STATUS } from '@/app/constants';
 import { ingressSchema } from './schemas';
@@ -242,20 +246,13 @@ describe('createApp', () => {
   });
 
   it('creates persistent volume resources', async () => {
-    const expectedPersistentVolumeClaim = {
-      apiVersion: 'v1',
-      kind: 'PersistentVolumeClaim',
-      metadata: { name: 'app-data' },
-      spec: {
-        accessModes: ['ReadWriteOnce'],
-        storageClassName: 'longhorn',
-        resources: {
-          requests: {
-            storage: '10Gi',
-          },
-        },
+    const expectedPersistentVolumeClaim = produce(
+      basePersistentVolumeClaim,
+      (draft) => {
+        draft.metadata.name = 'app-data';
+        draft.spec.resources.requests.storage = '10Gi';
       },
-    } satisfies z.infer<typeof persistentVolumeClaimSchema>;
+    ) satisfies z.infer<typeof persistentVolumeClaimSchema>;
 
     const appName = 'storage-app';
 
@@ -284,20 +281,13 @@ describe('createApp', () => {
   });
 
   it('links volume mounts to persistent volumes', async () => {
-    const expectedPersistentVolumeClaim = {
-      apiVersion: 'v1',
-      kind: 'PersistentVolumeClaim',
-      metadata: { name: 'app-data' },
-      spec: {
-        accessModes: ['ReadWriteOnce'],
-        storageClassName: 'longhorn',
-        resources: {
-          requests: {
-            storage: '10Gi',
-          },
-        },
+    const expectedPersistentVolumeClaim = produce(
+      basePersistentVolumeClaim,
+      (draft) => {
+        draft.metadata.name = 'app-data';
+        draft.spec.resources.requests.storage = '10Gi';
       },
-    } satisfies z.infer<typeof persistentVolumeClaimSchema>;
+    ) satisfies z.infer<typeof persistentVolumeClaimSchema>;
 
     const appName = 'volume-app';
 
