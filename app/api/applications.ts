@@ -14,6 +14,7 @@ import {
   deploymentSchema,
   ingressSchema,
   kustomizationSchema,
+  persistentVolumeClaimSchema,
 } from './schemas';
 import * as k from './k8s';
 import { AppManifests, fromManifests, toManifests } from './app-k8s-adapter';
@@ -22,7 +23,12 @@ export type AppResourceType =
   | z.infer<typeof authClientSchema>
   | z.infer<typeof deploymentSchema>
   | z.infer<typeof ingressSchema>
-  | z.infer<typeof kustomizationSchema>;
+  | z.infer<typeof kustomizationSchema>
+  | z.infer<typeof persistentVolumeClaimSchema>;
+
+type AdditionalResourceSchema =
+  | z.infer<typeof authClientSchema>
+  | z.infer<typeof persistentVolumeClaimSchema>;
 
 export async function getApps() {
   const appDir = getAppsDir();
@@ -305,10 +311,15 @@ async function getManifestsFromAppFiles(
     schema: ingressSchema,
   });
 
-  function schemaForFile(filename: string) {
-    // change this to a regex like *.authclient.yaml
+  function schemaForFile(
+    filename: string,
+  ): z.ZodType<AdditionalResourceSchema> | undefined {
     if (filename.match(/\.authclient\.yaml$/)) {
       return authClientSchema;
+    }
+
+    if (filename.match(/\.persistentvolumeclaim\.yaml$/)) {
+      return persistentVolumeClaimSchema;
     }
 
     return undefined;
@@ -323,7 +334,7 @@ async function getManifestsFromAppFiles(
 
       const { data } = await getFile({
         path: `${appPath}/${resourceFile}`,
-        schema: authClientSchema,
+        schema,
       });
 
       return data;

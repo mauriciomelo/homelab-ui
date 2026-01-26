@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useFormState, useWatch } from 'react-hook-form';
+import { FieldError, useController, useWatch } from 'react-hook-form';
 import { type Lens } from '@hookform/lenses';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Shield, Trash2 } from 'lucide-react';
-import { AppSchema, AuthClientSchema } from '@/app/api/schemas';
+import { AuthClientSchema } from '@/app/api/schemas';
 
 const formatUriList = (value?: string[]) =>
   value?.length ? value.join(',\n') : '';
@@ -43,18 +43,6 @@ export function AuthClientCard({
   const [postLogoutUrisInput, setPostLogoutUrisInput] = useState(() =>
     formatUriList(resource?.spec?.postLogoutRedirectUris),
   );
-  const { errors } = useFormState<AppSchema>();
-  const redirectErrors =
-    errors.additionalResources?.[index]?.spec?.redirectUris;
-  const postLogoutErrors =
-    errors.additionalResources?.[index]?.spec?.postLogoutRedirectUris;
-
-  const redirectErrorMessage = redirectErrors?.find?.(
-    (error) => !!error?.message,
-  )?.message;
-  const postLogoutErrorMessage = postLogoutErrors?.find?.(
-    (error) => !!error?.message,
-  )?.message;
 
   const nameInterop = lens.focus('metadata').focus('name').interop();
   const redirectUrisInterop = lens
@@ -65,6 +53,13 @@ export function AuthClientCard({
     .focus('spec')
     .focus('postLogoutRedirectUris')
     .interop();
+
+  const redirectErrorMessage = getErrorMessage(
+    useController(redirectUrisInterop).fieldState.error,
+  );
+  const postLogoutErrorMessage = getErrorMessage(
+    useController(postLogoutUrisInterop).fieldState.error,
+  );
 
   return (
     <div className="border-border/70 bg-background space-y-4 rounded-lg border p-4 shadow-sm">
@@ -175,4 +170,11 @@ export function AuthClientCard({
       />
     </div>
   );
+}
+
+function getErrorMessage(error: FieldError | FieldError[] | undefined) {
+  if (Array.isArray(error)) {
+    return error.find((e) => !!e?.message)?.message;
+  }
+  return error?.message;
 }

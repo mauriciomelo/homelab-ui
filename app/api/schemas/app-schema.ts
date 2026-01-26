@@ -6,8 +6,12 @@ import {
 } from '@/lib/resource-utils';
 import { z } from 'zod';
 import { authClientSchema } from './auth-client-schema';
+import { persistentVolumeClaimSchema } from './persistent-volume-claim-schema';
 
-const additionalResourceSchema = z.union([authClientSchema]);
+const additionalResourceSchema = z.union([
+  authClientSchema,
+  persistentVolumeClaimSchema,
+]);
 const envVariableSchema = z.union([
   z.object({
     name: z.string().min(1, 'Variable name is required'),

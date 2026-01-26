@@ -5,7 +5,11 @@ import { fs, vol } from 'memfs';
 import YAML from 'yaml';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import git, { PushResult } from 'isomorphic-git';
-import { AppSchema, authClientSchema } from './schemas';
+import {
+  AppSchema,
+  authClientSchema,
+  persistentVolumeClaimSchema,
+} from './schemas';
 import { setupMockGitRepo } from '../../test-utils';
 import { baseApp, baseDeployment } from '../../test-utils/fixtures';
 import { produce } from 'immer';
@@ -235,6 +239,48 @@ describe('createApp', () => {
     const createdApp = apps.find((app) => app.spec.name === app.spec.name);
 
     expect(createdApp?.spec.additionalResources).toEqual([expectedAuthClient]);
+  });
+
+  it('creates persistent volume claim resources', async () => {
+    const expectedPersistentVolumeClaim = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: { name: 'app-data' },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        storageClassName: 'longhorn',
+        resources: {
+          requests: {
+            storage: '10Gi',
+          },
+        },
+      },
+    } satisfies z.infer<typeof persistentVolumeClaimSchema>;
+
+    const appName = 'storage-app';
+
+    const app = produce(baseApp.spec, (draft) => {
+      draft.name = appName;
+      draft.additionalResources = [expectedPersistentVolumeClaim];
+    });
+
+    await createApp(app);
+
+    const { data: persistedPersistentVolumeClaim } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/app-data.persistentvolumeclaim.yaml`,
+      schema: persistentVolumeClaimSchema,
+    });
+
+    expect(persistedPersistentVolumeClaim).toEqual(
+      expectedPersistentVolumeClaim,
+    );
+
+    const apps = await getApps();
+    const createdApp = apps.find((app) => app.spec.name === appName);
+
+    expect(createdApp?.spec.additionalResources).toEqual([
+      expectedPersistentVolumeClaim,
+    ]);
   });
 });
 

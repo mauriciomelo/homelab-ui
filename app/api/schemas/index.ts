@@ -1,5 +1,6 @@
 export * from './app-schema';
 export * from './auth-client-schema';
+export * from './persistent-volume-claim-schema';
 export * from './deployment-schema';
 export * from './ingress-schema';
 export * from './kustomization-schema';
