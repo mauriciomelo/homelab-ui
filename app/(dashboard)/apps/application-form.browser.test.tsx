@@ -278,7 +278,7 @@ describe('ApplicationForm', () => {
         .toBeInTheDocument();
     });
 
-    test('adds persistent volume claim from additional resources', async ({
+    test('adds persistent volume from additional resources', async ({
       worker,
     }) => {
       const user = userEvent.setup();
@@ -299,10 +299,10 @@ describe('ApplicationForm', () => {
 
       await user.click(page.getByRole('button', { name: 'Add Resource' }));
       await user.click(
-        page.getByRole('menuitem', { name: 'Persistent Volume Claim' }),
+        page.getByRole('menuitem', { name: 'Persistent Volume' }),
       );
 
-      const pvcNameInput = page.getByLabelText('PVC Name');
+      const volumeNameInput = page.getByLabelText('Persistent Volume Name');
       const storageInput = page.getByRole('textbox', { name: 'Storage' });
       const accessModeSelect = page.getByRole('combobox', {
         name: 'Access Mode',
@@ -311,7 +311,7 @@ describe('ApplicationForm', () => {
         name: 'storage unit',
       });
 
-      await expect.element(pvcNameInput).toHaveValue('pvc');
+      await expect.element(volumeNameInput).toHaveValue('data');
       await expect.element(storageInput).toHaveValue('1');
       await expect.element(storageUnitSelect).toHaveTextContent('Gi');
       await expect.element(accessModeSelect).toHaveValue('ReadWriteOnce');
@@ -743,6 +743,78 @@ describe('ApplicationForm', () => {
               metadata: { name: 'authclient' },
               spec: {
                 redirectUris: ['https://example.com/callback'],
+              },
+            },
+          ],
+        });
+    });
+
+    test('links volume mount to persistent volume', async ({ worker }) => {
+      vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'pvc-mount-app';
+        app.spec.additionalResources = [
+          {
+            apiVersion: 'v1',
+            kind: 'PersistentVolumeClaim',
+            metadata: { name: 'data' },
+            spec: {
+              accessModes: ['ReadWriteOnce'],
+              storageClassName: 'longhorn',
+              resources: {
+                requests: {
+                  storage: '1Gi',
+                },
+              },
+            },
+          },
+        ];
+        app.spec.volumeMounts = [];
+        app.spec.ingress = { port: { name: 'http' } };
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(await page.getByText('pvc-mount-app'));
+
+      await user.click(page.getByRole('button', { name: 'Add Volume Mount' }));
+
+      const mountPathInput = page.getByPlaceholder('/data');
+      await user.fill(mountPathInput, '/data');
+
+      const volumeSelect = page.getByRole('combobox', {
+        name: 'Persistent Volume',
+      });
+      await user.click(volumeSelect);
+      await user.click(page.getByRole('option', { name: 'data' }));
+
+      await user.click(page.getByText('Update'));
+
+      await expect
+        .poll(() => vi.mocked(actions.updateApp))
+        .toHaveBeenCalledWith({
+          ...app.spec,
+          volumeMounts: [{ mountPath: '/data', name: 'data' }],
+          additionalResources: [
+            {
+              apiVersion: 'v1',
+              kind: 'PersistentVolumeClaim',
+              metadata: { name: 'data' },
+              spec: {
+                accessModes: ['ReadWriteOnce'],
+                storageClassName: 'longhorn',
+                resources: {
+                  requests: {
+                    storage: '1Gi',
+                  },
+                },
               },
             },
           ],

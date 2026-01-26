@@ -67,7 +67,7 @@ export function PersistentVolumeClaimCard({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold">
             <HardDrive className="text-muted-foreground h-4 w-4" />
-            <span>Persistent Volume Claim</span>
+            <span>Persistent Volume</span>
           </div>
           <p className="text-muted-foreground text-xs">
             Define persistent storage for your app.
@@ -77,7 +77,7 @@ export function PersistentVolumeClaimCard({
           type="button"
           variant="ghost"
           size="icon"
-          aria-label="Remove Persistent Volume Claim"
+          aria-label="Remove Persistent Volume"
           onClick={() => onRemove(index)}
           className="text-muted-foreground hover:text-foreground"
         >
@@ -89,7 +89,7 @@ export function PersistentVolumeClaimCard({
         name={nameInterop.name}
         render={({ field }) => (
           <FormItem className="space-y-2">
-            <FormLabel>PVC Name</FormLabel>
+            <FormLabel>Persistent Volume Name</FormLabel>
             <FormControl>
               <Input className="font-mono text-sm" {...field} />
             </FormControl>

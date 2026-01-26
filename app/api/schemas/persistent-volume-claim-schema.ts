@@ -9,7 +9,7 @@ export const persistentVolumeClaimSchema = z.object({
   apiVersion: z.literal('v1'),
   kind: z.literal('PersistentVolumeClaim'),
   metadata: z.object({
-    name: z.string().min(1, 'PVC name is required'),
+    name: z.string().min(1, 'Persistent volume name is required'),
   }),
   spec: z.object({
     accessModes: z

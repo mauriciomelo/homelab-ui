@@ -241,7 +241,7 @@ describe('createApp', () => {
     expect(createdApp?.spec.additionalResources).toEqual([expectedAuthClient]);
   });
 
-  it('creates persistent volume claim resources', async () => {
+  it('creates persistent volume resources', async () => {
     const expectedPersistentVolumeClaim = {
       apiVersion: 'v1',
       kind: 'PersistentVolumeClaim',
@@ -283,7 +283,7 @@ describe('createApp', () => {
     ]);
   });
 
-  it('links volume mounts to persistent volume claims', async () => {
+  it('links volume mounts to persistent volumes', async () => {
     const expectedPersistentVolumeClaim = {
       apiVersion: 'v1',
       kind: 'PersistentVolumeClaim',
@@ -321,7 +321,7 @@ describe('createApp', () => {
     expect(createdApp?.spec.volumeMounts).toEqual(app.volumeMounts);
   });
 
-  it('rejects volume mounts without matching persistent volume claims', async () => {
+  it('rejects volume mounts without matching persistent volumes', async () => {
     const app = produce(baseApp.spec, (draft) => {
       draft.name = 'invalid-volume-app';
       draft.additionalResources = [];
@@ -333,7 +333,7 @@ describe('createApp', () => {
       issues: [
         {
           path: ['volumeMounts', 0, 'name'],
-          message: 'Volume mount must reference a persistent volume claim',
+          message: 'Volume mount must reference a persistent volume',
         },
       ],
     });

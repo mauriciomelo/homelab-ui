@@ -7,7 +7,7 @@ We need to add first-class PersistentVolumeClaim (PVC) support as an additional 
 - [x] **API: PVC manifests round-trip**: Apps can include PVC additional resources, and those resources persist through create/read flows without loss.
 - [x] **API: Volume mounts reference PVCs**: App specs can define volume mounts that reference PVC additional resources, and invalid references are rejected.
 - [x] **UI: PVC resources editable**: The Application Form lets users add, edit, and remove PVC additional resources.
-- [ ] **UI: Volume mounts link to PVCs**: The Application Form lets users add volume mounts and link them to PVC resources.
+- [x] **UI: Volume mounts link to PVCs**: The Application Form lets users add volume mounts and link them to PVC resources.
 
 ## Tech Notes
 

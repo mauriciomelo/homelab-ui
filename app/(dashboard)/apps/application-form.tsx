@@ -38,6 +38,7 @@ import {
   AppSchema,
   appSchema,
   deriveResourceReferences,
+  type PersistentVolumeClaimSchema,
 } from '@/app/api/schemas';
 import { updateApp } from './actions';
 import { Separator } from '@radix-ui/react-separator';
@@ -61,6 +62,7 @@ import { createApp } from './actions';
 import { AuthClientCard } from './auth-client-card';
 import { ResourceLimitsField, sizeToResource } from './resource-limits-field';
 import { PersistentVolumeClaimCard } from './persistent-volume-claim-card';
+import { VolumeMountsSection } from './volume-mounts-section';
 
 type FormMode = 'edit' | 'create';
 type EnvVariable = AppSchema['envVariables'][number];
@@ -96,6 +98,8 @@ type UseAuthClientEnvLinksArgs = {
   lens: Lens<AppSchema>;
 };
 
+const basePersistentVolumeName = 'data';
+
 const authClientKeyLabels = {
   'client-id': 'Client ID',
   'client-secret': 'Client Secret',
@@ -108,6 +112,25 @@ const hasSecretRef = (
 
 const isAuthClientKey = (value: string): value is AuthClientKey =>
   authClientKeys.some((key) => key === value);
+
+const getNextPersistentVolumeName = (
+  persistentVolumeClaims: PersistentVolumeClaimSchema[],
+) => {
+  const existingNames = new Set(
+    persistentVolumeClaims.map((resource) => resource.metadata.name),
+  );
+
+  if (!existingNames.has(basePersistentVolumeName)) {
+    return basePersistentVolumeName;
+  }
+
+  let nextIndex = 2;
+  while (existingNames.has(`${basePersistentVolumeName}${nextIndex}`)) {
+    nextIndex += 1;
+  }
+
+  return `${basePersistentVolumeName}${nextIndex}`;
+};
 
 function useAuthClientEnvLinks({ lens }: UseAuthClientEnvLinksArgs) {
   const additionalResourcesInterop = lens
@@ -320,6 +343,7 @@ const defaultAppData: AppSchema = {
   image: '',
   ports: [{ name: 'http', containerPort: 80 }],
   envVariables: [{ name: '', value: '' }],
+  volumeMounts: [],
   resources: {
     limits: sizeToResource.small.limits,
   },
@@ -337,7 +361,11 @@ export function ApplicationForm(props: {
 
   const form = useForm<AppSchema>({
     resolver: zodResolver(appSchema),
-    defaultValues: props.data ?? defaultAppData,
+    defaultValues: {
+      ...defaultAppData,
+      ...props.data,
+      volumeMounts: props.data?.volumeMounts ?? [],
+    },
   });
   const lens = useLens({ control: form.control });
   const additionalResourcesLens = lens.focus('additionalResources').defined();
@@ -365,9 +393,22 @@ export function ApplicationForm(props: {
     name: 'ports',
   });
 
+  const {
+    fields: volumeMountFields,
+    append: appendVolumeMount,
+    remove: removeVolumeMount,
+  } = useFieldArray({
+    control: form.control,
+    name: 'volumeMounts',
+  });
+
   const ports = useWatch({ control: form.control, name: 'ports' });
   const additionalResources =
     useWatch({ control: form.control, name: 'additionalResources' }) ?? [];
+  const persistentVolumeClaims = additionalResources.filter(
+    (resource): resource is PersistentVolumeClaimSchema =>
+      resource.kind === 'PersistentVolumeClaim',
+  );
   const { authClientReferences, handleEnvLinkSelect, handleEnvLinkClear } =
     useAuthClientEnvLinks({ lens });
 
@@ -385,6 +426,10 @@ export function ApplicationForm(props: {
     appendPort({ name: '', containerPort: 80 });
   };
 
+  const addVolumeMount = () => {
+    appendVolumeMount({ mountPath: '', name: '' });
+  };
+
   const addAuthClientResource = () => {
     const newAuthClient: NonNullable<AppSchema['additionalResources']>[number] =
       {
@@ -399,13 +444,14 @@ export function ApplicationForm(props: {
     appendAdditionalResource(newAuthClient);
   };
 
-  const addPersistentVolumeClaimResource = () => {
+  const createPersistentVolumeClaimResource = () => {
+    const volumeName = getNextPersistentVolumeName(persistentVolumeClaims);
     const newPersistentVolumeClaim: NonNullable<
       AppSchema['additionalResources']
     >[number] = {
       apiVersion: 'v1',
       kind: 'PersistentVolumeClaim',
-      metadata: { name: 'pvc' },
+      metadata: { name: volumeName },
       spec: {
         accessModes: ['ReadWriteOnce'],
         storageClassName: 'longhorn',
@@ -418,6 +464,11 @@ export function ApplicationForm(props: {
     };
 
     appendAdditionalResource(newPersistentVolumeClaim);
+    return volumeName;
+  };
+
+  const addPersistentVolumeClaimResource = () => {
+    createPersistentVolumeClaimResource();
   };
 
   const handleRemovePort = (index: number) => {
@@ -436,6 +487,10 @@ export function ApplicationForm(props: {
             additionalResources:
               data.additionalResources && data.additionalResources.length > 0
                 ? data.additionalResources
+                : undefined,
+            volumeMounts:
+              data.volumeMounts && data.volumeMounts.length > 0
+                ? data.volumeMounts
                 : undefined,
           };
           const result =
@@ -719,6 +774,14 @@ export function ApplicationForm(props: {
           }}
         />
 
+        <VolumeMountsSection
+          lens={lens}
+          volumeMountFields={volumeMountFields}
+          persistentVolumeClaims={persistentVolumeClaims}
+          onAdd={addVolumeMount}
+          onRemove={removeVolumeMount}
+        />
+
         <div className="border-border/60 bg-muted/20 space-y-4 rounded-lg border p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-base font-semibold">
@@ -744,7 +807,7 @@ export function ApplicationForm(props: {
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={addPersistentVolumeClaimResource}>
                   <HardDrive className="text-muted-foreground h-4 w-4" />
-                  Persistent Volume Claim
+                  Persistent Volume
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

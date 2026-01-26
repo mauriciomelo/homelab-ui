@@ -29,7 +29,7 @@ const envVariableSchema = z.union([
 ]);
 const volumeMountSchema = z.object({
   mountPath: z.string().min(1, 'Mount path is required'),
-  name: z.string().min(1, 'PVC name is required'),
+  name: z.string().min(1, 'Persistent volume name is required'),
 });
 
 export const appSchema = z
@@ -135,7 +135,7 @@ export const appSchema = z
     validateBrokenVolumeMountReferences(data).forEach(({ index }) => {
       ctx.addIssue({
         code: 'custom',
-        message: 'Volume mount must reference a persistent volume claim',
+        message: 'Volume mount must reference a persistent volume',
         path: ['volumeMounts', index, 'name'],
       });
     });
