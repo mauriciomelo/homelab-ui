@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ResourceField } from '@/components/resource-field';
+import { cpuConfig, memoryConfig } from '@/lib/resource-utils';
 import { AppSchema } from '@/app/api/schemas';
 
 type SizeKey = 'small' | 'medium' | 'large';
@@ -137,7 +138,7 @@ export function ResourceLimitsField({
                       onChange={field.onChange}
                       error={errors.resources?.limits?.cpu?.message}
                       dataTestId="resource-limits-cpu-input"
-                      type="cpu"
+                      config={cpuConfig}
                     />
                   </FormItem>
                 )}
@@ -155,7 +156,7 @@ export function ResourceLimitsField({
                       onChange={field.onChange}
                       error={errors.resources?.limits?.memory?.message}
                       dataTestId="resource-limits-memory-input"
-                      type="memory"
+                      config={memoryConfig}
                     />
                   </FormItem>
                 )}

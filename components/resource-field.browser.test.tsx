@@ -4,6 +4,7 @@ import { userEvent, renderWithProviders, test } from '@/test-utils/browser';
 import { page } from 'vitest/browser';
 import { useState } from 'react';
 import { ResourceField } from './resource-field';
+import { cpuConfig, memoryConfig, storageConfig } from '@/lib/resource-utils';
 
 describe('ResourceField', () => {
   beforeEach(() => {
@@ -17,7 +18,7 @@ describe('ResourceField', () => {
         id="memory"
         label="Memory"
         value="1Gi"
-        type="memory"
+        config={memoryConfig}
       />,
     );
 
@@ -36,7 +37,12 @@ describe('ResourceField', () => {
   test('render slider labels for the cpu field', async () => {
     const user = userEvent.setup();
     await renderWithProviders(
-      <StatefulResourceField id="cpu" label="CPU" value="1" type="cpu" />,
+      <StatefulResourceField
+        id="cpu"
+        label="CPU"
+        value="1"
+        config={cpuConfig}
+      />,
     );
 
     const input = page.getByRole('textbox', { name: 'CPU' });
@@ -53,10 +59,15 @@ describe('ResourceField', () => {
     await expect(page.getByLabelText('max-value')).toHaveTextContent('8 cores');
   });
 
-  describe('type="memory"', () => {
+  describe('memory config', () => {
     test('renders input and unit', async () => {
       await renderWithProviders(
-        <StatefulResourceField id="cpu" label="CPU" value="500m" type="cpu" />,
+        <StatefulResourceField
+          id="cpu"
+          label="CPU"
+          value="500m"
+          config={cpuConfig}
+        />,
       );
 
       const input = page.getByRole('textbox', { name: 'CPU' });
@@ -76,7 +87,7 @@ describe('ResourceField', () => {
           label="Memory"
           value="1Gi"
           onChange={onChange}
-          type="memory"
+          config={memoryConfig}
         />,
       );
 
@@ -103,7 +114,7 @@ describe('ResourceField', () => {
           label="Memory"
           value="2Mi"
           onChange={onChange}
-          type="memory"
+          config={memoryConfig}
         />,
       );
 
@@ -126,7 +137,7 @@ describe('ResourceField', () => {
           label="Memory"
           value="0Mi"
           onChange={onChange}
-          type="memory"
+          config={memoryConfig}
         />,
       );
 
@@ -160,7 +171,7 @@ describe('ResourceField', () => {
           label="Memory"
           value="1Gi"
           error="Memory limit is too high"
-          type="memory"
+          config={memoryConfig}
         />,
       );
 
@@ -170,10 +181,30 @@ describe('ResourceField', () => {
       expect(page.getByText('Memory limit is too high')).toBeInTheDocument();
     });
   });
-  describe('type="cpu"', () => {
+
+  test('uses custom unit label from config', async () => {
+    await renderWithProviders(
+      <StatefulResourceField
+        id="storage"
+        label="Storage"
+        value="1Gi"
+        config={storageConfig}
+      />,
+    );
+
+    await expect(
+      page.getByRole('combobox', { name: 'storage unit' }),
+    ).toHaveTextContent('Gi');
+  });
+  describe('cpu config', () => {
     test('renders input and unit', async () => {
       await renderWithProviders(
-        <StatefulResourceField id="cpu" label="CPU" value="500m" type="cpu" />,
+        <StatefulResourceField
+          id="cpu"
+          label="CPU"
+          value="500m"
+          config={cpuConfig}
+        />,
       );
 
       const input = page.getByRole('textbox', { name: 'CPU' });
@@ -193,7 +224,7 @@ describe('ResourceField', () => {
           label="CPU"
           value="1"
           onChange={onChange}
-          type="cpu"
+          config={cpuConfig}
         />,
       );
 
@@ -222,7 +253,7 @@ describe('ResourceField', () => {
           label="CPU"
           value="0"
           onChange={onChange}
-          type="cpu"
+          config={cpuConfig}
         />,
       );
 

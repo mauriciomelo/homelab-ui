@@ -31,6 +31,7 @@ import {
   Link2,
   Shield,
   Unlink2,
+  HardDrive,
 } from 'lucide-react';
 import type { App } from '@/app/api/applications';
 import {
@@ -59,6 +60,7 @@ import {
 import { createApp } from './actions';
 import { AuthClientCard } from './auth-client-card';
 import { ResourceLimitsField, sizeToResource } from './resource-limits-field';
+import { PersistentVolumeClaimCard } from './persistent-volume-claim-card';
 
 type FormMode = 'edit' | 'create';
 type EnvVariable = AppSchema['envVariables'][number];
@@ -397,6 +399,27 @@ export function ApplicationForm(props: {
     appendAdditionalResource(newAuthClient);
   };
 
+  const addPersistentVolumeClaimResource = () => {
+    const newPersistentVolumeClaim: NonNullable<
+      AppSchema['additionalResources']
+    >[number] = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: { name: 'pvc' },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        storageClassName: 'longhorn',
+        resources: {
+          requests: {
+            storage: '1Gi',
+          },
+        },
+      },
+    };
+
+    appendAdditionalResource(newPersistentVolumeClaim);
+  };
+
   const handleRemovePort = (index: number) => {
     if (portFields.length > 1) {
       removePort(index);
@@ -719,6 +742,10 @@ export function ApplicationForm(props: {
                   <Shield className="text-muted-foreground h-4 w-4" />
                   Auth Client
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={addPersistentVolumeClaimResource}>
+                  <HardDrive className="text-muted-foreground h-4 w-4" />
+                  Persistent Volume Claim
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -726,7 +753,24 @@ export function ApplicationForm(props: {
             <div className="space-y-3">
               {additionalResourceFields.map((resourceField, index) => {
                 const resource = additionalResources[index];
-                if (!resource || resource.kind !== 'AuthClient') {
+                if (!resource) {
+                  return null;
+                }
+
+                if (resource.kind === 'PersistentVolumeClaim') {
+                  return (
+                    <PersistentVolumeClaimCard
+                      key={resourceField.id}
+                      index={index}
+                      lens={additionalResourcesLens
+                        .focus(index)
+                        .narrow('kind', 'PersistentVolumeClaim')}
+                      onRemove={removeAdditionalResource}
+                    />
+                  );
+                }
+
+                if (resource.kind !== 'AuthClient') {
                   return null;
                 }
 

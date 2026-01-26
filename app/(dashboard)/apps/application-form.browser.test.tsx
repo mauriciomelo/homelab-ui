@@ -278,6 +278,45 @@ describe('ApplicationForm', () => {
         .toBeInTheDocument();
     });
 
+    test('adds persistent volume claim from additional resources', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (app) => {
+        app.spec.name = 'pvc-app';
+        app.spec.additionalResources = [];
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([app]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('pvc-app'));
+
+      await user.click(page.getByRole('button', { name: 'Add Resource' }));
+      await user.click(
+        page.getByRole('menuitem', { name: 'Persistent Volume Claim' }),
+      );
+
+      const pvcNameInput = page.getByLabelText('PVC Name');
+      const storageInput = page.getByRole('textbox', { name: 'Storage' });
+      const accessModeSelect = page.getByRole('combobox', {
+        name: 'Access Mode',
+      });
+      const storageUnitSelect = page.getByRole('combobox', {
+        name: 'storage unit',
+      });
+
+      await expect.element(pvcNameInput).toHaveValue('pvc');
+      await expect.element(storageInput).toHaveValue('1');
+      await expect.element(storageUnitSelect).toHaveTextContent('Gi');
+      await expect.element(accessModeSelect).toHaveValue('ReadWriteOnce');
+    });
+
     test('sets a default auth client name', async ({ worker }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {

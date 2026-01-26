@@ -23,14 +23,9 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import {
-  CPU_STEPS,
-  MEMORY_STEPS,
-  CPU_UNITS,
-  MEMORY_UNITS,
   parseResourceValue,
-  type ResourceType,
-  formatValue,
   toBaseUnit,
+  type ResourceFieldConfig,
 } from '@/lib/resource-utils';
 
 interface ResourceFieldProps {
@@ -45,7 +40,7 @@ interface ResourceFieldProps {
   required?: boolean;
   className?: string;
   dataTestId?: string;
-  type?: ResourceType;
+  config: ResourceFieldConfig;
 }
 
 export function ResourceField({
@@ -60,15 +55,16 @@ export function ResourceField({
   required = false,
   className,
   dataTestId,
-  type = 'memory',
+  config,
 }: ResourceFieldProps) {
-  const resource = parseResourceValue(value, type);
+  const resource = parseResourceValue(value, config.units);
   const [showSlider, setShowSlider] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = React.useState(false);
-  const base = type === 'memory' ? 1024 : 1000;
-  const steps = type === 'memory' ? MEMORY_STEPS : CPU_STEPS;
-  const units = type === 'memory' ? MEMORY_UNITS : CPU_UNITS;
+  const { base, steps, units, unitLabel } = config;
+  const formatSliderValue =
+    config.formatSliderValue ??
+    ((currentValue) => `${currentValue.amount}${currentValue.unit}`);
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -85,7 +81,7 @@ export function ResourceField({
   const getSliderValue = () => {
     const currentValueInBase = toBaseUnit(resource, units, base);
     const differences = steps.map((step) => {
-      const stepValue = parseResourceValue(step, type);
+      const stepValue = parseResourceValue(step, units);
       const stepInBase = toBaseUnit(stepValue, units, base);
       return Math.abs(stepInBase - currentValueInBase);
     });
@@ -99,8 +95,8 @@ export function ResourceField({
 
   const maxSliderLabel = () => {
     const maxStep = steps[steps.length - 1];
-    const stepValue = parseResourceValue(maxStep, type);
-    return formatValue(stepValue);
+    const stepValue = parseResourceValue(maxStep, units);
+    return formatSliderValue(stepValue);
   };
 
   return (
@@ -147,7 +143,7 @@ export function ResourceField({
               disabled={disabled}
             >
               <SelectTrigger
-                aria-label={`${type} unit`}
+                aria-label={unitLabel}
                 className="w-[85px] rounded-l-none border-0 shadow-none focus:ring-0 focus:ring-offset-0"
               >
                 <SelectValue />
@@ -187,7 +183,7 @@ export function ResourceField({
                 aria-label="current-value"
                 className="font-medium tabular-nums"
               >
-                {formatValue(resource)}
+                {formatSliderValue(resource)}
               </span>
             </div>
             <Slider
