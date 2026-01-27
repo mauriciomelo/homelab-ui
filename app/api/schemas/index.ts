@@ -5,3 +5,5 @@ export * from './deployment-schema';
 export * from './ingress-schema';
 export * from './kustomization-schema';
 export * from './traefik-config-schema';
+export * from './service-schema';
+export * from './namespace-schema';

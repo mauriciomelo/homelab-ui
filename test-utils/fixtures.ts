@@ -2,7 +2,9 @@ import type { App } from '@/app/api/applications';
 import { APP_STATUS } from '@/app/constants';
 import {
   deploymentSchema,
+  namespaceSchema,
   persistentVolumeClaimSchema,
+  serviceSchema,
 } from '@/app/api/schemas';
 import z from 'zod';
 
@@ -82,6 +84,39 @@ export const basePersistentVolumeClaim: z.infer<
       requests: {
         storage: '1Gi',
       },
+    },
+  },
+});
+
+export const baseService: z.infer<typeof serviceSchema> = Object.freeze({
+  apiVersion: 'v1',
+  kind: 'Service',
+  metadata: {
+    name: 'test-app',
+  },
+  spec: {
+    type: 'ClusterIP',
+    selector: {
+      app: 'test-app',
+    },
+    ports: [
+      {
+        name: 'http',
+        port: 80,
+        protocol: 'TCP',
+        targetPort: 'http',
+      },
+    ],
+  },
+});
+
+export const baseNamespace: z.infer<typeof namespaceSchema> = Object.freeze({
+  apiVersion: 'v1',
+  kind: 'Namespace',
+  metadata: {
+    name: 'test-app',
+    labels: {
+      name: 'test-app',
     },
   },
 });

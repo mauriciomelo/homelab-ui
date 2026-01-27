@@ -9,13 +9,17 @@ import {
   AppSchema,
   authClientSchema,
   IngressSchema,
+  namespaceSchema,
   persistentVolumeClaimSchema,
+  serviceSchema,
 } from './schemas';
 import { setupMockGitRepo } from '../../test-utils';
 import {
   baseApp,
   baseDeployment,
+  baseNamespace,
   basePersistentVolumeClaim,
+  baseService,
 } from '../../test-utils/fixtures';
 import { produce } from 'immer';
 import { APP_STATUS } from '@/app/constants';
@@ -218,6 +222,46 @@ describe('createApp', () => {
     );
   });
 
+  it('creates service and namespace resources', async () => {
+    const appName = 'required-resources-app';
+    const port = 8080;
+
+    const app = produce(baseApp.spec, (draft) => {
+      draft.name = appName;
+      draft.ports = [{ name: 'http', containerPort: port }];
+      draft.envVariables = [];
+      draft.ingress = { port: { name: 'http' } };
+    });
+
+    const expectedService = produce(baseService, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.selector.app = appName;
+      draft.spec.ports[0].port = port;
+      draft.spec.ports[0].name = 'http';
+      draft.spec.ports[0].targetPort = 'http';
+    });
+
+    const expectedNamespace = produce(baseNamespace, (draft) => {
+      draft.metadata.name = appName;
+      draft.metadata.labels = { name: appName };
+    });
+
+    await createApp(app);
+
+    const { data: service } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/service.yaml`,
+      schema: serviceSchema,
+    });
+
+    const { data: namespace } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/namespace.yaml`,
+      schema: namespaceSchema,
+    });
+
+    expect(service).toEqual(expectedService);
+    expect(namespace).toEqual(expectedNamespace);
+  });
+
   it('creates auth client resources', async () => {
     const expectedAuthClient = {
       apiVersion: 'tesselar.io/v1',
@@ -368,6 +412,10 @@ describe('getApps', () => {
           buildKustomization({ name: 'app1' }),
         ),
         './app1/ingress.yaml': YAML.stringify(buildIngress({ name: 'app1' })),
+        './app1/service.yaml': YAML.stringify(buildService({ name: 'app1' })),
+        './app1/namespace.yaml': YAML.stringify(
+          buildNamespace({ name: 'app1' }),
+        ),
         './app1/deployment.yaml': YAML.stringify(app1Deployment),
       },
       baseAppsDir,
@@ -380,6 +428,10 @@ describe('getApps', () => {
           buildKustomization({ name: 'app2' }),
         ),
         './app2/ingress.yaml': YAML.stringify(buildIngress({ name: 'app2' })),
+        './app2/service.yaml': YAML.stringify(buildService({ name: 'app2' })),
+        './app2/namespace.yaml': YAML.stringify(
+          buildNamespace({ name: 'app2' }),
+        ),
         './app2/deployment.yaml': YAML.stringify(app2Deployment),
       },
       baseAppsDir,
@@ -427,7 +479,12 @@ function buildKustomization({ name }: { name: string }) {
     kind: 'Kustomization',
     metadata: { name: name },
     namespace: name,
-    resources: ['deployment.yaml', 'ingress.yaml'],
+    resources: [
+      'namespace.yaml',
+      'deployment.yaml',
+      'service.yaml',
+      'ingress.yaml',
+    ],
   };
 }
 
@@ -457,6 +514,22 @@ function buildIngress({ name }: { name: string }): IngressSchema {
       ],
     },
   };
+}
+
+function buildService({ name }: { name: string }) {
+  return produce(baseService, (draft) => {
+    draft.metadata.name = name;
+    draft.spec.selector.app = name;
+    draft.spec.ports[0].name = 'http';
+    draft.spec.ports[0].targetPort = 'http';
+  });
+}
+
+function buildNamespace({ name }: { name: string }) {
+  return produce(baseNamespace, (draft) => {
+    draft.metadata.name = name;
+    draft.metadata.labels = { name };
+  });
 }
 
 function seedTraefikConfig() {

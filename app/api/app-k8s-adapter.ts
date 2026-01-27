@@ -1,7 +1,12 @@
 import * as z from 'zod';
 
 import { AppSchema } from './schemas';
-import { deploymentSchema, ingressSchema } from './schemas';
+import {
+  deploymentSchema,
+  ingressSchema,
+  namespaceSchema,
+  serviceSchema,
+} from './schemas';
 
 /**
  * Generates Kubernetes manifests (Deployment, Ingress, Kustomization, etc.)
@@ -76,9 +81,42 @@ export function toManifests(app: AppSchema) {
     },
   };
 
+  const service: z.infer<typeof serviceSchema> = {
+    apiVersion: 'v1',
+    kind: 'Service' as const,
+    metadata: {
+      name: app.name,
+    },
+    spec: {
+      type: 'ClusterIP',
+      selector: {
+        app: app.name,
+      },
+      ports: app.ports.map((port) => ({
+        name: port.name,
+        port: port.containerPort,
+        protocol: 'TCP',
+        targetPort: port.name,
+      })),
+    },
+  };
+
+  const namespace: z.infer<typeof namespaceSchema> = {
+    apiVersion: 'v1',
+    kind: 'Namespace' as const,
+    metadata: {
+      name: app.name,
+      labels: {
+        name: app.name,
+      },
+    },
+  };
+
   return {
     deployment,
     ingress,
+    service,
+    namespace,
     additionalResources: app.additionalResources ?? [],
   };
 }

@@ -14,7 +14,9 @@ import {
   deploymentSchema,
   ingressSchema,
   kustomizationSchema,
+  namespaceSchema,
   persistentVolumeClaimSchema,
+  serviceSchema,
   traefikConfigSchema,
   traefikValuesContentSchema,
 } from './schemas';
@@ -26,7 +28,9 @@ export type AppResourceType =
   | z.infer<typeof deploymentSchema>
   | z.infer<typeof ingressSchema>
   | z.infer<typeof kustomizationSchema>
-  | z.infer<typeof persistentVolumeClaimSchema>;
+  | z.infer<typeof persistentVolumeClaimSchema>
+  | z.infer<typeof serviceSchema>
+  | z.infer<typeof namespaceSchema>;
 
 type AdditionalResourceSchema =
   | z.infer<typeof authClientSchema>
@@ -72,7 +76,7 @@ export async function restartApp(name: string) {
 }
 
 async function getAppByName(name: string) {
-  const { ingress, deployment, additionalResources } =
+  const { ingress, deployment, service, namespace, additionalResources } =
     await getManifestsFromAppFiles(name);
 
   const { host } = await getClusterConfig();
@@ -124,6 +128,8 @@ async function getAppByName(name: string) {
   const spec = fromManifests({
     deployment: deployment,
     ingress: ingress,
+    service: service,
+    namespace: namespace,
     additionalResources: additionalResources,
   });
   const appName = spec.name;
@@ -187,7 +193,9 @@ function getFileName(resource: AppResourceType) {
   if (
     resource.kind === 'Deployment' ||
     resource.kind === 'Ingress' ||
-    resource.kind === 'Kustomization'
+    resource.kind === 'Kustomization' ||
+    resource.kind === 'Service' ||
+    resource.kind === 'Namespace'
   ) {
     return `${resource.kind.toLowerCase()}.yaml`;
   }
@@ -266,10 +274,13 @@ async function commitAndPushChanges(appName: string, message: string) {
 
 export async function createApp(app: AppSchema) {
   const parsedApp = appSchema.parse(app);
-  const { deployment, ingress, additionalResources } = toManifests(parsedApp);
+  const { deployment, ingress, service, namespace, additionalResources } =
+    toManifests(parsedApp);
 
   await writeResourcesToFileSystem(parsedApp.name, [
+    namespace,
     deployment,
+    service,
     ingress,
     ...additionalResources,
   ]);
@@ -331,7 +342,12 @@ async function getManifestsFromAppFiles(
   appName: string,
 ): Promise<AppManifests> {
   const appPath = getAppDir(appName);
-  const requiredFiles = new Set(['deployment.yaml', 'ingress.yaml']);
+  const requiredFiles = new Set([
+    'deployment.yaml',
+    'ingress.yaml',
+    'service.yaml',
+    'namespace.yaml',
+  ]);
 
   const kustomizationResult = await getFile({
     path: `${appPath}/kustomization.yaml`,
@@ -348,9 +364,19 @@ async function getManifestsFromAppFiles(
     schema: deploymentSchema,
   });
 
+  const serviceResult = await getFile({
+    path: `${appPath}/service.yaml`,
+    schema: serviceSchema,
+  });
+
   const ingressResult = await getFile({
     path: `${appPath}/ingress.yaml`,
     schema: ingressSchema,
+  });
+
+  const namespaceResult = await getFile({
+    path: `${appPath}/namespace.yaml`,
+    schema: namespaceSchema,
   });
 
   function schemaForFile(
@@ -385,7 +411,9 @@ async function getManifestsFromAppFiles(
 
   return {
     deployment: deploymentResult.data,
+    service: serviceResult.data,
     ingress: ingressResult.data,
+    namespace: namespaceResult.data,
     additionalResources: additionalResources.filter(
       (resource) => resource !== undefined,
     ),
