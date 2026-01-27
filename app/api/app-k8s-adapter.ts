@@ -44,6 +44,9 @@ export function toManifests(app: AppSchema) {
       name: app.name,
     },
     spec: {
+      strategy: {
+        type: 'Recreate',
+      },
       selector: {
         matchLabels: {
           app: app.name,

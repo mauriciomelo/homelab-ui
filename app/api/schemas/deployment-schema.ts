@@ -22,6 +22,11 @@ export const deploymentSchema = z.object({
   }),
   spec: z.object({
     replicas: z.number().optional(),
+    strategy: z
+      .object({
+        type: z.literal('Recreate'),
+      })
+      .optional(),
     selector: z.object({
       matchLabels: z.object({
         app: z.string(),

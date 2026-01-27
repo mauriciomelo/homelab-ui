@@ -223,6 +223,25 @@ describe('createApp', () => {
     );
   });
 
+  it('defaults deployments to recreate strategy', async () => {
+    const appName = 'recreate-app';
+
+    const app = produce(baseApp.spec, (draft) => {
+      draft.name = appName;
+      draft.ports = [{ name: 'http', containerPort: 8080 }];
+      draft.ingress = { port: { name: 'http' } };
+    });
+
+    await createApp(app);
+
+    const { data: deployment } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/deployment.yaml`,
+      schema: deploymentSchema,
+    });
+
+    expect(deployment.spec.strategy).toEqual({ type: 'Recreate' });
+  });
+
   it('creates service and namespace resources', async () => {
     const appName = 'required-resources-app';
     const port = 8080;
