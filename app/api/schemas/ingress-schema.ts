@@ -10,7 +10,6 @@ export const ingressSchema = z.object({
   spec: z.object({
     rules: z.array(
       z.object({
-        host: z.string(),
         http: z.object({
           paths: z.array(
             z.object({
@@ -31,3 +30,5 @@ export const ingressSchema = z.object({
     ),
   }),
 });
+
+export type IngressSchema = z.infer<typeof ingressSchema>;

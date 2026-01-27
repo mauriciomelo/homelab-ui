@@ -57,7 +57,6 @@ export function toManifests(app: AppSchema) {
     spec: {
       rules: [
         {
-          host: `${app.name}.local`,
           http: {
             paths: [
               {

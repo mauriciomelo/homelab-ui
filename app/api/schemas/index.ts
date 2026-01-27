@@ -4,3 +4,4 @@ export * from './persistent-volume-claim-schema';
 export * from './deployment-schema';
 export * from './ingress-schema';
 export * from './kustomization-schema';
+export * from './traefik-config-schema';

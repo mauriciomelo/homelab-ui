@@ -8,6 +8,7 @@ import git, { PushResult } from 'isomorphic-git';
 import {
   AppSchema,
   authClientSchema,
+  IngressSchema,
   persistentVolumeClaimSchema,
 } from './schemas';
 import { setupMockGitRepo } from '../../test-utils';
@@ -21,6 +22,9 @@ import { APP_STATUS } from '@/app/constants';
 import { ingressSchema } from './schemas';
 import * as k from './k8s';
 import z from 'zod';
+
+const traefikConfigPath =
+  '/test-project/clusters/my-cluster/tesselar-system/traefik/traefik-config.yaml';
 
 vi.mock('server-only', () => ({}));
 
@@ -160,6 +164,8 @@ describe('createApp', () => {
       dir: '/test-project',
       fs,
     });
+
+    seedTraefikConfig();
   });
 
   it('creates a new application', async () => {
@@ -336,6 +342,8 @@ describe('getApps', () => {
       dir: '/test-project',
       fs,
     });
+
+    seedTraefikConfig();
   });
   it('retrieves all applications from file system', async () => {
     const app1Deployment = produce(baseDeployment, (draft) => {
@@ -383,12 +391,12 @@ describe('getApps', () => {
     expect(apps[0].spec.name).toBe('app1');
     expect(apps[0].spec.image).toBe('nginx:latest');
     expect(apps[0].status).toBe(APP_STATUS.RUNNING);
-    expect(apps[0].link).toBe('http://app1.local');
+    expect(apps[0].link).toBe('https://app1.local');
 
     expect(apps[1].spec.name).toBe('app2');
     expect(apps[1].spec.image).toBe('redis:7');
     expect(apps[1].status).toBe(APP_STATUS.RUNNING);
-    expect(apps[1].link).toBe('http://app2.local');
+    expect(apps[1].link).toBe('https://app2.local');
   });
 
   it('correctly transforms the spec to files and back ', async () => {
@@ -423,7 +431,7 @@ function buildKustomization({ name }: { name: string }) {
   };
 }
 
-function buildIngress({ name }: { name: string }) {
+function buildIngress({ name }: { name: string }): IngressSchema {
   return {
     apiVersion: 'networking.k8s.io/v1',
     kind: 'Ingress',
@@ -434,7 +442,6 @@ function buildIngress({ name }: { name: string }) {
     spec: {
       rules: [
         {
-          host: `${name}.local`,
           http: {
             paths: [
               {
@@ -450,4 +457,28 @@ function buildIngress({ name }: { name: string }) {
       ],
     },
   };
+}
+
+function seedTraefikConfig() {
+  const traefikConfig = {
+    apiVersion: 'helm.cattle.io/v1',
+    kind: 'HelmChartConfig',
+    metadata: {
+      name: 'traefik',
+      namespace: 'kube-system',
+    },
+    spec: {
+      valuesContent: YAML.stringify({
+        providers: {
+          kubernetesIngress: {
+            defaultRule: 'Host(`{{ .Name }}.local`)',
+          },
+        },
+      }),
+    },
+  };
+
+  vol.fromJSON({
+    [traefikConfigPath]: YAML.stringify(traefikConfig),
+  });
 }
