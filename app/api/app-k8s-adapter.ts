@@ -8,11 +8,35 @@ import {
   serviceSchema,
 } from './schemas';
 
+type HealthCheck = NonNullable<AppSchema['health']>['check'];
+
+const HEALTH_DEFAULTS = {
+  startup: {
+    initialDelaySeconds: 5,
+    periodSeconds: 5,
+    timeoutSeconds: 2,
+    failureThreshold: 60,
+  },
+  readiness: {
+    periodSeconds: 10,
+    timeoutSeconds: 2,
+    successThreshold: 1,
+    failureThreshold: 3,
+  },
+  liveness: {
+    periodSeconds: 10,
+    timeoutSeconds: 2,
+    successThreshold: 1,
+    failureThreshold: 3,
+  },
+};
+
 /**
  * Generates Kubernetes manifests (Deployment, Ingress, Kustomization, etc.)
  * from the base app schema.
  */
 export function toManifests(app: AppSchema) {
+  const healthProbes = app.health ? buildHealthProbes(app.health.check) : {};
   const deployment: z.infer<typeof deploymentSchema> = {
     apiVersion: 'apps/v1',
     kind: 'Deployment' as const,
@@ -43,6 +67,7 @@ export function toManifests(app: AppSchema) {
               env: app.envVariables,
               resources: app.resources,
               volumeMounts: app.volumeMounts,
+              ...healthProbes,
             },
           ],
 
@@ -135,6 +160,7 @@ export function fromManifests({
   const appName = deployment.metadata.name;
   const ingressPortName =
     ingress.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name;
+  const health = deriveHealth(container);
 
   const app: AppSchema = {
     name: appName,
@@ -145,9 +171,50 @@ export function fromManifests({
     ingress: { port: { name: ingressPortName } },
     additionalResources: additionalResources,
     volumeMounts: container.volumeMounts,
+    ...(health ? { health } : {}),
   };
 
   return app;
+}
+
+function buildHealthProbes(check: HealthCheck) {
+  return {
+    startupProbe: {
+      httpGet: { path: check.path, port: check.port },
+      ...HEALTH_DEFAULTS.startup,
+    },
+    readinessProbe: {
+      httpGet: { path: check.path, port: check.port },
+      ...HEALTH_DEFAULTS.readiness,
+    },
+    livenessProbe: {
+      httpGet: { path: check.path, port: check.port },
+      ...HEALTH_DEFAULTS.liveness,
+    },
+  };
+}
+
+function deriveHealth(
+  container: z.infer<
+    typeof deploymentSchema
+  >['spec']['template']['spec']['containers'][number],
+) {
+  const probe =
+    container.startupProbe?.httpGet ??
+    container.readinessProbe?.httpGet ??
+    container.livenessProbe?.httpGet;
+
+  if (!probe) {
+    return undefined;
+  }
+
+  const check: HealthCheck = {
+    type: 'httpGet',
+    path: probe.path,
+    port: probe.port,
+  };
+
+  return { check };
 }
 
 function deriveVolumesFromMounts(volumeMounts: AppSchema['volumeMounts']) {

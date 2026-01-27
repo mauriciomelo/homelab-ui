@@ -1,5 +1,19 @@
 import * as z from 'zod';
 
+const httpGetSchema = z.object({
+  path: z.string(),
+  port: z.string(),
+});
+
+const probeSchema = z.object({
+  httpGet: httpGetSchema,
+  initialDelaySeconds: z.number().optional(),
+  periodSeconds: z.number().optional(),
+  timeoutSeconds: z.number().optional(),
+  successThreshold: z.number().optional(),
+  failureThreshold: z.number().optional(),
+});
+
 export const deploymentSchema = z.object({
   apiVersion: z.string(),
   kind: z.literal('Deployment'),
@@ -63,6 +77,9 @@ export const deploymentSchema = z.object({
                 memory: z.string(),
               }),
             }),
+            startupProbe: probeSchema.optional(),
+            readinessProbe: probeSchema.optional(),
+            livenessProbe: probeSchema.optional(),
           }),
         ),
         volumes: z

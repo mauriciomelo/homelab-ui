@@ -31,6 +31,14 @@ const volumeMountSchema = z.object({
   mountPath: z.string().min(1, 'Mount path is required'),
   name: z.string().min(1, 'Persistent volume name is required'),
 });
+const healthCheckSchema = z.object({
+  type: z.literal('httpGet'),
+  path: z.string().min(1, 'Health check path is required'),
+  port: z.string().min(1, 'Health check port is required'),
+});
+const healthSchema = z.object({
+  check: healthCheckSchema,
+});
 
 export const appSchema = z
   .object({
@@ -110,6 +118,7 @@ export const appSchema = z
         name: z.string().min(1, 'Ingress port name is required'),
       }),
     }),
+    health: healthSchema.optional(),
     additionalResources: z.array(additionalResourceSchema).optional(),
   })
   .refine(
@@ -121,6 +130,21 @@ export const appSchema = z
       message:
         'Ingress port name must reference a port in the defined ports list',
       path: ['ingress', 'port', 'name'],
+    },
+  )
+  .refine(
+    (data) => {
+      if (!data.health) {
+        return true;
+      }
+
+      const portNames = data.ports.map((p) => p.name);
+      return portNames.includes(data.health.check.port);
+    },
+    {
+      message:
+        'Health check port must reference a port in the defined ports list',
+      path: ['health', 'check', 'port'],
     },
   )
   .superRefine((data, ctx) => {

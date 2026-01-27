@@ -5,7 +5,7 @@ We need the app form to create a minimal application that can be deployed succes
 ## Acceptance Criteria
 
 - [x] **API: Add missing required resources**: Creating an app produces Service and Namespace alongside the existing required resources, and reading those manifests returns a valid App spec without losing required fields.
-- [ ] **API: Support minimal health check schema + defaults**: The App schema supports the minimal health check configuration, and generated manifests include startup/readiness/liveness probes with sensible defaults.
+- [x] **API: Support minimal health check schema + defaults**: The App schema supports the minimal health check configuration, and generated manifests include startup/readiness/liveness probes with sensible defaults.
 - [ ] **API: Apply safe deployment strategy**: Generated deployments default to `Recreate` strategy to avoid concurrent pods for stateful apps.
 - [ ] **UI: Capture minimal deployable inputs**: The Application Form captures the minimum data needed to deploy (name, image, ports, and health check inputs) with sensible defaults.
 - [ ] **UI: Apply health check defaults**: Enabling the minimal health check creates startup/readiness/liveness probes with sensible defaults.

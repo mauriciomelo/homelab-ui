@@ -8,6 +8,7 @@ import git, { PushResult } from 'isomorphic-git';
 import {
   AppSchema,
   authClientSchema,
+  deploymentSchema,
   IngressSchema,
   namespaceSchema,
   persistentVolumeClaimSchema,
@@ -260,6 +261,80 @@ describe('createApp', () => {
 
     expect(service).toEqual(expectedService);
     expect(namespace).toEqual(expectedNamespace);
+  });
+
+  it('adds default health probes', async () => {
+    const appName = 'health-probe-app';
+
+    const app = produce(baseApp.spec, (draft) => {
+      draft.name = appName;
+      draft.ports = [{ name: 'http', containerPort: 8080 }];
+      draft.ingress = { port: { name: 'http' } };
+      draft.health = {
+        check: {
+          type: 'httpGet',
+          path: '/',
+          port: 'http',
+        },
+      };
+    });
+
+    await createApp(app);
+
+    const { data: deployment } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/deployment.yaml`,
+      schema: deploymentSchema,
+    });
+
+    const container = deployment.spec.template.spec.containers[0];
+
+    expect(container.startupProbe).toEqual({
+      httpGet: { path: '/', port: 'http' },
+      initialDelaySeconds: 5,
+      periodSeconds: 5,
+      timeoutSeconds: 2,
+      failureThreshold: 60,
+    });
+
+    expect(container.readinessProbe).toEqual({
+      httpGet: { path: '/', port: 'http' },
+      periodSeconds: 10,
+      timeoutSeconds: 2,
+      successThreshold: 1,
+      failureThreshold: 3,
+    });
+
+    expect(container.livenessProbe).toEqual({
+      httpGet: { path: '/', port: 'http' },
+      periodSeconds: 10,
+      timeoutSeconds: 2,
+      successThreshold: 1,
+      failureThreshold: 3,
+    });
+  });
+
+  it('rejects health check ports outside defined ports', async () => {
+    const app = produce(baseApp.spec, (draft) => {
+      draft.name = 'invalid-health-port-app';
+      draft.ports = [{ name: 'http', containerPort: 8080 }];
+      draft.health = {
+        check: {
+          type: 'httpGet',
+          path: '/',
+          port: 'metrics',
+        },
+      };
+    });
+
+    await expect(createApp(app)).rejects.toMatchObject({
+      issues: [
+        {
+          path: ['health', 'check', 'port'],
+          message:
+            'Health check port must reference a port in the defined ports list',
+        },
+      ],
+    });
   });
 
   it('creates auth client resources', async () => {

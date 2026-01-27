@@ -3,7 +3,7 @@ description: Implement the next highest priority task from a story and mark it c
 agent: build
 ---
 
-Story: $ARGUMENTS
+User notes: $ARGUMENTS
 
 Implement the highest priority task from the selected story in `docs/stories`.
 
@@ -26,7 +26,7 @@ Implementation requirements:
 - Make the code change for the selected task only.
 - Do not update the story file to check off the task until the user confirms the task is complete.
 - Run `pnpm run dance` and confirm it passes.
-- Do not start work on another task. The next task will be selected in the next run after validated by the user.
+- Do not move to the next task automatically (unless explicitly requested). The next task will be selected in the next run after validated by the user.
 
 TDD workflow:
 
