@@ -669,6 +669,15 @@ describe('ApplicationForm', () => {
             limits: { cpu: '1000m', memory: '1Gi' },
           },
           ingress: { port: { name: 'http' } },
+          health: {
+            check: {
+              type: 'httpGet',
+              path: '/',
+              port: 'http',
+            },
+          },
+          additionalResources: undefined,
+          volumeMounts: undefined,
         });
     });
 
@@ -743,9 +752,18 @@ describe('ApplicationForm', () => {
               metadata: { name: 'authclient' },
               spec: {
                 redirectUris: ['https://example.com/callback'],
+                postLogoutRedirectUris: undefined,
               },
             },
           ],
+          health: {
+            check: {
+              type: 'httpGet',
+              path: '/',
+              port: 'http',
+            },
+          },
+          volumeMounts: undefined,
         });
     });
 
@@ -791,6 +809,13 @@ describe('ApplicationForm', () => {
           ...app.spec,
           volumeMounts: [{ mountPath: '/data', name: 'data' }],
           additionalResources: [volumeResource],
+          health: {
+            check: {
+              type: 'httpGet',
+              path: '/',
+              port: 'http',
+            },
+          },
         });
     });
 
@@ -903,6 +928,15 @@ describe('ApplicationForm', () => {
             limits: { cpu: '750m', memory: '768Mi' },
           },
           ingress: { port: { name: 'http' } },
+          health: {
+            check: {
+              type: 'httpGet',
+              path: '/',
+              port: 'http',
+            },
+          },
+          additionalResources: undefined,
+          volumeMounts: undefined,
         });
     });
 
@@ -1065,6 +1099,62 @@ describe('ApplicationForm', () => {
   });
 
   describe('create application', () => {
+    test('captures default health check inputs on create', async ({
+      worker,
+    }) => {
+      vi.mocked(actions.createApp).mockResolvedValue({ success: true });
+      const user = userEvent.setup();
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('Create App'));
+
+      const healthSection = page.getByRole('group', { name: 'Health Check' });
+      const pathInput = healthSection.getByLabelText('Path', { exact: true });
+      const portSelect = healthSection.getByLabelText('Port', { exact: true });
+
+      await expect.element(pathInput).toHaveValue('/');
+      await expect.element(portSelect).toHaveTextContent('http');
+
+      await user.fill(page.getByPlaceholder('App Name'), 'new-app');
+      await user.fill(
+        page.getByPlaceholder(
+          'nginx:latest or registry.example.com/my-app:v1.0.0',
+        ),
+        'redis:7-alpine',
+      );
+      await user.fill(page.getByPlaceholder('VARIABLE_NAME'), 'REDIS_HOST');
+      await user.fill(page.getByPlaceholder('value'), 'localhost');
+
+      await user.click(page.getByRole('button', { name: 'Create' }));
+
+      await expect
+        .poll(() => vi.mocked(actions.createApp))
+        .toHaveBeenCalledWith({
+          name: 'new-app',
+          image: 'redis:7-alpine',
+          ports: [{ name: 'http', containerPort: 80 }],
+          envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
+          resources: {
+            limits: { cpu: '500m', memory: '512Mi' },
+          },
+          ingress: { port: { name: 'http' } },
+          health: {
+            check: {
+              type: 'httpGet',
+              path: '/',
+              port: 'http',
+            },
+          },
+        });
+    });
+
     test('handles successful app creation', async ({ worker }) => {
       vi.mocked(actions.createApp).mockResolvedValue({ success: true });
       const user = userEvent.setup();
@@ -1111,6 +1201,13 @@ describe('ApplicationForm', () => {
             limits: { cpu: '500m', memory: '512Mi' },
           },
           ingress: { port: { name: 'http' } },
+          health: {
+            check: {
+              type: 'httpGet',
+              path: '/',
+              port: 'http',
+            },
+          },
         });
     });
   });

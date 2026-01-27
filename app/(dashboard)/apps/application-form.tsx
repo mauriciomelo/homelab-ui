@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
+  Activity,
   Layers,
   List,
   Loader2Icon,
@@ -58,6 +59,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { createApp } from './actions';
 import { AuthClientCard } from './auth-client-card';
 import { ResourceLimitsField, sizeToResource } from './resource-limits-field';
@@ -343,6 +352,13 @@ const defaultAppData: AppSchema = {
   image: '',
   ports: [{ name: 'http', containerPort: 80 }],
   envVariables: [{ name: '', value: '' }],
+  health: {
+    check: {
+      type: 'httpGet',
+      path: '/',
+      port: 'http',
+    },
+  },
   volumeMounts: [],
   resources: {
     limits: sizeToResource.small.limits,
@@ -556,186 +572,50 @@ export function ApplicationForm(props: {
           render={() => {
             const fieldClassName = 'font-mono text-sm m-0';
             return (
-              <div className="border-border/60 bg-muted/20 space-y-4 rounded-lg border p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-base font-semibold">
+              <Card role="group" aria-labelledby="ports-title">
+                <CardHeader>
+                  <CardTitle
+                    id="ports-title"
+                    className="flex items-center gap-2 text-base"
+                  >
                     <Plug className="text-muted-foreground h-4 w-4" />
                     <span>Ports</span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addPort}
-                    className="h-9"
-                    data-testid="add-port-btn"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Port
-                  </Button>
-                </div>
-                <div className="text-muted-foreground flex items-center gap-2 px-2 text-xs font-semibold">
-                  <span className="w-60">Port Name</span>
-                  <span className="flex-1">Port Number</span>
-                  <div className="w-9" />
-                </div>
-                <div className="space-y-3">
-                  {portFields.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="border-border/60 bg-background flex items-start gap-2 rounded-md border p-2"
+                  </CardTitle>
+                  <CardAction>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addPort}
+                      className="h-9"
+                      data-testid="add-port-btn"
                     >
-                      <FormField
-                        control={form.control}
-                        name={`ports.${index}.name`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input
-                                placeholder="http"
-                                data-testid={`port-name-${index}`}
-                                className={cn(fieldClassName, 'w-60')}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`ports.${index}.containerPort`}
-                        render={({ field }) => (
-                          <FormItem className="flex-1 grow">
-                            <FormControl>
-                              <Input
-                                placeholder="80"
-                                data-testid={`port-number-${index}`}
-                                className={cn(fieldClassName)}
-                                type="number"
-                                {...field}
-                                onChange={(event) =>
-                                  field.onChange(+event.target.value)
-                                }
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon"
-                        onClick={() => handleRemovePort(index)}
-                        disabled={portFields.length === 1}
-                        className="shrink-0"
-                        data-testid={`remove-port-${index}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Separator className="bg-border/70" />
-                <FormField
-                  control={form.control}
-                  name="ingress.port.name"
-                  render={({ field }) => {
-                    return (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2 text-sm font-medium">
-                          <Globe className="text-muted-foreground h-4 w-4" />
-                          Web Port
-                        </FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="ingress-port-select">
-                              <SelectValue placeholder="Select a port" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {ports?.map(
-                              (port, index) =>
-                                port.name && (
-                                  <SelectItem
-                                    key={index}
-                                    value={port.name}
-                                    data-testid={`ingress-port-option-${port.name}`}
-                                  >
-                                    <span className="font-mono">
-                                      {port.name} ({port.containerPort})
-                                    </span>
-                                  </SelectItem>
-                                ),
-                            )}
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          Select the port to route traffic to.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }}
-                />
-              </div>
-            );
-          }}
-        />
-
-        <FormField
-          control={form.control}
-          name="envVariables"
-          render={() => {
-            const fieldClassName = 'font-mono text-sm m-0';
-            return (
-              <div className="border-border/60 bg-muted/20 space-y-4 rounded-lg border p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-base font-semibold">
-                    <List className="text-muted-foreground h-4 w-4" />
-                    <span>Environment Variables</span>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Port
+                    </Button>
+                  </CardAction>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-muted-foreground flex items-center gap-2 px-2 text-xs font-semibold">
+                    <span className="w-60">Port Name</span>
+                    <span className="flex-1">Port Number</span>
+                    <div className="w-9" />
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addEnvVariable}
-                    className="h-9"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Environment Variable
-                  </Button>
-                </div>
-                <FormDescription>
-                  Link variables to Auth Client secrets (client-id,
-                  client-secret) when you need runtime credentials.
-                </FormDescription>
-                <div className="space-y-3">
-                  {fields.map((item, index) => {
-                    const envVariableLens = lens
-                      .focus('envVariables')
-                      .focus(index);
-
-                    return (
+                  <div className="space-y-3">
+                    {portFields.map((item, index) => (
                       <div
                         key={item.id}
                         className="border-border/60 bg-background flex items-start gap-2 rounded-md border p-2"
                       >
                         <FormField
                           control={form.control}
-                          name={`envVariables.${index}.name`}
+                          name={`ports.${index}.name`}
                           render={({ field }) => (
                             <FormItem>
                               <FormControl>
                                 <Input
-                                  placeholder="VARIABLE_NAME"
-                                  className={cn(
-                                    fieldClassName,
-                                    'w-[200px] text-blue-700',
-                                  )}
+                                  placeholder="http"
+                                  data-testid={`port-name-${index}`}
+                                  className={cn(fieldClassName, 'w-60')}
                                   {...field}
                                 />
                               </FormControl>
@@ -743,33 +623,251 @@ export function ApplicationForm(props: {
                             </FormItem>
                           )}
                         />
-                        <span className="text-muted-foreground">=</span>
-                        <EnvVariableValueField
-                          lens={envVariableLens}
-                          fieldClassName={fieldClassName}
-                        />
-                        <AuthClientLinkMenu
-                          index={index}
-                          lens={envVariableLens}
-                          authClientReferences={authClientReferences}
-                          onLinkSelect={handleEnvLinkSelect}
-                          onLinkClear={handleEnvLinkClear}
+                        <FormField
+                          control={form.control}
+                          name={`ports.${index}.containerPort`}
+                          render={({ field }) => (
+                            <FormItem className="flex-1 grow">
+                              <FormControl>
+                                <Input
+                                  placeholder="80"
+                                  data-testid={`port-number-${index}`}
+                                  className={cn(fieldClassName)}
+                                  type="number"
+                                  {...field}
+                                  onChange={(event) =>
+                                    field.onChange(+event.target.value)
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
                         <Button
                           type="button"
                           variant="secondary"
                           size="icon"
-                          onClick={() => removeEnvVariable(index)}
-                          disabled={fields.length === 1}
+                          onClick={() => handleRemovePort(index)}
+                          disabled={portFields.length === 1}
                           className="shrink-0"
+                          data-testid={`remove-port-${index}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    ))}
+                  </div>
+                  <Separator className="bg-border/70" />
+                  <FormField
+                    control={form.control}
+                    name="ingress.port.name"
+                    render={({ field }) => {
+                      return (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2 text-sm font-medium">
+                            <Globe className="text-muted-foreground h-4 w-4" />
+                            Web Port
+                          </FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="ingress-port-select">
+                                <SelectValue placeholder="Select a port" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {ports?.map(
+                                (port, index) =>
+                                  port.name && (
+                                    <SelectItem
+                                      key={index}
+                                      value={port.name}
+                                      data-testid={`ingress-port-option-${port.name}`}
+                                    >
+                                      <span className="font-mono">
+                                        {port.name} ({port.containerPort})
+                                      </span>
+                                    </SelectItem>
+                                  ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Select the port to route traffic to.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            );
+          }}
+        />
+        <Card role="group" aria-labelledby="health-check-title">
+          <CardHeader>
+            <CardTitle
+              id="health-check-title"
+              className="flex items-center gap-2 text-base"
+            >
+              <Activity className="text-muted-foreground h-4 w-4" />
+              <span>Health Check</span>
+            </CardTitle>
+            <CardDescription>
+              Configure the HTTP endpoint used for startup and readiness checks.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="health.check.path"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Path</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="/"
+                        className="font-mono text-sm"
+                        {...field}
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="health.check.port"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel className="text-sm font-medium">Port</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value ?? ''}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a port" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ports?.map(
+                          (port, index) =>
+                            port.name && (
+                              <SelectItem key={index} value={port.name}>
+                                <span className="font-mono">
+                                  {port.name} ({port.containerPort})
+                                </span>
+                              </SelectItem>
+                            ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <FormField
+          control={form.control}
+          name="envVariables"
+          render={() => {
+            const fieldClassName = 'font-mono text-sm m-0';
+            return (
+              <Card role="group" aria-labelledby="env-vars-title">
+                <CardHeader>
+                  <CardTitle
+                    id="env-vars-title"
+                    className="flex items-center gap-2 text-base"
+                  >
+                    <List className="text-muted-foreground h-4 w-4" />
+                    <span>Environment Variables</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Link variables to Auth Client secrets (client-id,
+                    client-secret) when you need runtime credentials.
+                  </CardDescription>
+                  <CardAction>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addEnvVariable}
+                      className="h-9"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Environment Variable
+                    </Button>
+                  </CardAction>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {fields.map((item, index) => {
+                      const envVariableLens = lens
+                        .focus('envVariables')
+                        .focus(index);
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="border-border/60 bg-background flex items-start gap-2 rounded-md border p-2"
+                        >
+                          <FormField
+                            control={form.control}
+                            name={`envVariables.${index}.name`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input
+                                    placeholder="VARIABLE_NAME"
+                                    className={cn(
+                                      fieldClassName,
+                                      'w-[200px] text-blue-700',
+                                    )}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <span className="text-muted-foreground">=</span>
+                          <EnvVariableValueField
+                            lens={envVariableLens}
+                            fieldClassName={fieldClassName}
+                          />
+                          <AuthClientLinkMenu
+                            index={index}
+                            lens={envVariableLens}
+                            authClientReferences={authClientReferences}
+                            onLinkSelect={handleEnvLinkSelect}
+                            onLinkClear={handleEnvLinkClear}
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="icon"
+                            onClick={() => removeEnvVariable(index)}
+                            disabled={fields.length === 1}
+                            className="shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             );
           }}
         />
@@ -782,79 +880,86 @@ export function ApplicationForm(props: {
           onRemove={removeVolumeMount}
         />
 
-        <div className="border-border/60 bg-muted/20 space-y-4 rounded-lg border p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-base font-semibold">
+        <Card role="group" aria-labelledby="additional-resources-title">
+          <CardHeader>
+            <CardTitle
+              id="additional-resources-title"
+              className="flex items-center gap-2 text-base"
+            >
               <Layers className="text-muted-foreground h-4 w-4" />
               <span>Additional Resources</span>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-[200px] justify-between"
-                  data-testid="additional-resource-trigger"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Resource
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={addAuthClientResource}>
-                  <Shield className="text-muted-foreground h-4 w-4" />
-                  Auth Client
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={addPersistentVolumeClaimResource}>
-                  <HardDrive className="text-muted-foreground h-4 w-4" />
-                  Persistent Volume
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          {additionalResourceFields.length ? (
-            <div className="space-y-3">
-              {additionalResourceFields.map((resourceField, index) => {
-                const resource = additionalResources[index];
-                if (!resource) {
-                  return null;
-                }
+            </CardTitle>
+            <CardAction>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-[200px] justify-between"
+                    data-testid="additional-resource-trigger"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Resource
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={addAuthClientResource}>
+                    <Shield className="text-muted-foreground h-4 w-4" />
+                    Auth Client
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={addPersistentVolumeClaimResource}>
+                    <HardDrive className="text-muted-foreground h-4 w-4" />
+                    Persistent Volume
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            {additionalResourceFields.length ? (
+              <div className="space-y-3">
+                {additionalResourceFields.map((resourceField, index) => {
+                  const resource = additionalResources[index];
+                  if (!resource) {
+                    return null;
+                  }
 
-                if (resource.kind === 'PersistentVolumeClaim') {
+                  if (resource.kind === 'PersistentVolumeClaim') {
+                    return (
+                      <PersistentVolumeClaimCard
+                        key={resourceField.id}
+                        index={index}
+                        lens={additionalResourcesLens
+                          .focus(index)
+                          .narrow('kind', 'PersistentVolumeClaim')}
+                        onRemove={removeAdditionalResource}
+                      />
+                    );
+                  }
+
+                  if (resource.kind !== 'AuthClient') {
+                    return null;
+                  }
+
                   return (
-                    <PersistentVolumeClaimCard
+                    <AuthClientCard
                       key={resourceField.id}
                       index={index}
                       lens={additionalResourcesLens
                         .focus(index)
-                        .narrow('kind', 'PersistentVolumeClaim')}
+                        .narrow('kind', 'AuthClient')}
                       onRemove={removeAdditionalResource}
                     />
                   );
-                }
-
-                if (resource.kind !== 'AuthClient') {
-                  return null;
-                }
-
-                return (
-                  <AuthClientCard
-                    key={resourceField.id}
-                    index={index}
-                    lens={additionalResourcesLens
-                      .focus(index)
-                      .narrow('kind', 'AuthClient')}
-                    onRemove={removeAdditionalResource}
-                  />
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-muted-foreground text-sm">
-              No additional resources.
-            </div>
-          )}
-        </div>
+                })}
+              </div>
+            ) : (
+              <div className="text-muted-foreground text-sm">
+                No additional resources.
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="flex gap-3 pt-4">
           {form.formState.isSubmitting ? (

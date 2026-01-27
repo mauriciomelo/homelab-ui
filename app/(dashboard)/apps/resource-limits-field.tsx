@@ -5,11 +5,17 @@ import { useController, useFormState, useWatch } from 'react-hook-form';
 import { type Lens } from '@hookform/lenses';
 import {
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
 } from '@/components/ui/form';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Cpu } from 'lucide-react';
 import {
   Select,
@@ -81,93 +87,103 @@ export function ResourceLimitsField({
   const memoryInterop = lens.focus('limits').focus('memory').interop();
 
   return (
-    <FormItem>
-      <FormLabel className="flex items-center gap-2 text-base font-medium">
-        <Cpu className="text-muted-foreground h-4 w-4" />
-        Resource Limits
-      </FormLabel>
-      <div className="flex gap-2">
-        <Select
-          value={selectedSize}
-          onValueChange={(value) => {
-            if (value === 'custom' || isSizeKey(value)) {
-              setSelectedSize(value);
-              if (isSizeKey(value)) {
-                resourcesField.onChange(sizeToResource[value]);
-              }
-            }
-          }}
+    <Card role="group" aria-labelledby="resource-limits-title">
+      <CardHeader>
+        <CardTitle
+          id="resource-limits-title"
+          className="flex items-center gap-2 text-base"
         >
-          <FormControl>
-            <SelectTrigger className="h-auto shrink-0 [&_[data-slot=select-value]]:line-clamp-none">
-              <SelectValue placeholder="Select resource limits" />
-            </SelectTrigger>
-          </FormControl>
-          <SelectContent>
-            {sizeOptions.map((key) => {
-              const { label } = sizeToResource[key];
-              return (
-                <SelectItem key={key} value={key}>
+          <Cpu className="text-muted-foreground h-4 w-4" />
+          <span>Resource Limits</span>
+        </CardTitle>
+        <CardDescription>
+          Choose the resource allocation for your app.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <FormItem>
+          <FormLabel className="sr-only">Resource Limits</FormLabel>
+          <div className="flex gap-2">
+            <Select
+              value={selectedSize}
+              onValueChange={(value) => {
+                if (value === 'custom' || isSizeKey(value)) {
+                  setSelectedSize(value);
+                  if (isSizeKey(value)) {
+                    resourcesField.onChange(sizeToResource[value]);
+                  }
+                }
+              }}
+            >
+              <FormControl>
+                <SelectTrigger className="h-auto shrink-0 [&_[data-slot=select-value]]:line-clamp-none">
+                  <SelectValue placeholder="Select resource limits" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {sizeOptions.map((key) => {
+                  const { label } = sizeToResource[key];
+                  return (
+                    <SelectItem key={key} value={key}>
+                      <div className="flex items-center gap-2 text-left">
+                        <span className="font-bold capitalize">{key}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {label}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+                <SelectItem value="custom">
                   <div className="flex items-center gap-2 text-left">
-                    <span className="font-bold capitalize">{key}</span>
-                    <span className="text-muted-foreground text-xs">
-                      {label}
-                    </span>
+                    <span className="font-bold">Custom</span>
                   </div>
                 </SelectItem>
-              );
-            })}
-            <SelectItem value="custom">
-              <div className="flex items-center gap-2 text-left">
-                <span className="font-bold">Custom</span>
-              </div>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        {selectedSize === 'custom' && (
-          <>
-            <div className="flex-1">
-              <FormField
-                control={cpuInterop.control}
-                name={cpuInterop.name}
-                render={({ field }) => (
-                  <FormItem>
-                    <ResourceField
-                      id="resource-limits-cpu"
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={errors.resources?.limits?.cpu?.message}
-                      dataTestId="resource-limits-cpu-input"
-                      config={cpuConfig}
-                    />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="flex-1">
-              <FormField
-                control={memoryInterop.control}
-                name={memoryInterop.name}
-                render={({ field }) => (
-                  <FormItem>
-                    <ResourceField
-                      id="resource-limits-memory"
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={errors.resources?.limits?.memory?.message}
-                      dataTestId="resource-limits-memory-input"
-                      config={memoryConfig}
-                    />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </>
-        )}
-      </div>
-      <FormDescription>
-        Choose the resource allocation for your app.
-      </FormDescription>
-    </FormItem>
+              </SelectContent>
+            </Select>
+            {selectedSize === 'custom' && (
+              <>
+                <div className="flex-1">
+                  <FormField
+                    control={cpuInterop.control}
+                    name={cpuInterop.name}
+                    render={({ field }) => (
+                      <FormItem>
+                        <ResourceField
+                          id="resource-limits-cpu"
+                          value={field.value}
+                          onChange={field.onChange}
+                          error={errors.resources?.limits?.cpu?.message}
+                          dataTestId="resource-limits-cpu-input"
+                          config={cpuConfig}
+                        />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="flex-1">
+                  <FormField
+                    control={memoryInterop.control}
+                    name={memoryInterop.name}
+                    render={({ field }) => (
+                      <FormItem>
+                        <ResourceField
+                          id="resource-limits-memory"
+                          value={field.value}
+                          onChange={field.onChange}
+                          error={errors.resources?.limits?.memory?.message}
+                          dataTestId="resource-limits-memory-input"
+                          config={memoryConfig}
+                        />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </FormItem>
+      </CardContent>
+    </Card>
   );
 }
