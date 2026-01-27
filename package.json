@@ -12,7 +12,7 @@
     "test:ci": "vitest --watch=false --browser.headless",
     "tsc": "tsc --noEmit",
     "lint": "eslint . --fix",
-    "dance": "concurrently -n \"lint,test,tsc\" \"pnpm run lint\" \"pnpm run test:ci --silent passed-only\" \"pnpm run tsc\""
+    "dance": "concurrently --kill-others-on-fail -n \"lint,test,tsc\" \"pnpm run lint\" \"pnpm run test:ci --silent passed-only\" \"pnpm run tsc\""
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",
