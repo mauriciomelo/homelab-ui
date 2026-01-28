@@ -163,7 +163,13 @@ export async function updateApp(app: AppSchema) {
   const appDir = getAppDir(parsedApp.name);
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
-  const { deployment: nextDeployment } = toManifests(parsedApp);
+  const {
+    deployment: nextDeployment,
+    ingress,
+    service,
+    namespace,
+    additionalResources,
+  } = toManifests(parsedApp);
 
   const previousDeployment = await getFile({
     path: deploymentFilePath,
@@ -176,7 +182,13 @@ export async function updateApp(app: AppSchema) {
     ...updatedDeployment,
   } satisfies z.infer<typeof deploymentSchema>;
 
-  await writeResourcesToFileSystem(parsedApp.name, [deployment]);
+  await writeResourcesToFileSystem(parsedApp.name, [
+    namespace,
+    deployment,
+    service,
+    ingress,
+    ...additionalResources,
+  ]);
 
   await commitAndPushChanges(parsedApp.name, `Update app ${parsedApp.name}`);
 

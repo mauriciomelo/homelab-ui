@@ -10,6 +10,7 @@ import {
   authClientSchema,
   deploymentSchema,
   IngressSchema,
+  kustomizationSchema,
   namespaceSchema,
   persistentVolumeClaimSchema,
   serviceSchema,
@@ -18,6 +19,8 @@ import { setupMockGitRepo } from '../../test-utils';
 import {
   baseApp,
   baseDeployment,
+  baseIngress,
+  baseKustomization,
   baseNamespace,
   basePersistentVolumeClaim,
   baseService,
@@ -160,6 +163,90 @@ describe('updateApp', () => {
     ]);
 
     expect(gitPushMock).toHaveBeenCalled();
+  });
+
+  it('keeps all kustomization resources after update', async () => {
+    const appName = 'test-app';
+
+    const currentDeployment = produce(baseDeployment, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.template.spec.containers[0].image = 'old-image:1.0';
+    });
+
+    const service = produce(baseService, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.selector.app = appName;
+    });
+
+    const ingress = produce(baseIngress, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.rules[0].host = `${appName}.\${DOMAIN}`;
+      draft.spec.rules[0].http.paths[0].backend.service.name = appName;
+    });
+
+    const namespace = produce(baseNamespace, (draft) => {
+      draft.metadata.name = appName;
+      draft.metadata.labels = {
+        ...(draft.metadata.labels ?? {}),
+        name: appName,
+      };
+    });
+
+    const pvc = produce(basePersistentVolumeClaim, (draft) => {
+      draft.metadata.name = 'data';
+    });
+
+    const kustomization = produce(baseKustomization, (draft) => {
+      draft.metadata.name = appName;
+      draft.namespace = appName;
+      draft.resources = [
+        'deployment.yaml',
+        'ingress.yaml',
+        'service.yaml',
+        'namespace.yaml',
+        'data.persistentvolumeclaim.yaml',
+      ];
+    });
+
+    vol.fromJSON({
+      '/test-project/clusters/my-cluster/my-applications/test-app/deployment.yaml':
+        YAML.stringify(currentDeployment),
+      '/test-project/clusters/my-cluster/my-applications/test-app/service.yaml':
+        YAML.stringify(service),
+      '/test-project/clusters/my-cluster/my-applications/test-app/ingress.yaml':
+        YAML.stringify(ingress),
+      '/test-project/clusters/my-cluster/my-applications/test-app/namespace.yaml':
+        YAML.stringify(namespace),
+      '/test-project/clusters/my-cluster/my-applications/test-app/data.persistentvolumeclaim.yaml':
+        YAML.stringify(pvc),
+      '/test-project/clusters/my-cluster/my-applications/test-app/kustomization.yaml':
+        YAML.stringify(kustomization),
+    });
+
+    await setupMockGitRepo({
+      dir: '/test-project',
+      fs,
+    });
+
+    const newSpec = produce(baseApp.spec, (draft) => {
+      draft.name = appName;
+      draft.image = 'new-image:2.0';
+      draft.ports = [{ name: 'http', containerPort: 80 }];
+      draft.envVariables = [];
+      draft.ingress = { port: { name: 'http' } };
+      draft.additionalResources = [pvc];
+    });
+
+    await updateApp(newSpec);
+
+    const { data: updatedKustomization } = await getFile({
+      path: '/test-project/clusters/my-cluster/my-applications/test-app/kustomization.yaml',
+      schema: kustomizationSchema,
+    });
+
+    expect([...updatedKustomization.resources].sort()).toEqual(
+      [...kustomization.resources].sort(),
+    );
   });
 });
 

@@ -2,6 +2,8 @@ import type { App } from '@/app/api/applications';
 import { APP_STATUS } from '@/app/constants';
 import {
   deploymentSchema,
+  ingressSchema,
+  kustomizationSchema,
   namespaceSchema,
   persistentVolumeClaimSchema,
   serviceSchema,
@@ -110,6 +112,38 @@ export const baseService: z.infer<typeof serviceSchema> = Object.freeze({
   },
 });
 
+const baseIngressData: z.infer<typeof ingressSchema> = {
+  apiVersion: 'networking.k8s.io/v1',
+  kind: 'Ingress',
+  metadata: {
+    name: 'test-app',
+    annotations: {},
+  },
+  spec: {
+    rules: [
+      {
+        host: 'test-app.${DOMAIN}',
+        http: {
+          paths: [
+            {
+              path: '/',
+              pathType: 'Prefix',
+              backend: {
+                service: {
+                  name: 'test-app',
+                  port: { name: 'http' },
+                },
+              },
+            },
+          ],
+        },
+      },
+    ],
+  },
+};
+
+export const baseIngress = Object.freeze(baseIngressData);
+
 export const baseNamespace: z.infer<typeof namespaceSchema> = Object.freeze({
   apiVersion: 'v1',
   kind: 'Namespace',
@@ -120,3 +154,20 @@ export const baseNamespace: z.infer<typeof namespaceSchema> = Object.freeze({
     },
   },
 });
+
+const baseKustomizationData: z.infer<typeof kustomizationSchema> = {
+  apiVersion: 'kustomize.config.k8s.io/v1beta1',
+  kind: 'Kustomization',
+  metadata: {
+    name: 'test-app',
+  },
+  namespace: 'test-app',
+  resources: [
+    'deployment.yaml',
+    'ingress.yaml',
+    'service.yaml',
+    'namespace.yaml',
+  ],
+};
+
+export const baseKustomization = Object.freeze(baseKustomizationData);
