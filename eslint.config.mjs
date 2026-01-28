@@ -9,6 +9,13 @@ const eslintConfig = [
   {
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        {
+          assertionStyle: 'never',
+        },
+      ],
     },
     ignores: [
       'node_modules/**',

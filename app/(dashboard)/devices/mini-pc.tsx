@@ -65,6 +65,7 @@ function MiniPC({
     <animated.group
       position={position}
       scale={scale}
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       rotation={rotation as unknown as VectorLike}
     >
       {/* GLTF Mini PC Model */}

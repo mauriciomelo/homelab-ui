@@ -84,14 +84,20 @@ const mockListNamespacedPod = vi.fn().mockResolvedValue({
   items: [],
 });
 
-vi.mocked(k.appsApi).mockReturnValue({
-  readNamespacedDeployment: mockReadNamespacedDeployment,
-  patchNamespacedDeployment: vi.fn(),
-} as unknown as ReturnType<typeof k.appsApi>);
+vi.mocked(k.appsApi).mockReturnValue(
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  {
+    readNamespacedDeployment: mockReadNamespacedDeployment,
+    patchNamespacedDeployment: vi.fn(),
+  } as unknown as ReturnType<typeof k.appsApi>,
+);
 
-vi.mocked(k.coreApi).mockReturnValue({
-  listNamespacedPod: mockListNamespacedPod,
-} as unknown as ReturnType<typeof k.coreApi>);
+vi.mocked(k.coreApi).mockReturnValue(
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  {
+    listNamespacedPod: mockListNamespacedPod,
+  } as unknown as ReturnType<typeof k.coreApi>,
+);
 
 beforeEach(async () => {
   mockGetAppConfig.mockReturnValue({

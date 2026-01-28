@@ -17,6 +17,10 @@ const ZITADEL = {
   key: 'pat',
 };
 
+function isKubernetesError(err: unknown): err is { code: number } {
+  return typeof err === 'object' && err !== null && 'code' in err;
+}
+
 const authClientSchema = z.object({
   spec: z.object({
     redirectUris: z.array(z.string()),
@@ -38,6 +42,7 @@ const crd: k8s.V1CustomResourceDefinition = {
         served: true,
         storage: true,
         schema: {
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
           openAPIV3Schema: z.toJSONSchema(
             authClientSchema,
           ) as V1JSONSchemaProps,
@@ -61,8 +66,7 @@ async function createCrdIfNotExists() {
     await client.readCustomResourceDefinition({ name: crd.metadata!.name! });
     console.log('AuthClient CRD already exists');
   } catch (err: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((err as any).code === 404) {
+    if (isKubernetesError(err) && err.code === 404) {
       console.log('AuthClient CRD does not exist, creating...');
       await client.createCustomResourceDefinition({ body: crd });
       console.log('AuthClient CRD created');
@@ -168,8 +172,7 @@ async function secretExists({
     await client.readNamespacedSecret({ name, namespace });
     return true;
   } catch (err: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((err as any).code === 404) {
+    if (isKubernetesError(err) && err.code === 404) {
       return false;
     }
     throw err;

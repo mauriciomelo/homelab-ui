@@ -39,7 +39,7 @@ export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
 ) {
   const queryClient = getQueryClient();
   if (queryOptions.queryKey[1]?.type === 'infinite') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions, @typescript-eslint/no-explicit-any
     return queryClient.prefetchInfiniteQuery(queryOptions as any);
   }
 

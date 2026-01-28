@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import type { AppSchema, PersistentVolumeClaimSchema } from '@/app/api/schemas';
 
 type VolumeMountsSectionProps = {
-  lens: Lens<AppSchema>;
+  volumeMountsLens: Lens<AppSchema['volumeMounts']>;
   volumeMountFields: FieldArrayWithId<AppSchema, 'volumeMounts', 'id'>[];
   persistentVolumeClaims: PersistentVolumeClaimSchema[];
   onAdd: () => void;
@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/inset-group';
 
 export function VolumeMountsSection({
-  lens,
+  volumeMountsLens,
   volumeMountFields,
   persistentVolumeClaims,
   onAdd,
@@ -44,13 +44,12 @@ export function VolumeMountsSection({
 }: VolumeMountsSectionProps) {
   const fieldClassName = 'font-mono text-sm m-0';
   const hasPersistentVolumeClaims = persistentVolumeClaims.length > 0;
-  const volumeMountsLens = lens.focus('volumeMounts').defined();
-  const volumeMountsInterop = volumeMountsLens.interop();
+  const { control, name } = volumeMountsLens.defined().interop();
 
   return (
     <FormField
-      control={volumeMountsInterop.control}
-      name={volumeMountsInterop.name}
+      control={control}
+      name={name}
       render={() => (
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
@@ -77,7 +76,7 @@ export function VolumeMountsSection({
             )}
             {volumeMountFields.length > 0 ? (
               volumeMountFields.map((item, index) => {
-                const mountLens = volumeMountsLens.focus(index).defined();
+                const mountLens = volumeMountsLens.defined().focus(index).defined();
                 const mountPathInterop = mountLens
                   .focus('mountPath')
                   .interop();

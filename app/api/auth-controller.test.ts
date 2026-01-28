@@ -188,8 +188,9 @@ describe('registerAuthClientController', () => {
   });
 
   it('throws an error if reading CRD fails for reasons other than 404', async () => {
-    const error = new Error('Kubernetes API error');
-    (error as any).code = 500; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const error = Object.assign(new Error('Kubernetes API error'), {
+      code: 500,
+    });
     mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockRejectedValue(
       error,
     );
@@ -227,7 +228,8 @@ describe('registerAuthClientController', () => {
       http.post(
         `${ZITADEL_URL}/management/v1/projects/project-id/apps/oidc`,
         async ({ request }) => {
-          const body = (await request.json()) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line @typescript-eslint/consistent-type-assertions, @typescript-eslint/no-explicit-any
+          const body = (await request.json()) as any;
 
           zitadelRequestSpy(body);
           if (
