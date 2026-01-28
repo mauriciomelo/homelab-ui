@@ -111,10 +111,10 @@ export function ResourceField({
         <PopoverAnchor asChild>
           <div
             className={cn(
-              'bg-background flex items-center rounded-md border transition-colors',
+              'flex items-center rounded-md transition-colors hover:bg-muted/50 px-2 -mx-2',
               isFocused &&
                 'ring-ring ring-offset-background ring-2 ring-offset-2',
-              error && 'border-destructive',
+              error && 'border-destructive border',
               disabled && 'cursor-not-allowed opacity-50',
             )}
           >
@@ -133,10 +133,10 @@ export function ResourceField({
               disabled={disabled}
               required={required}
               aria-invalid={!!error}
-              className="flex-1 border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0 text-right"
               data-testid={dataTestId}
             />
-            <div className="bg-border h-6 w-px" />
+            <div className="bg-border h-4 w-px mx-2" />
             <Select
               value={resource.unit === '' ? 'cores' : resource.unit.toString()}
               onValueChange={handleUnitChange}
@@ -144,7 +144,7 @@ export function ResourceField({
             >
               <SelectTrigger
                 aria-label={unitLabel}
-                className="w-[85px] rounded-l-none border-0 shadow-none focus:ring-0 focus:ring-offset-0"
+                className="w-auto min-w-[60px] rounded-l-none border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0 px-0 gap-1 text-right"
               >
                 <SelectValue />
               </SelectTrigger>

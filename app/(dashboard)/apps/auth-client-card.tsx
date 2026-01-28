@@ -12,18 +12,16 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Shield, Trash2 } from 'lucide-react';
 import { AuthClientSchema } from '@/app/api/schemas';
+
+import {
+  InsetGroup,
+  InsetRow,
+  InsetLabel,
+  InsetInput,
+} from '@/components/ui/inset-group';
 
 const formatUriList = (value?: string[]) =>
   value?.length ? value.join(',\n') : '';
@@ -70,120 +68,133 @@ export function AuthClientCard({
   );
 
   return (
-    <Card role="group" aria-labelledby={`auth-client-title-${index}`}>
-      <CardHeader>
-        <CardTitle
-          id={`auth-client-title-${index}`}
-          className="flex items-center gap-2 text-sm"
-        >
+    <InsetGroup role="group" aria-labelledby={`auth-client-title-${index}`}>
+      <div className="flex items-center justify-between p-3 bg-muted/30">
+        <div className="flex items-center gap-2">
           <Shield className="text-muted-foreground h-4 w-4" />
-          <span>Auth Client</span>
-        </CardTitle>
-        <CardDescription>Configure OAuth redirect settings</CardDescription>
-        <CardAction>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Remove Auth Client"
-            onClick={() => onRemove(index)}
-            className="text-muted-foreground hover:text-foreground"
+          <span
+            id={`auth-client-title-${index}`}
+            className="text-sm font-medium"
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FormField
-          control={nameInterop.control}
-          name={nameInterop.name}
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel>Auth Client Name</FormLabel>
+            Auth Client
+          </span>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Remove Auth Client"
+          onClick={() => onRemove(index)}
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <FormField
+        control={nameInterop.control}
+        name={nameInterop.name}
+        render={({ field }) => (
+          <InsetRow asChild>
+            <FormItem className="space-y-0">
+              <InsetLabel asChild>
+                <FormLabel>Name</FormLabel>
+              </InsetLabel>
               <FormControl>
-                <Input className="font-mono text-sm" {...field} />
+                <InsetInput className="text-left" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-        <FormField
-          control={redirectUrisInterop.control}
-          name={redirectUrisInterop.name}
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel>Redirect URI</FormLabel>
-              <FormControl>
-                <Textarea
-                  {...field}
-                  className="min-h-[88px] resize-y"
-                  value={redirectUrisInput}
-                  aria-invalid={!!redirectErrorMessage}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setRedirectUrisInput(nextValue);
-                    field.onChange(parseUriList(nextValue));
-                  }}
-                  onBlur={(event) => {
-                    field.onBlur();
-                    setRedirectUrisInput(
-                      formatUriList(parseUriList(event.target.value)),
-                    );
-                  }}
-                />
-              </FormControl>
-              {redirectErrorMessage ? (
-                <p className="text-destructive text-sm">
-                  {redirectErrorMessage}
-                </p>
-              ) : (
-                <FormDescription>
-                  Comma-separated redirect URIs.
-                </FormDescription>
-              )}
+          </InsetRow>
+        )}
+      />
+      <FormField
+        control={redirectUrisInterop.control}
+        name={redirectUrisInterop.name}
+        render={({ field }) => (
+          <InsetRow className="items-start" asChild>
+            <FormItem className="space-y-0">
+              <InsetLabel className="pt-2" asChild>
+                <FormLabel>Redirect URIs</FormLabel>
+              </InsetLabel>
+              <div className="flex-1 space-y-1">
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    className="min-h-[88px] resize-y border-0 bg-transparent px-2 rounded-md transition-colors hover:bg-muted/50 shadow-none focus-visible:ring-0 text-sm"
+                    value={redirectUrisInput}
+                    aria-invalid={!!redirectErrorMessage}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setRedirectUrisInput(nextValue);
+                      field.onChange(parseUriList(nextValue));
+                    }}
+                    onBlur={(event) => {
+                      field.onBlur();
+                      setRedirectUrisInput(
+                        formatUriList(parseUriList(event.target.value)),
+                      );
+                    }}
+                  />
+                </FormControl>
+                {redirectErrorMessage ? (
+                  <p className="text-destructive text-sm">
+                    {redirectErrorMessage}
+                  </p>
+                ) : (
+                  <FormDescription className="text-xs">
+                    Comma-separated redirect URIs.
+                  </FormDescription>
+                )}
+              </div>
             </FormItem>
-          )}
-        />
-        <FormField
-          control={postLogoutUrisInterop.control}
-          name={postLogoutUrisInterop.name}
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel>Post-logout URI</FormLabel>
-              <FormControl>
-                <Textarea
-                  {...field}
-                  className="min-h-[88px] resize-y"
-                  value={postLogoutUrisInput}
-                  aria-invalid={!!postLogoutErrorMessage}
+          </InsetRow>
+        )}
+      />
+      <FormField
+        control={postLogoutUrisInterop.control}
+        name={postLogoutUrisInterop.name}
+        render={({ field }) => (
+          <InsetRow className="items-start" asChild>
+            <FormItem className="space-y-0">
+              <InsetLabel className="pt-2" asChild>
+                <FormLabel>Post-logout URIs</FormLabel>
+              </InsetLabel>
+              <div className="flex-1 space-y-1">
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    className="min-h-[88px] resize-y border-0 bg-transparent px-2 rounded-md transition-colors hover:bg-muted/50 shadow-none focus-visible:ring-0 text-sm"
+                    value={postLogoutUrisInput}
+                    aria-invalid={!!postLogoutErrorMessage}
                   onChange={(event) => {
                     const nextValue = event.target.value;
                     setPostLogoutUrisInput(nextValue);
-                    const parsed = parseUriList(nextValue);
-                    field.onChange(parsed.length ? parsed : undefined);
+                    field.onChange(parseUriList(nextValue));
                   }}
-                  onBlur={(event) => {
-                    field.onBlur();
-                    setPostLogoutUrisInput(
-                      formatUriList(parseUriList(event.target.value)),
-                    );
-                  }}
-                />
-              </FormControl>
-              {postLogoutErrorMessage ? (
-                <p className="text-destructive text-sm">
-                  {postLogoutErrorMessage}
-                </p>
-              ) : (
-                <FormDescription>
-                  Optional comma-separated post-logout redirect URIs.
-                </FormDescription>
-              )}
+                    onBlur={(event) => {
+                      field.onBlur();
+                      setPostLogoutUrisInput(
+                        formatUriList(parseUriList(event.target.value)),
+                      );
+                    }}
+                  />
+                </FormControl>
+                {postLogoutErrorMessage ? (
+                  <p className="text-destructive text-sm">
+                    {postLogoutErrorMessage}
+                  </p>
+                ) : (
+                  <FormDescription className="text-xs">
+                    Optional comma-separated post-logout redirect URIs.
+                  </FormDescription>
+                )}
+              </div>
             </FormItem>
-          )}
-        />
-      </CardContent>
-    </Card>
+          </InsetRow>
+        )}
+      />
+    </InsetGroup>
   );
 }
 

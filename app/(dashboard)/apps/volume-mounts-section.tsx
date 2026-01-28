@@ -9,16 +9,7 @@ import {
   FormItem,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { HardDrive, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -37,6 +28,13 @@ type VolumeMountsSectionProps = {
   onRemove: (index: number) => void;
 };
 
+import {
+  InsetGroup,
+  InsetSectionTitle,
+  InsetRow,
+  InsetInput,
+} from '@/components/ui/inset-group';
+
 export function VolumeMountsSection({
   lens,
   volumeMountFields,
@@ -54,135 +52,123 @@ export function VolumeMountsSection({
       control={volumeMountsInterop.control}
       name={volumeMountsInterop.name}
       render={() => (
-        <Card role="group" aria-labelledby="volume-mounts-title">
-          <CardHeader>
-            <CardTitle
-              id="volume-mounts-title"
-              className="flex items-center gap-2 text-base"
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <InsetSectionTitle id="volume-mounts-title" className="pb-0">
+              Volume Mounts
+            </InsetSectionTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onAdd}
+              className="h-6 px-2 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50"
             >
-              <HardDrive className="text-muted-foreground h-4 w-4" />
-              <span>Volume Mounts</span>
-            </CardTitle>
-            <CardDescription>
-              Mount persistent volumes inside the container.
-            </CardDescription>
-            <CardAction>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onAdd}
-                className="h-9"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Volume Mount
-              </Button>
-            </CardAction>
-          </CardHeader>
-          <CardContent>
-            {volumeMountFields.length ? (
-              <>
-                <div className="text-muted-foreground flex items-center gap-2 px-2 text-xs font-semibold">
-                  <span className="w-60">Mount Path</span>
-                  <span className="flex-1">Persistent Volume</span>
-                  <div className="w-9" />
-                </div>
-                <div className="space-y-3">
-                  {volumeMountFields.map((item, index) => {
-                    const mountLens = volumeMountsLens.focus(index).defined();
-                    const mountPathInterop = mountLens
-                      .focus('mountPath')
-                      .interop();
-                    const volumeNameInterop = mountLens.focus('name').interop();
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="border-border/60 bg-background flex items-start gap-2 rounded-md border p-2"
-                      >
-                        <FormField
-                          control={mountPathInterop.control}
-                          name={mountPathInterop.name}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input
-                                  placeholder="/data"
-                                  className={cn(fieldClassName, 'w-60')}
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={volumeNameInterop.control}
-                          name={volumeNameInterop.name}
-                          render={({ field }) => (
-                            <FormItem className="flex-1 grow">
-                              <Select
-                                onValueChange={field.onChange}
-                                value={field.value ?? ''}
-                              >
-                                <FormControl>
-                                  <SelectTrigger
-                                    aria-label="Persistent Volume"
-                                    className="w-full"
-                                  >
-                                    <SelectValue placeholder="Select a persistent volume">
-                                      {field.value ? (
-                                        <span className="font-mono">
-                                          {field.value}
-                                        </span>
-                                      ) : null}
-                                    </SelectValue>
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {hasPersistentVolumeClaims ? (
-                                    persistentVolumeClaims.map((resource) => (
-                                      <SelectItem
-                                        key={resource.metadata.name}
-                                        value={resource.metadata.name}
-                                      >
-                                        <span className="font-mono">
-                                          {resource.metadata.name}
-                                        </span>
-                                      </SelectItem>
-                                    ))
-                                  ) : (
-                                    <SelectItem value="no-pv" disabled>
-                                      Add a persistent volume in Additional
-                                      Resources
-                                    </SelectItem>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon"
-                          onClick={() => onRemove(index)}
-                          className="shrink-0"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <div className="text-muted-foreground text-sm">
-                No volume mounts.
+              <Plus className="mr-1 h-3 w-3" />
+              Add Volume Mount
+            </Button>
+          </div>
+          <InsetGroup role="group" aria-labelledby="volume-mounts-title">
+            {volumeMountFields.length > 0 && (
+              <div className="flex items-center gap-4 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+                <span className="w-1/3">Mount Path</span>
+                <span className="flex-1">Persistent Volume</span>
+                <div className="w-8" />
               </div>
             )}
-          </CardContent>
-        </Card>
+            {volumeMountFields.length > 0 ? (
+              volumeMountFields.map((item, index) => {
+                const mountLens = volumeMountsLens.focus(index).defined();
+                const mountPathInterop = mountLens
+                  .focus('mountPath')
+                  .interop();
+                const volumeNameInterop = mountLens
+                  .focus('name')
+                  .interop();
+
+                return (
+                  <InsetRow key={item.id}>
+                    <FormField
+                      control={mountPathInterop.control}
+                      name={mountPathInterop.name}
+                      render={({ field }) => (
+                        <FormItem className="w-1/3 space-y-0">
+                          <FormControl>
+                            <InsetInput
+                              placeholder="/data"
+                              className={cn(fieldClassName, 'text-left')}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={volumeNameInterop.control}
+                      name={volumeNameInterop.name}
+                      render={({ field }) => (
+                        <FormItem className="flex-1 space-y-0">
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? ''}
+                          >
+                            <FormControl>
+                              <SelectTrigger
+                                aria-label="Persistent Volume"
+                                className="h-auto py-1 w-full border-0 bg-transparent px-2 rounded-md transition-colors hover:bg-muted/50 shadow-none focus:ring-0 text-left"
+                              >
+                                <SelectValue placeholder="Select a persistent volume">
+                                  {field.value ? (
+                                    <span className="font-mono">
+                                      {field.value}
+                                    </span>
+                                  ) : null}
+                                </SelectValue>
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {hasPersistentVolumeClaims ? (
+                                persistentVolumeClaims.map((resource) => (
+                                  <SelectItem
+                                    key={resource.metadata.name}
+                                    value={resource.metadata.name}
+                                  >
+                                    <span className="font-mono">
+                                      {resource.metadata.name}
+                                    </span>
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <SelectItem value="no-pv" disabled>
+                                  Add a persistent volume in Additional
+                                  Resources
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onRemove(index)}
+                      className="h-8 w-8 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </InsetRow>
+                );
+              })
+            ) : (
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                No volume mounts configured.
+              </div>
+            )}
+          </InsetGroup>
+        </div>
       )}
     />
   );

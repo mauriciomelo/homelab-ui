@@ -118,7 +118,7 @@ describe('ApplicationForm', () => {
     await renderWithProviders(<Apps />);
     await user.click(await page.getByText('test-app'));
 
-    await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+    await user.click(page.getByRole('combobox', { name: 'Preset' }));
     await user.click(page.getByRole('option', { name: 'Custom' }));
 
     const cpuInput = page.getByTestId('resource-limits-cpu-input');
@@ -148,7 +148,7 @@ describe('ApplicationForm', () => {
     await renderWithProviders(<Apps />);
     await user.click(await page.getByText('test-app'));
 
-    await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+    await user.click(page.getByRole('combobox', { name: 'Preset' }));
     await user.click(page.getByRole('option', { name: 'Custom' }));
 
     const memoryInput = page.getByTestId('resource-limits-memory-input');
@@ -197,11 +197,12 @@ describe('ApplicationForm', () => {
       await expect.element(envNameInput).toHaveValue('DB_NAME');
       await expect.element(envValueInput).toHaveValue('production');
 
-      const portSelect = page.getByTestId('ingress-port-select');
-      await expect.element(portSelect).toHaveTextContent('http');
+      await expect
+        .element(page.getByRole('button', { name: /Web Port/ }).nth(0))
+        .toHaveAttribute('aria-pressed', 'true');
 
-      const portNameInput = page.getByTestId('port-name-0');
-      const portNumberInput = page.getByTestId('port-number-0');
+      const portNameInput = page.getByLabelText('Port Name').nth(0);
+      const portNumberInput = page.getByLabelText('Port Number').nth(0);
 
       await expect.element(portNameInput).toHaveValue('http');
       await expect.element(portNumberInput).toHaveValue(80);
@@ -235,11 +236,11 @@ describe('ApplicationForm', () => {
       await user.click(page.getByText('auth-app'));
 
       await expect
-        .element(page.getByText('Additional Resources'))
+        .element(page.getByText('Additional Resources', { exact: true }))
         .toBeInTheDocument();
-      const authClientNameInput = page.getByLabelText('Auth Client Name');
-      const redirectUriInput = page.getByLabelText('Redirect URI');
-      const postLogoutUriInput = page.getByLabelText('Post-logout URI');
+      const authClientNameInput = page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name');
+      const redirectUriInput = page.getByLabelText('Redirect URIs');
+      const postLogoutUriInput = page.getByLabelText('Post-logout URIs');
 
       await expect.element(authClientNameInput).toHaveValue('authclient-main');
       await expect
@@ -271,10 +272,10 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
       await expect
-        .poll(() => page.getByLabelText('Auth Client Name'))
+        .poll(() => page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name'))
         .toBeInTheDocument();
       await expect
-        .poll(() => page.getByLabelText('Redirect URI'))
+        .poll(() => page.getByLabelText('Redirect URIs'))
         .toBeInTheDocument();
     });
 
@@ -302,7 +303,7 @@ describe('ApplicationForm', () => {
         page.getByRole('menuitem', { name: 'Persistent Volume' }),
       );
 
-      const volumeNameInput = page.getByLabelText('Persistent Volume Name');
+      const volumeNameInput = page.getByRole('group', { name: 'Persistent Volume' }).getByLabelText('Name');
       const storageInput = page.getByRole('textbox', { name: 'Storage' });
       const accessModeSelect = page.getByRole('combobox', {
         name: 'Access Mode',
@@ -338,7 +339,7 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
       await expect
-        .poll(() => page.getByLabelText('Auth Client Name'))
+        .poll(() => page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name'))
         .toHaveValue('authclient');
     });
 
@@ -362,7 +363,7 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('button', { name: 'Add Resource' }));
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
-      const postLogoutInput = page.getByLabelText('Post-logout URI');
+      const postLogoutInput = page.getByLabelText('Post-logout URIs');
       await user.click(postLogoutInput);
       await user.keyboard(
         'https://example.com/logout, https://example.com/logout-next',
@@ -397,7 +398,7 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('button', { name: 'Add Resource' }));
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
-      const redirectInput = page.getByLabelText('Redirect URI');
+      const redirectInput = page.getByLabelText('Redirect URIs');
       await user.click(redirectInput);
       await user.keyboard('https://example.com/callback, not-a-url');
 
@@ -436,10 +437,10 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
       await expect
-        .poll(() => page.getByLabelText('Auth Client Name').elements().length)
+        .poll(() => page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name').elements().length)
         .toBe(2);
 
-      const authClientNames = page.getByLabelText('Auth Client Name');
+      const authClientNames = page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name');
       await user.fill(authClientNames.nth(0), 'primary-client');
       await user.fill(authClientNames.nth(1), 'secondary-client');
 
@@ -448,10 +449,10 @@ describe('ApplicationForm', () => {
       );
 
       await expect
-        .poll(() => page.getByLabelText('Auth Client Name').elements().length)
+        .poll(() => page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name').elements().length)
         .toBe(1);
       await expect
-        .element(page.getByLabelText('Auth Client Name'))
+        .element(page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name'))
         .toHaveValue('secondary-client');
     });
 
@@ -476,10 +477,10 @@ describe('ApplicationForm', () => {
       // Open the form sheet
       await user.click(page.getByText('test-app'));
 
-      const portNameInput0 = page.getByTestId('port-name-0');
-      const portNumberInput0 = page.getByTestId('port-number-0');
-      const portNameInput1 = page.getByTestId('port-name-1');
-      const portNumberInput1 = page.getByTestId('port-number-1');
+      const portNameInput0 = page.getByLabelText('Port Name').nth(0);
+      const portNumberInput0 = page.getByLabelText('Port Number').nth(0);
+      const portNameInput1 = page.getByLabelText('Port Name').nth(1);
+      const portNumberInput1 = page.getByLabelText('Port Number').nth(1);
 
       await expect.element(portNameInput0).toHaveValue('http');
       await expect.element(portNumberInput0).toHaveValue(80);
@@ -505,10 +506,10 @@ describe('ApplicationForm', () => {
       // Open the form sheet
       await user.click(page.getByText('test-app'));
 
-      await user.click(page.getByTestId('add-port-btn'));
+      await user.click(page.getByRole('button', { name: 'Add Port' }));
 
       await expect
-        .poll(() => page.getByTestId('port-name-1'))
+        .poll(() => page.getByLabelText('Port Name').nth(1))
         .toBeInTheDocument();
     });
 
@@ -534,24 +535,22 @@ describe('ApplicationForm', () => {
       await user.click(page.getByText('test-app'));
 
       // Verify we have 2 ports initially
-      await expect.element(page.getByTestId('port-name-0')).toBeInTheDocument();
-      await expect.element(page.getByTestId('port-name-1')).toBeInTheDocument();
+      await expect.element(page.getByLabelText('Port Name').nth(0)).toBeInTheDocument();
+      await expect.element(page.getByLabelText('Port Name').nth(1)).toBeInTheDocument();
 
       // Click remove on the second port
-      await user.click(page.getByTestId('remove-port-1'));
+      await user.click(page.getByRole('button', { name: 'Remove Port' }).nth(1));
 
       // Verify second port is gone
       await expect
-        .poll(() => page.getByTestId('port-name-1').elements().length)
+        .poll(() => page.getByLabelText('Port Name').nth(1).elements().length)
         .toBe(0);
 
       // Verify first port is still there
-      await expect.element(page.getByTestId('port-name-0')).toBeInTheDocument();
+      await expect.element(page.getByLabelText('Port Name').nth(0)).toBeInTheDocument();
     });
 
-    test('updates ingress port options when ports change', async ({
-      worker,
-    }) => {
+    test('updates web port when toggle is clicked', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
         http.get('*/api/trpc/apps', () => {
@@ -559,6 +558,7 @@ describe('ApplicationForm', () => {
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
+              app.spec.ingress = { port: { name: 'http' } };
             }),
           ]);
         }),
@@ -569,26 +569,28 @@ describe('ApplicationForm', () => {
       // Open the form sheet
       await user.click(page.getByText('test-app'));
 
-      // Check initial ingress port
-      const portSelect = page.getByTestId('ingress-port-select');
-      await expect.element(portSelect).toHaveTextContent('http');
+      // Check initial active web port
+      await expect
+        .element(page.getByRole('button', { name: /Web Port/ }).nth(0))
+        .toHaveAttribute('aria-pressed', 'true');
 
       // Add a new port
-      await user.click(page.getByTestId('add-port-btn'));
-      const newPortNameInput = page.getByTestId('port-name-1');
+      await user.click(page.getByRole('button', { name: 'Add Port' }));
+      const newPortNameInput = page.getByLabelText('Port Name').nth(1);
       await user.fill(newPortNameInput, 'metrics');
 
-      // Open select
-      await user.click(portSelect);
+      // Click toggle on new port
+      await user.click(page.getByRole('button', { name: /Web Port/ }).nth(1));
 
-      // Check if new option is available
+      // Verify new port is active
       await expect
-        .element(page.getByTestId('ingress-port-option-metrics'))
-        .toBeInTheDocument();
+        .element(page.getByRole('button', { name: /Web Port/ }).nth(1))
+        .toHaveAttribute('aria-pressed', 'true');
 
-      // Select the new port
-      await user.click(page.getByTestId('ingress-port-option-metrics'));
-      await expect.element(portSelect).toHaveTextContent('metrics');
+      // Verify old port is inactive
+      await expect
+        .element(page.getByRole('button', { name: /Web Port/ }).nth(0))
+        .toHaveAttribute('aria-pressed', 'false');
     });
 
     test('adds new environment variable', async ({ worker }) => {
@@ -610,7 +612,7 @@ describe('ApplicationForm', () => {
       // Open the form sheet
       await user.click(page.getByText('test-app'));
 
-      await user.click(page.getByText('Add Environment Variable'));
+      await user.click(page.getByText('Add Variable'));
 
       await expect
         .poll(() => page.getByPlaceholder('VARIABLE_NAME').elements().length)
@@ -644,9 +646,10 @@ describe('ApplicationForm', () => {
       );
       const nameInput = page.getByPlaceholder('VARIABLE_NAME');
       const valueInput = page.getByPlaceholder('value');
-      const portSelect = page.getByTestId('ingress-port-select');
 
-      await expect.element(portSelect).toHaveTextContent('http');
+      await expect
+        .element(page.getByRole('button', { name: /Web Port/ }).nth(0))
+        .toHaveAttribute('aria-pressed', 'true');
 
       await user.fill(imageInput, 'redis:7-alpine');
 
@@ -896,11 +899,11 @@ describe('ApplicationForm', () => {
 
       // Check current resource limits selection
       await expect(
-        page.getByRole('combobox', { name: 'Resource Limits' }),
+        page.getByRole('combobox', { name: 'Preset' }),
       ).toHaveTextContent('small');
 
       // Click on the resource limits select to open it
-      await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+      await user.click(page.getByRole('combobox', { name: 'Preset' }));
 
       // Select Custom option
       await user.click(page.getByRole('option', { name: 'Custom' }));
@@ -959,10 +962,10 @@ describe('ApplicationForm', () => {
       await user.click(await page.getByText(app.spec.name));
 
       await expect(
-        page.getByRole('combobox', { name: 'Resource Limits' }),
+        page.getByRole('combobox', { name: 'Preset' }),
       ).toHaveTextContent('medium');
 
-      await user.click(page.getByRole('combobox', { name: 'Resource Limits' }));
+      await user.click(page.getByRole('combobox', { name: 'Preset' }));
       await user.click(page.getByRole('option', { name: 'Custom' }));
 
       const cpuInput = page.getByTestId('resource-limits-cpu-input');
@@ -1055,8 +1058,8 @@ describe('ApplicationForm', () => {
       await renderWithProviders(<Apps />);
       await user.click(await page.getByText('test-app'));
 
-      await user.click(page.getByTestId('add-port-btn'));
-      const newPortNameInput = page.getByTestId('port-name-1');
+      await user.click(page.getByRole('button', { name: 'Add Port' }));
+      const newPortNameInput = page.getByLabelText('Port Name').nth(1);
       await user.fill(newPortNameInput, 'http');
 
       await user.click(page.getByText('Update'));
@@ -1084,10 +1087,10 @@ describe('ApplicationForm', () => {
       await renderWithProviders(<Apps />);
       await user.click(await page.getByText('test-app'));
 
-      await user.click(page.getByTestId('add-port-btn'));
-      const newPortNameInput = page.getByTestId('port-name-1');
+      await user.click(page.getByRole('button', { name: 'Add Port' }));
+      const newPortNameInput = page.getByLabelText('Port Name').nth(1);
       await user.fill(newPortNameInput, 'metrics');
-      const newPortNumberInput = page.getByTestId('port-number-1');
+      const newPortNumberInput = page.getByLabelText('Port Number').nth(1);
       await user.fill(newPortNumberInput, '80');
 
       await user.click(page.getByText('Update'));
@@ -1171,8 +1174,9 @@ describe('ApplicationForm', () => {
 
       expect(page.getByText('Create New App')).toBeInTheDocument();
 
-      const portSelect = page.getByTestId('ingress-port-select');
-      await expect.element(portSelect).toHaveTextContent('http');
+      await expect
+        .element(page.getByRole('button', { name: /Web Port/ }).nth(0))
+        .toHaveAttribute('aria-pressed', 'true');
 
       const nameInput = page.getByPlaceholder('App Name');
       const imageInput = page.getByPlaceholder(

@@ -115,7 +115,7 @@ export function Apps() {
             }
           }}
         >
-          <SheetContent className="w-[600px] sm:max-w-[600px]">
+          <SheetContent className="w-[600px] sm:max-w-[600px] bg-muted">
             <SheetHeader>
               <SheetTitle>
                 {formMode === 'create'

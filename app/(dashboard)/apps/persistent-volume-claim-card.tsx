@@ -10,15 +10,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ResourceField } from '@/components/resource-field';
 import { storageConfig } from '@/lib/resource-utils';
 import { HardDrive, Trash2 } from 'lucide-react';
@@ -31,6 +23,13 @@ import {
   ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox';
+
+import {
+  InsetGroup,
+  InsetRow,
+  InsetLabel,
+  InsetInput,
+} from '@/components/ui/inset-group';
 
 const accessModeOptions = [
   {
@@ -70,104 +69,122 @@ export function PersistentVolumeClaimCard({
   const storageError = useController(storageInterop).fieldState.error?.message;
 
   return (
-    <Card role="group" aria-labelledby={`persistent-volume-title-${index}`}>
-      <CardHeader>
-        <CardTitle
-          id={`persistent-volume-title-${index}`}
-          className="flex items-center gap-2 text-sm"
-        >
+    <InsetGroup
+      role="group"
+      aria-labelledby={`persistent-volume-title-${index}`}
+    >
+      <div className="flex items-center justify-between p-3 bg-muted/30">
+        <div className="flex items-center gap-2">
           <HardDrive className="text-muted-foreground h-4 w-4" />
-          <span>Persistent Volume</span>
-        </CardTitle>
-        <CardDescription>
-          Define persistent storage for your app.
-        </CardDescription>
-        <CardAction>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Remove Persistent Volume"
-            onClick={() => onRemove(index)}
-            className="text-muted-foreground hover:text-foreground"
+          <span
+            id={`persistent-volume-title-${index}`}
+            className="text-sm font-medium"
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FormField
-          control={nameInterop.control}
-          name={nameInterop.name}
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel>Persistent Volume Name</FormLabel>
+            Persistent Volume
+          </span>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Remove Persistent Volume"
+          onClick={() => onRemove(index)}
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <FormField
+        control={nameInterop.control}
+        name={nameInterop.name}
+        render={({ field }) => (
+          <InsetRow asChild>
+            <FormItem className="space-y-0">
+              <InsetLabel asChild>
+                <FormLabel>Name</FormLabel>
+              </InsetLabel>
               <FormControl>
-                <Input className="font-mono text-sm" {...field} />
+                <InsetInput className="text-left" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
-          )}
-        />
-        <FormField
-          control={storageInterop.control}
-          name={storageInterop.name}
-          render={({ field }) => (
-            <FormItem>
-              <ResourceField
-                id={`pvc-storage-${index}`}
-                label="Storage"
-                value={field.value}
-                onChange={field.onChange}
-                error={storageError}
-                config={storageConfig}
-              />
+          </InsetRow>
+        )}
+      />
+      <FormField
+        control={storageInterop.control}
+        name={storageInterop.name}
+        render={({ field }) => (
+          <InsetRow asChild>
+            <FormItem className="space-y-0">
+              <InsetLabel asChild>
+                <Label htmlFor={`pvc-storage-${index}`}>Storage</Label>
+              </InsetLabel>
+              <div className="flex-1 min-w-0">
+                <ResourceField
+                  id={`pvc-storage-${index}`}
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={storageError}
+                  config={storageConfig}
+                />
+              </div>
             </FormItem>
-          )}
-        />
-        <FormField
-          control={accessModesInterop.control}
-          name={accessModesInterop.name}
-          render={({ field }) => (
-            <FormItem className="space-y-2">
-              <FormLabel>Access Mode</FormLabel>
-              <Combobox
-                items={accessModeOptions}
-                value={
-                  accessModeOptions.find(
-                    (option) => option.value === field.value?.[0],
-                  ) ?? null
-                }
-                onValueChange={(value) =>
-                  field.onChange(value ? [value.value] : [])
-                }
-                itemToStringLabel={(option) => option.label}
-                itemToStringValue={(option) => option.value}
-              >
-                <FormControl>
-                  <ComboboxInput placeholder="Search access modes..." />
-                </FormControl>
-                <ComboboxContent>
-                  <ComboboxEmpty>No access modes found.</ComboboxEmpty>
-                  <ComboboxList>
-                    {(option) => (
-                      <ComboboxItem key={option.value} value={option}>
-                        <div className="flex flex-col text-left">
-                          <span>{option.label}</span>
-                          <span className="text-muted-foreground text-xs">
-                            {option.description}
-                          </span>
-                        </div>
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-              <FormMessage />
+          </InsetRow>
+        )}
+      />
+      <FormField
+        control={accessModesInterop.control}
+        name={accessModesInterop.name}
+        render={({ field }) => (
+          <InsetRow asChild>
+            <FormItem className="space-y-0">
+              <InsetLabel asChild>
+                <FormLabel>Access Mode</FormLabel>
+              </InsetLabel>
+              <div className="flex-1 min-w-0">
+                <Combobox
+                  items={accessModeOptions}
+                  value={
+                    accessModeOptions.find(
+                      (option) => option.value === field.value?.[0],
+                    ) ?? null
+                  }
+                  onValueChange={(value) =>
+                    field.onChange(value ? [value.value] : [])
+                  }
+                  itemToStringLabel={(option) => option.label}
+                  itemToStringValue={(option) => option.value}
+                >
+                  <FormControl>
+                    <ComboboxInput
+                      placeholder="Search access modes..."
+                      className="h-auto py-1 w-full border-0 bg-transparent px-2 rounded-md transition-colors hover:bg-muted/50 shadow-none focus:ring-0 text-left"
+                    />
+                  </FormControl>
+                  <ComboboxContent>
+                    <ComboboxEmpty>No access modes found.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(option) => (
+                        <ComboboxItem key={option.value} value={option}>
+                          <div className="flex flex-col text-left">
+                            <span>{option.label}</span>
+                            <span className="text-muted-foreground text-xs">
+                              {option.description}
+                            </span>
+                          </div>
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+                <FormMessage />
+              </div>
             </FormItem>
-          )}
-        />
-      </CardContent>
-    </Card>
+          </InsetRow>
+        )}
+      />
+    </InsetGroup>
   );
 }
