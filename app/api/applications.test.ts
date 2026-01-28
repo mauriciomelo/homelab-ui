@@ -28,8 +28,8 @@ import { ingressSchema } from './schemas';
 import * as k from './k8s';
 import z from 'zod';
 
-const traefikConfigPath =
-  '/test-project/clusters/my-cluster/tesselar-system/traefik/traefik-config.yaml';
+const gotkSyncPath =
+  '/test-project/clusters/my-cluster/flux-system/gotk-sync.yaml';
 
 vi.mock('server-only', () => ({}));
 
@@ -170,7 +170,7 @@ describe('createApp', () => {
       fs,
     });
 
-    seedTraefikConfig();
+    seedFluxConfig();
   });
 
   it('creates a new application', async () => {
@@ -481,7 +481,7 @@ describe('getApps', () => {
       fs,
     });
 
-    seedTraefikConfig();
+    seedFluxConfig();
   });
   it('retrieves all applications from file system', async () => {
     const app1Deployment = produce(baseDeployment, (draft) => {
@@ -626,26 +626,55 @@ function buildNamespace({ name }: { name: string }) {
   });
 }
 
-function seedTraefikConfig() {
-  const traefikConfig = {
-    apiVersion: 'helm.cattle.io/v1',
-    kind: 'HelmChartConfig',
+function seedFluxConfig() {
+  const gitRepository = {
+    apiVersion: 'source.toolkit.fluxcd.io/v1',
+    kind: 'GitRepository',
     metadata: {
-      name: 'traefik',
-      namespace: 'kube-system',
+      name: 'flux-system',
+      namespace: 'flux-system',
     },
     spec: {
-      valuesContent: YAML.stringify({
-        providers: {
-          kubernetesIngress: {
-            defaultRule: 'Host(`{{ .Name }}.local`)',
-          },
-        },
-      }),
+      interval: '30000m0s',
+      ref: {
+        branch: 'main',
+      },
+      secretRef: {
+        name: 'flux-system',
+      },
+      url: 'ssh://git@github.com/example/repo',
     },
   };
 
+  const kustomization = {
+    apiVersion: 'kustomize.toolkit.fluxcd.io/v1',
+    kind: 'Kustomization',
+    metadata: {
+      name: 'flux-system',
+      namespace: 'flux-system',
+    },
+    spec: {
+      interval: '10m0s',
+      path: './clusters/my-cluster',
+      prune: true,
+      postBuild: {
+        substitute: {
+          DOMAIN: 'local',
+        },
+      },
+      sourceRef: {
+        kind: 'GitRepository',
+        name: 'flux-system',
+      },
+    },
+  };
+
+  const gotkSyncContent = [
+    YAML.stringify(gitRepository),
+    YAML.stringify(kustomization),
+  ].join('---\n');
+
   vol.fromJSON({
-    [traefikConfigPath]: YAML.stringify(traefikConfig),
+    [gotkSyncPath]: gotkSyncContent,
   });
 }

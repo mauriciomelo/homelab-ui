@@ -17,8 +17,7 @@ import {
   namespaceSchema,
   persistentVolumeClaimSchema,
   serviceSchema,
-  traefikConfigSchema,
-  traefikValuesContentSchema,
+  fluxGotkKustomizationSchema,
 } from './schemas';
 import * as k from './k8s';
 import { AppManifests, fromManifests, toManifests } from './app-k8s-adapter';
@@ -79,8 +78,6 @@ async function getAppByName(name: string) {
   const { ingress, deployment, service, namespace, additionalResources } =
     await getManifestsFromAppFiles(name);
 
-  const { host } = await getClusterConfig();
-
   const [deploymentRes, podsRes] = await Promise.all([
     k.appsApi().readNamespacedDeployment({ name, namespace: name }),
     k.coreApi().listNamespacedPod({ namespace: name }),
@@ -133,7 +130,6 @@ async function getAppByName(name: string) {
     additionalResources: additionalResources,
   });
   const appName = spec.name;
-  const appHost = resolveAppHost(appName, host);
   return {
     spec,
     pods,
@@ -158,7 +154,7 @@ async function getAppByName(name: string) {
       },
     },
     status: appStatus,
-    link: `https://${appHost}`,
+    link: await getAppLink(appName),
   };
 }
 
@@ -299,43 +295,48 @@ export async function getFile<T>({
 }): Promise<{ data: T; raw: unknown }> {
   const fileText = await fs.promises.readFile(path, 'utf-8');
 
-  const raw = YAML.parse(fileText.toString());
-  return { data: schema.parse(raw), raw };
+  const documents = YAML.parseAllDocuments(fileText.toString());
+  const errors = documents.flatMap((document) => document.errors);
+  if (errors.length > 0) {
+    throw errors[0];
+  }
+
+  const rawDocuments = documents.map((document) => document.toJSON());
+  if (rawDocuments.length === 1) {
+    const raw = rawDocuments[0];
+    return { data: schema.parse(raw), raw };
+  }
+
+  const matched = rawDocuments.find((raw) => schema.safeParse(raw).success);
+  if (!matched) {
+    throw new Error('No matching document found');
+  }
+
+  return { data: schema.parse(matched), raw: matched };
 }
 
-async function getClusterConfig(): Promise<{ host: string }> {
+async function getClusterConfig(): Promise<{ domain: string }> {
   const config = getAppConfig();
-  const traefikConfigPath = path.join(
+  const gotkSyncPath = path.join(
     config.PROJECT_DIR,
     'clusters',
     config.CLUSTER_NAME,
-    'tesselar-system',
-    'traefik',
-    'traefik-config.yaml',
+    'flux-system',
+    'gotk-sync.yaml',
   );
-  const { data } = await getFile({
-    path: traefikConfigPath,
-    schema: traefikConfigSchema,
+
+  const kustomization = await getFile({
+    path: gotkSyncPath,
+    schema: fluxGotkKustomizationSchema,
   });
-  const values = traefikValuesContentSchema.parse(
-    YAML.parse(data.spec.valuesContent),
-  );
-  const defaultRule = values.providers.kubernetesIngress.defaultRule;
-  const hostMatch = defaultRule.match(/Host\(`([^`]+)`\)/);
 
-  if (!hostMatch) {
-    throw new Error(`Unable to parse Traefik defaultRule: ${defaultRule}`);
-  }
-
-  const host = hostMatch[1]
-    .replace(/{{\s*\.Name\s*}}/g, '')
-    .replace(/^\./, '');
-
-  return { host };
+  return { domain: kustomization.data.spec.postBuild.substitute.DOMAIN };
 }
 
-function resolveAppHost(appName: string, host: string) {
-  return `${appName}.${host}`;
+async function getAppLink(appName: string) {
+  const { domain } = await getClusterConfig();
+
+  return `https://${appName}.${domain}`;
 }
 
 async function getManifestsFromAppFiles(

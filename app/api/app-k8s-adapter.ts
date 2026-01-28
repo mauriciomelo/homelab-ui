@@ -90,6 +90,7 @@ export function toManifests(app: AppSchema) {
     spec: {
       rules: [
         {
+          host: `${app.name}.\${DOMAIN}`,
           http: {
             paths: [
               {

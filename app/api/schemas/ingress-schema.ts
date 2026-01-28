@@ -10,6 +10,7 @@ export const ingressSchema = z.object({
   spec: z.object({
     rules: z.array(
       z.object({
+        host: z.string().optional(),
         http: z.object({
           paths: z.array(
             z.object({
