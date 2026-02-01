@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "The name of the application",
+      "type": "string",
+      "minLength": 1
+    },
+    "image": {
+      "description": "Container image to deploy",
+      "type": "string",
+      "minLength": 1
+    },
+    "ports": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Port name for references (named ports can be used by ingress.port.name and health.check.port)",
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "containerPort": {
+            "description": "Container port number",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          }
+        },
+        "required": [
+          "name",
+          "containerPort"
+        ]
+      }
+    },
+    "envVariables": {
+      "description": "Environment variables for the app; can reference AuthClient secrets via valueFrom.secretKeyRef",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "Environment variable name",
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "description": "Environment variable literal value (example: \"https://example.com\")",
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "Environment variable name",
+                "type": "string",
+                "minLength": 1
+              },
+              "valueFrom": {
+                "description": "Value sourced from a secret",
+                "type": "object",
+                "properties": {
+                  "secretKeyRef": {
+                    "description": "Secret key reference",
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "description": "Secret resource name (example: \"SSO\" to match an AuthClient named SSO)",
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "key": {
+                        "description": "Secret key to read (example: \"client-id\" or \"client-secret\")",
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "key"
+                    ]
+                  }
+                },
+                "required": [
+                  "secretKeyRef"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "valueFrom"
+            ]
+          }
+        ]
+      }
+    },
+    "volumeMounts": {
+      "description": "Persistent volume mounts",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "mountPath": {
+            "description": "Container mount path for the volume",
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "description": "Persistent volume claim name",
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "mountPath",
+          "name"
+        ]
+      }
+    },
+    "resources": {
+      "description": "Compute resource settings",
+      "type": "object",
+      "properties": {
+        "limits": {
+          "description": "Resource limits for the app",
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "description": "CPU limit (e.g. 1000m or 1)",
+              "type": "string",
+              "minLength": 1
+            },
+            "memory": {
+              "description": "Memory limit (e.g. 512Mi or 1Gi)",
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "cpu",
+            "memory"
+          ]
+        }
+      },
+      "required": [
+        "limits"
+      ]
+    },
+    "ingress": {
+      "description": "Ingress configuration for the app",
+      "type": "object",
+      "properties": {
+        "port": {
+          "description": "Ingress port reference",
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "Port name to expose via ingress",
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      "required": [
+        "port"
+      ]
+    },
+    "health": {
+      "description": "Optional health check configuration",
+      "type": "object",
+      "properties": {
+        "check": {
+          "description": "Health check settings",
+          "type": "object",
+          "properties": {
+            "type": {
+              "description": "HTTP GET health check",
+              "type": "string",
+              "const": "httpGet"
+            },
+            "path": {
+              "description": "HTTP path to probe for health",
+              "type": "string",
+              "minLength": 1
+            },
+            "port": {
+              "description": "Port name to use for health checks",
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "type",
+            "path",
+            "port"
+          ]
+        }
+      },
+      "required": [
+        "check"
+      ]
+    },
+    "additionalResources": {
+      "description": "Additional resources required by the app.",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "title": "AuthClient",
+            "description": "AuthClient resource (example: \"sso\"); applying this creates a Secret named sso with keys \"client-id\" and \"client-secret\" for env var references",
+            "type": "object",
+            "properties": {
+              "apiVersion": {
+                "type": "string",
+                "const": "tesselar.io/v1"
+              },
+              "kind": {
+                "type": "string",
+                "const": "AuthClient"
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "spec": {
+                "type": "object",
+                "properties": {
+                  "redirectUris": {
+                    "description": "Allowed redirect URIs for the AuthClient (example: \"https://app.example.com/callback\")",
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "format": "uri"
+                    }
+                  },
+                  "postLogoutRedirectUris": {
+                    "description": "Optional post-logout redirect URIs (example: \"https://app.example.com/\")",
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "format": "uri"
+                    }
+                  }
+                },
+                "required": [
+                  "redirectUris"
+                ]
+              }
+            },
+            "required": [
+              "apiVersion",
+              "kind",
+              "metadata",
+              "spec"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "apiVersion": {
+                "type": "string",
+                "const": "v1"
+              },
+              "kind": {
+                "type": "string",
+                "const": "PersistentVolumeClaim"
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "spec": {
+                "title": "PersistentVolumeClaim",
+                "type": "object",
+                "properties": {
+                  "accessModes": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "storageClassName": {
+                    "type": "string",
+                    "const": "longhorn"
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "requests": {
+                        "type": "object",
+                        "properties": {
+                          "storage": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "storage"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "requests"
+                    ]
+                  }
+                },
+                "required": [
+                  "accessModes",
+                  "storageClassName",
+                  "resources"
+                ]
+              }
+            },
+            "required": [
+              "apiVersion",
+              "kind",
+              "metadata",
+              "spec"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "image",
+    "ports",
+    "envVariables",
+    "resources",
+    "ingress"
+  ]
+}

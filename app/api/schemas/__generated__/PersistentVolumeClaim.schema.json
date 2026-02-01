@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "PersistentVolumeClaim"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "spec": {
+      "title": "PersistentVolumeClaim",
+      "type": "object",
+      "properties": {
+        "accessModes": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "storageClassName": {
+          "type": "string",
+          "const": "longhorn"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "storage": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "storage"
+              ]
+            }
+          },
+          "required": [
+            "requests"
+          ]
+        }
+      },
+      "required": [
+        "accessModes",
+        "storageClassName",
+        "resources"
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}

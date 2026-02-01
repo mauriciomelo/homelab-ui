@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuthClient",
+  "description": "AuthClient resource (example: \"sso\"); applying this creates a Secret named sso with keys \"client-id\" and \"client-secret\" for env var references",
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "tesselar.io/v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "AuthClient"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "spec": {
+      "type": "object",
+      "properties": {
+        "redirectUris": {
+          "description": "Allowed redirect URIs for the AuthClient (example: \"https://app.example.com/callback\")",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          }
+        },
+        "postLogoutRedirectUris": {
+          "description": "Optional post-logout redirect URIs (example: \"https://app.example.com/\")",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          }
+        }
+      },
+      "required": [
+        "redirectUris"
+      ]
+    }
+  },
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ]
+}
