@@ -39,13 +39,12 @@ export function Apps() {
   const apps = useQuery({ ...trpc.apps.queryOptions(), refetchInterval: 2000 });
   const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>(null);
-  const appDropArea = useAppDropArea();
 
   const selectedApp = selectedAppName
     ? (apps.data?.find((app) => app.spec.name === selectedAppName) ?? null)
     : null;
 
-  const formData = appDropArea.data ?? selectedApp?.spec ?? defaultAppData;
+  const formData = selectedApp?.spec ?? defaultAppData;
   // Force a fresh form instance when switching between modes or apps.
   const formKey = `${formMode ?? 'idle'}-${selectedAppName ?? 'new'}`;
 
@@ -53,6 +52,7 @@ export function Apps() {
     data: formData,
     mode: formMode || 'edit',
   });
+  const appDropArea = useAppDropArea({ form: form.form });
 
   const handleCreateApp = () => {
     setSelectedAppName(null);

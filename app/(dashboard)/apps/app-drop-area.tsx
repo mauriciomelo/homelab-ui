@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useState, type DragEvent } from 'react';
+import type { UseFormReturn } from 'react-hook-form';
 import { FileUp } from 'lucide-react';
 import YAML from 'yaml';
 import { appSchema, type AppSchema } from '@/app/api/schemas';
@@ -18,12 +19,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export const useAppDropArea = () => {
+export const useAppDropArea = ({
+  form,
+}: {
+  form: UseFormReturn<AppSchema>;
+}) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [data, setData] = useState<AppSchema | null>(null);
 
   const handleDialogOpenChange = (open: boolean) => {
     setIsConfirmOpen(open);
@@ -101,7 +105,7 @@ export const useAppDropArea = () => {
         return;
       }
 
-      setData(result.data);
+      form.reset(result.data);
       setIsConfirmOpen(false);
       setPendingFile(null);
     } catch (error) {
@@ -111,7 +115,6 @@ export const useAppDropArea = () => {
   };
 
   return {
-    data,
     dropAreaProps: {
       isConfirmOpen,
       isDragActive,

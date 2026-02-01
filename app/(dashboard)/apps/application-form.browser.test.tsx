@@ -1363,7 +1363,6 @@ describe('ApplicationForm', () => {
         .poll(() => page.getByRole('button', { name: 'Use values' }))
         .toBeInTheDocument();
       await user.click(page.getByRole('button', { name: 'Use values' }));
-      await user.click(page.getByRole('button', { name: 'Load new values' }));
 
       const imageInput = page.getByPlaceholder(
         'nginx:latest or registry.example.com/my-app:v1.0.0',
