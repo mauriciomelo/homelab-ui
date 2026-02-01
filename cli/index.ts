@@ -123,7 +123,7 @@ const run = async () => {
                 describe: 'Path to an app directory or app.yaml file',
               },
             },
-            async (argv: ArgumentsCamelCase<{ appPath: string }>) => {
+            async (argv) => {
               const outcome = await validateAppFile(argv.appPath);
 
               if (isValidationFailure(outcome)) {
@@ -156,12 +156,7 @@ const run = async () => {
                   'Directory to create app.yaml in, or a path to a yaml file',
               },
             },
-            async (
-              argv: ArgumentsCamelCase<{
-                name: string;
-                targetPath: string;
-              }>,
-            ) => {
+            async (argv) => {
               const filePath = resolveAppFilePath(argv.targetPath);
 
               if (await fileExists(filePath)) {
