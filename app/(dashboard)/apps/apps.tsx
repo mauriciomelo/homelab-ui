@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { ApplicationForm } from './application-form';
+import { ApplicationForm, useApplicationForm } from './application-form';
 import { useTRPC } from '@/trpc/client';
 import { useQuery } from '@tanstack/react-query';
 import { APP_STATUS } from '@/app/constants';
@@ -17,6 +17,7 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -26,28 +27,47 @@ import { Status } from '@/components/ui/status';
 import { PageContent } from '@/components/page-content';
 import { AppIcon, appStatusProps } from '@/components/app-icon';
 import { Button } from '@/components/ui/button';
+import { Form } from '@/components/ui/form';
 import { Plus } from 'lucide-react';
+import { AppDropArea, useAppDropArea } from './app-drop-area';
+import { defaultAppData } from '@/app/api/schemas';
 
 type FormMode = 'edit' | 'create' | null;
 
 export function Apps() {
   const trpc = useTRPC();
   const apps = useQuery({ ...trpc.apps.queryOptions(), refetchInterval: 2000 });
-  const [selectedApp, setSelectedApp] = useState<App | null>(null);
+  const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>(null);
+  const appDropArea = useAppDropArea();
+
+  const selectedApp = selectedAppName
+    ? (apps.data?.find((app) => app.spec.name === selectedAppName) ?? null)
+    : null;
+
+  const formData = appDropArea.data ?? selectedApp?.spec ?? defaultAppData;
+  // Force a fresh form instance when switching between modes or apps.
+  const formKey = `${formMode ?? 'idle'}-${selectedAppName ?? 'new'}`;
+
+  const form = useApplicationForm({
+    data: formData,
+    mode: formMode || 'edit',
+  });
 
   const handleCreateApp = () => {
-    setSelectedApp(null);
+    setSelectedAppName(null);
     setFormMode('create');
+    form.form.reset(defaultAppData);
   };
 
   const handleEditApp = (app: App) => {
-    setSelectedApp(app);
+    setSelectedAppName(app.spec.name);
     setFormMode('edit');
+    form.form.reset(app.spec);
   };
 
   const handleCloseForm = () => {
-    setSelectedApp(null);
+    setSelectedAppName(null);
     setFormMode(null);
     apps.refetch();
   };
@@ -115,28 +135,48 @@ export function Apps() {
             }
           }}
         >
-          <SheetContent className="w-[600px] sm:max-w-[600px] bg-muted">
-            <SheetHeader>
-              <SheetTitle>
-                {formMode === 'create'
-                  ? 'Create New App'
-                  : selectedApp?.spec.name}
-              </SheetTitle>
-              <SheetDescription>
-                {formMode === 'create'
-                  ? 'Configure your new application.'
-                  : "Edit the App's configuration."}
-              </SheetDescription>
-            </SheetHeader>
-            {formMode && (
-              <div className="flex-1 overflow-y-auto">
-                <ApplicationForm
-                  className="p-4"
-                  data={selectedApp?.spec}
-                  mode={formMode}
-                />
-              </div>
-            )}
+          <SheetContent className="bg-muted w-[600px] sm:max-w-[600px]">
+            <Form {...form.form}>
+              <form
+                onSubmit={form.onSubmit}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <SheetHeader>
+                  <SheetTitle>
+                    {formMode === 'create'
+                      ? 'Create New App'
+                      : (selectedApp?.spec.name ?? selectedAppName)}
+                  </SheetTitle>
+                  <SheetDescription>
+                    {formMode === 'create'
+                      ? 'Configure your new application.'
+                      : "Edit the App's configuration."}
+                  </SheetDescription>
+                </SheetHeader>
+                <AppDropArea
+                  className="min-h-0 flex-1"
+                  {...appDropArea.dropAreaProps}
+                >
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    <ApplicationForm key={formKey} className="p-4" {...form} />
+                  </div>
+                </AppDropArea>
+
+                <SheetFooter>
+                  <div className="flex gap-3">
+                    {form.form.formState.isSubmitting ? (
+                      <Button type="submit" className="flex-1" disabled>
+                        {form.mode === 'create' ? 'Creating...' : 'Updating...'}
+                      </Button>
+                    ) : (
+                      <Button type="submit" className="flex-1">
+                        {form.mode === 'create' ? 'Create' : 'Update'}
+                      </Button>
+                    )}
+                  </div>
+                </SheetFooter>
+              </form>
+            </Form>
           </SheetContent>
         </Sheet>
       </PageContent>

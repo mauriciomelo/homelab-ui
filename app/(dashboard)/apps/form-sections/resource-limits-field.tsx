@@ -20,6 +20,7 @@ import {
 import { ResourceField } from '@/components/resource-field';
 import { cpuConfig, memoryConfig } from '@/lib/resource-utils';
 import { AppSchema } from '@/app/api/schemas';
+import { sizeToResource } from '@/lib/resource-utils';
 
 type SizeKey = 'small' | 'medium' | 'large';
 
@@ -31,21 +32,6 @@ import {
   InsetRow,
   InsetLabel,
 } from '@/components/ui/inset-group';
-
-export const sizeToResource = {
-  small: {
-    limits: { cpu: '500m', memory: '512Mi' },
-    label: '0.5 vCPU, 512Mi RAM',
-  },
-  medium: { limits: { cpu: '1', memory: '1Gi' }, label: '1 vCPU, 1Gi RAM' },
-  large: { limits: { cpu: '2', memory: '2Gi' }, label: '2 vCPU, 2Gi RAM' },
-} satisfies Record<
-  SizeKey,
-  {
-    limits: { cpu: string; memory: string };
-    label: string;
-  }
->;
 
 function detectSelectedSize(resources?: {
   limits: { cpu: string; memory: string };
@@ -100,7 +86,7 @@ export function ResourceLimitsField({
                 Preset
               </FormLabel>
             </InsetLabel>
-            <div className="flex-1 flex justify-end min-w-0">
+            <div className="flex min-w-0 flex-1 justify-end">
               <Select
                 value={selectedSize}
                 onValueChange={(value) => {
@@ -113,7 +99,7 @@ export function ResourceLimitsField({
                 }}
               >
                 <FormControl>
-                  <SelectTrigger className="h-auto py-1 w-full border-0 bg-transparent px-2 rounded-md transition-colors hover:bg-muted/50 shadow-none focus:ring-0 [&_[data-slot=select-value]]:line-clamp-none flex justify-end gap-2 text-right">
+                  <SelectTrigger className="hover:bg-muted/50 flex h-auto w-full justify-end gap-2 rounded-md border-0 bg-transparent px-2 py-1 text-right shadow-none transition-colors focus:ring-0 [&_[data-slot=select-value]]:line-clamp-none">
                     <SelectValue placeholder="Select resource limits" />
                   </SelectTrigger>
                 </FormControl>
@@ -153,7 +139,7 @@ export function ResourceLimitsField({
                     <InsetLabel asChild>
                       <FormLabel>CPU</FormLabel>
                     </InsetLabel>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <ResourceField
                         id="resource-limits-cpu"
                         value={field.value}
@@ -176,7 +162,7 @@ export function ResourceLimitsField({
                     <InsetLabel asChild>
                       <FormLabel>Memory</FormLabel>
                     </InsetLabel>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <ResourceField
                         id="resource-limits-memory"
                         value={field.value}

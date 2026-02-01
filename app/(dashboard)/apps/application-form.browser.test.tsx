@@ -12,6 +12,7 @@ import { baseApp, basePersistentVolumeClaim } from '@/test-utils/fixtures';
 import { produce } from 'immer';
 import { Apps } from './apps';
 import { page } from 'vitest/browser';
+import YAML from 'yaml';
 
 vi.mock('server-only', () => ({}));
 vi.mock('./actions', () => {
@@ -208,6 +209,55 @@ describe('ApplicationForm', () => {
       await expect.element(portNumberInput).toHaveValue(80);
     });
 
+    test('resets form when switching apps and creating new app', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      const appOne = produce(baseApp, (app) => {
+        app.spec.name = 'app-one';
+        app.spec.image = 'redis:7-alpine';
+      });
+      const appTwo = produce(baseApp, (app) => {
+        app.spec.name = 'app-two';
+        app.spec.image = 'nginx:1.27';
+      });
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([appOne, appTwo]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      // Step 1: open the first app
+      await user.click(page.getByText('app-one'));
+
+      const nameInput = page.getByPlaceholder('App Name');
+      const imageInput = page.getByPlaceholder(
+        'nginx:latest or registry.example.com/my-app:v1.0.0',
+      );
+
+      await expect.element(nameInput).toHaveValue('app-one');
+      await expect.element(imageInput).toHaveValue('redis:7-alpine');
+
+      await user.fill(imageInput, 'custom-image:1.0');
+
+      // Step 2: open the second app and verify the form resets
+      await user.keyboard('{Escape}');
+      await user.click(page.getByText('app-two'));
+
+      await expect.element(nameInput).toHaveValue('app-two');
+      await expect.element(imageInput).toHaveValue('nginx:1.27');
+
+      // Step 3: open create app and verify defaults are restored
+      await user.keyboard('{Escape}');
+      await user.click(page.getByText('Create App'));
+
+      await expect.element(nameInput).toHaveValue('');
+      await expect.element(imageInput).toHaveValue('');
+    });
+
     test('renders existing auth clients', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
@@ -238,7 +288,9 @@ describe('ApplicationForm', () => {
       await expect
         .element(page.getByText('Additional Resources', { exact: true }))
         .toBeInTheDocument();
-      const authClientNameInput = page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name');
+      const authClientNameInput = page
+        .getByRole('group', { name: 'Auth Client' })
+        .getByLabelText('Name');
       const redirectUriInput = page.getByLabelText('Redirect URIs');
       const postLogoutUriInput = page.getByLabelText('Post-logout URIs');
 
@@ -272,7 +324,11 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
       await expect
-        .poll(() => page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name'))
+        .poll(() =>
+          page
+            .getByRole('group', { name: 'Auth Client' })
+            .getByLabelText('Name'),
+        )
         .toBeInTheDocument();
       await expect
         .poll(() => page.getByLabelText('Redirect URIs'))
@@ -303,7 +359,9 @@ describe('ApplicationForm', () => {
         page.getByRole('menuitem', { name: 'Persistent Volume' }),
       );
 
-      const volumeNameInput = page.getByRole('group', { name: 'Persistent Volume' }).getByLabelText('Name');
+      const volumeNameInput = page
+        .getByRole('group', { name: 'Persistent Volume' })
+        .getByLabelText('Name');
       const storageInput = page.getByRole('textbox', { name: 'Storage' });
       const accessModeSelect = page.getByRole('combobox', {
         name: 'Access Mode',
@@ -339,7 +397,11 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
       await expect
-        .poll(() => page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name'))
+        .poll(() =>
+          page
+            .getByRole('group', { name: 'Auth Client' })
+            .getByLabelText('Name'),
+        )
         .toHaveValue('authclient');
     });
 
@@ -437,10 +499,18 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
       await expect
-        .poll(() => page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name').elements().length)
+        .poll(
+          () =>
+            page
+              .getByRole('group', { name: 'Auth Client' })
+              .getByLabelText('Name')
+              .elements().length,
+        )
         .toBe(2);
 
-      const authClientNames = page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name');
+      const authClientNames = page
+        .getByRole('group', { name: 'Auth Client' })
+        .getByLabelText('Name');
       await user.fill(authClientNames.nth(0), 'primary-client');
       await user.fill(authClientNames.nth(1), 'secondary-client');
 
@@ -449,10 +519,20 @@ describe('ApplicationForm', () => {
       );
 
       await expect
-        .poll(() => page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name').elements().length)
+        .poll(
+          () =>
+            page
+              .getByRole('group', { name: 'Auth Client' })
+              .getByLabelText('Name')
+              .elements().length,
+        )
         .toBe(1);
       await expect
-        .element(page.getByRole('group', { name: 'Auth Client' }).getByLabelText('Name'))
+        .element(
+          page
+            .getByRole('group', { name: 'Auth Client' })
+            .getByLabelText('Name'),
+        )
         .toHaveValue('secondary-client');
     });
 
@@ -535,11 +615,17 @@ describe('ApplicationForm', () => {
       await user.click(page.getByText('test-app'));
 
       // Verify we have 2 ports initially
-      await expect.element(page.getByLabelText('Port Name').nth(0)).toBeInTheDocument();
-      await expect.element(page.getByLabelText('Port Name').nth(1)).toBeInTheDocument();
+      await expect
+        .element(page.getByLabelText('Port Name').nth(0))
+        .toBeInTheDocument();
+      await expect
+        .element(page.getByLabelText('Port Name').nth(1))
+        .toBeInTheDocument();
 
       // Click remove on the second port
-      await user.click(page.getByRole('button', { name: 'Remove Port' }).nth(1));
+      await user.click(
+        page.getByRole('button', { name: 'Remove Port' }).nth(1),
+      );
 
       // Verify second port is gone
       await expect
@@ -547,7 +633,9 @@ describe('ApplicationForm', () => {
         .toBe(0);
 
       // Verify first port is still there
-      await expect.element(page.getByLabelText('Port Name').nth(0)).toBeInTheDocument();
+      await expect
+        .element(page.getByLabelText('Port Name').nth(0))
+        .toBeInTheDocument();
     });
 
     test('updates web port when toggle is clicked', async ({ worker }) => {
@@ -672,16 +760,92 @@ describe('ApplicationForm', () => {
             limits: { cpu: '1000m', memory: '1Gi' },
           },
           ingress: { port: { name: 'http' } },
-          health: {
-            check: {
-              type: 'httpGet',
-              path: '/',
-              port: 'http',
-            },
-          },
-          additionalResources: undefined,
-          volumeMounts: undefined,
+          health: undefined,
+          additionalResources: [],
+          volumeMounts: [],
         });
+    });
+
+    test('prompts before applying external updates while editing', async ({
+      worker,
+    }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (draft) => {
+        draft.spec.name = 'external-update-app';
+        draft.spec.image = 'nginx:latest';
+      });
+      const updatedApp = produce(app, (draft) => {
+        draft.spec.image = 'redis:7-alpine';
+      });
+      let responseCount = 0;
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          responseCount += 1;
+          return trpcJsonResponse([responseCount === 1 ? app : updatedApp]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+      await user.click(await page.getByText('external-update-app'));
+
+      const imageInput = page.getByPlaceholder(
+        'nginx:latest or registry.example.com/my-app:v1.0.0',
+      );
+      await user.fill(imageInput, 'custom-image:1.0');
+
+      await expect
+        .poll(() => page.getByText('External update detected'), {
+          timeout: 5000,
+        })
+        .toBeInTheDocument();
+
+      await expect.element(imageInput).toHaveValue('custom-image:1.0');
+      await user.click(page.getByRole('button', { name: 'Keep editing' }));
+      await expect.element(imageInput).toHaveValue('custom-image:1.0');
+    });
+
+    test('applies external updates when confirmed', async ({ worker }) => {
+      const user = userEvent.setup();
+      const app = produce(baseApp, (draft) => {
+        draft.spec.name = 'external-accept-app';
+        draft.spec.image = 'nginx:latest';
+      });
+      const updatedApp = produce(app, (draft) => {
+        draft.spec.image = 'redis:7-alpine';
+      });
+      let responseCount = 0;
+
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          responseCount += 1;
+          return trpcJsonResponse([responseCount === 1 ? app : updatedApp]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+      await user.click(await page.getByText('external-accept-app'));
+
+      const imageInput = page.getByPlaceholder(
+        'nginx:latest or registry.example.com/my-app:v1.0.0',
+      );
+      await user.fill(imageInput, 'custom-image:1.0');
+
+      await expect
+        .poll(() => page.getByText('External update detected'), {
+          timeout: 5000,
+        })
+        .toBeInTheDocument();
+
+      await user.click(page.getByRole('button', { name: 'Load new values' }));
+
+      await expect
+        .poll(() =>
+          page.getByPlaceholder(
+            'nginx:latest or registry.example.com/my-app:v1.0.0',
+          ),
+        )
+        .toHaveValue('redis:7-alpine');
     });
 
     test('links environment variable to auth client secret', async ({
@@ -759,14 +923,8 @@ describe('ApplicationForm', () => {
               },
             },
           ],
-          health: {
-            check: {
-              type: 'httpGet',
-              path: '/',
-              port: 'http',
-            },
-          },
-          volumeMounts: undefined,
+          health: undefined,
+          volumeMounts: [],
         });
     });
 
@@ -812,13 +970,7 @@ describe('ApplicationForm', () => {
           ...app.spec,
           volumeMounts: [{ mountPath: '/data', name: 'data' }],
           additionalResources: [volumeResource],
-          health: {
-            check: {
-              type: 'httpGet',
-              path: '/',
-              port: 'http',
-            },
-          },
+          health: undefined,
         });
     });
 
@@ -931,15 +1083,9 @@ describe('ApplicationForm', () => {
             limits: { cpu: '750m', memory: '768Mi' },
           },
           ingress: { port: { name: 'http' } },
-          health: {
-            check: {
-              type: 'httpGet',
-              path: '/',
-              port: 'http',
-            },
-          },
-          additionalResources: undefined,
-          volumeMounts: undefined,
+          health: undefined,
+          additionalResources: [],
+          volumeMounts: [],
         });
     });
 
@@ -1132,6 +1278,7 @@ describe('ApplicationForm', () => {
         ),
         'redis:7-alpine',
       );
+      await user.click(page.getByText('Add Variable'));
       await user.fill(page.getByPlaceholder('VARIABLE_NAME'), 'REDIS_HOST');
       await user.fill(page.getByPlaceholder('value'), 'localhost');
 
@@ -1155,7 +1302,86 @@ describe('ApplicationForm', () => {
               port: 'http',
             },
           },
+          additionalResources: [],
+          volumeMounts: [],
         });
+    });
+
+    test('fills form from dropped yaml file', async ({ worker }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.get('*/api/trpc/apps', () => {
+          return trpcJsonResponse([]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('Create App'));
+
+      const nameInput = page.getByPlaceholder('App Name');
+      await expect.element(nameInput).toHaveValue('');
+
+      const appSpec = produce(baseApp.spec, (app) => {
+        app.name = 'yaml-app';
+        app.image = 'redis:7-alpine';
+        app.ports = [{ name: 'http', containerPort: 8080 }];
+        app.envVariables = [{ name: 'REDIS_HOST', value: 'localhost' }];
+        app.resources = { limits: { cpu: '750m', memory: '768Mi' } };
+        app.ingress = { port: { name: 'http' } };
+        app.health = {
+          check: {
+            type: 'httpGet',
+            path: '/health',
+            port: 'http',
+          },
+        };
+      });
+      const yamlContent = YAML.stringify(appSpec);
+      const dropArea = document.querySelector('[data-testid="app-drop-area"]');
+      if (!dropArea) {
+        throw new Error('Drop area not found');
+      }
+
+      const file = new File([yamlContent], 'app.yaml', { type: 'text/yaml' });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+
+      const createDragEvent = (eventName: string) => {
+        const event = new DragEvent(eventName, { bubbles: true });
+        Object.defineProperty(event, 'dataTransfer', {
+          value: dataTransfer,
+        });
+        return event;
+      };
+
+      ['dragenter', 'dragover', 'drop'].forEach((eventName) => {
+        dropArea.dispatchEvent(createDragEvent(eventName));
+      });
+
+      await expect
+        .poll(() => page.getByRole('button', { name: 'Use values' }))
+        .toBeInTheDocument();
+      await user.click(page.getByRole('button', { name: 'Use values' }));
+      await user.click(page.getByRole('button', { name: 'Load new values' }));
+
+      const imageInput = page.getByPlaceholder(
+        'nginx:latest or registry.example.com/my-app:v1.0.0',
+      );
+      const envNameInput = page.getByPlaceholder('VARIABLE_NAME');
+      const envValueInput = page.getByPlaceholder('value');
+      const portNameInput = page.getByLabelText('Port Name').nth(0);
+      const portNumberInput = page.getByLabelText('Port Number').nth(0);
+      const healthSection = page.getByRole('group', { name: 'Health Check' });
+      const pathInput = healthSection.getByLabelText('Path', { exact: true });
+
+      await expect.element(nameInput).toHaveValue('yaml-app');
+      await expect.element(imageInput).toHaveValue('redis:7-alpine');
+      await expect.element(envNameInput).toHaveValue('REDIS_HOST');
+      await expect.element(envValueInput).toHaveValue('localhost');
+      await expect.element(portNameInput).toHaveValue('http');
+      await expect.element(portNumberInput).toHaveValue(8080);
+      await expect.element(pathInput).toHaveValue('/health');
     });
 
     test('handles successful app creation', async ({ worker }) => {
@@ -1189,6 +1415,7 @@ describe('ApplicationForm', () => {
 
       await user.fill(nameInput, 'new-app');
       await user.fill(imageInput, 'redis:7-alpine');
+      await user.click(page.getByText('Add Variable'));
       await user.fill(envNameInput, 'REDIS_HOST');
       await user.fill(envValueInput, 'localhost');
 
@@ -1212,6 +1439,8 @@ describe('ApplicationForm', () => {
               port: 'http',
             },
           },
+          additionalResources: [],
+          volumeMounts: [],
         });
     });
   });

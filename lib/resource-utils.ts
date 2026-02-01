@@ -63,6 +63,23 @@ export const storageConfig = {
   unitLabel: 'storage unit',
 } satisfies ResourceFieldConfig;
 
+type SizeKey = 'small' | 'medium' | 'large';
+
+export const sizeToResource = {
+  small: {
+    limits: { cpu: '500m', memory: '512Mi' },
+    label: '0.5 vCPU, 512Mi RAM',
+  },
+  medium: { limits: { cpu: '1', memory: '1Gi' }, label: '1 vCPU, 1Gi RAM' },
+  large: { limits: { cpu: '2', memory: '2Gi' }, label: '2 vCPU, 2Gi RAM' },
+} satisfies Record<
+  SizeKey,
+  {
+    limits: { cpu: string; memory: string };
+    label: string;
+  }
+>;
+
 export function isUnitValid<T extends readonly string[]>(
   unit: string,
   units: T,

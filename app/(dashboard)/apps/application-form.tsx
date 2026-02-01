@@ -2,14 +2,16 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLens } from '@hookform/lenses';
+import { useMemo, useState } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
-import { Form } from '@/components/ui/form';
-import { Loader2Icon, Plus, Rocket, Shield, HardDrive } from 'lucide-react';
+import { Plus, Shield, HardDrive } from 'lucide-react';
 import type { App } from '@/app/api/applications';
+import isEqual from 'lodash/isEqual';
 import {
   AppSchema,
   appSchema,
+  defaultAppData,
   type PersistentVolumeClaimSchema,
 } from '@/app/api/schemas';
 import { updateApp } from './actions';
@@ -21,13 +23,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { InsetGroup, InsetSectionTitle } from '@/components/ui/inset-group';
 import { createApp } from './actions';
 import { AuthClientCard } from './auth-client-card';
-import {
-  ResourceLimitsField,
-  sizeToResource,
-} from './form-sections/resource-limits-field';
+import { ResourceLimitsField } from './form-sections/resource-limits-field';
 import { PersistentVolumeClaimCard } from './persistent-volume-claim-card';
 import { VolumeMountsSection } from './form-sections/volume-mounts-section';
 import { AppBasicsSection } from './form-sections/app-basics-section';
@@ -58,44 +67,55 @@ const getNextPersistentVolumeName = (
   return `${basePersistentVolumeName}${nextIndex}`;
 };
 
-const defaultAppData: AppSchema = {
-  name: '',
-  image: '',
-  ports: [{ name: 'http', containerPort: 80 }],
-  envVariables: [{ name: '', value: '' }],
-  health: {
-    check: {
-      type: 'httpGet',
-      path: '/',
-      port: 'http',
-    },
-  },
-  volumeMounts: [],
-  resources: {
-    limits: sizeToResource.small.limits,
-  },
-  ingress: {
-    port: { name: 'http' },
-  },
-};
-
-export function ApplicationForm(props: {
+export function useApplicationForm({
+  data,
+  mode,
+}: {
   data?: App['spec'];
-  mode?: FormMode;
-  className?: string;
+  mode: FormMode;
 }) {
-  const mode = props.mode ?? 'edit';
-
   const form = useForm<AppSchema>({
     resolver: zodResolver(appSchema),
-    defaultValues: {
-      ...defaultAppData,
-      ...props.data,
-      volumeMounts: props.data?.volumeMounts ?? [],
-    },
+    defaultValues: data ?? defaultAppData,
   });
+
+  const onSubmit = form.handleSubmit(async (formData) => {
+    const result =
+      mode === 'create' ? await createApp(formData) : await updateApp(formData);
+    // TODO: remove log and handle success/failure
+    console.log(result);
+  });
+
+  return { form, data, mode, onSubmit };
+}
+
+export function ApplicationForm(
+  props: {
+    className?: string;
+  } & ReturnType<typeof useApplicationForm>,
+) {
+  const { form, mode } = props;
+
   const lens = useLens({ control: form.control });
   const additionalResourcesLens = lens.focus('additionalResources').defined();
+
+  const [lastSeenData, setLastSeenData] = useState(props.data);
+
+  const hasDataChanged = useMemo(
+    () => !isEqual(lastSeenData, props.data),
+    [lastSeenData, props.data],
+  );
+
+  const handleExternalUpdateConfirm = () => {
+    const newData = props.data;
+    setLastSeenData(newData);
+    form.reset(newData);
+  };
+
+  const handleExternalUpdateCancel = () => {
+    const newData = props.data;
+    setLastSeenData(newData);
+  };
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -142,9 +162,7 @@ export function ApplicationForm(props: {
   };
 
   const removeEnvVariable = (index: number) => {
-    if (fields.length > 1) {
-      remove(index);
-    }
+    remove(index);
   };
 
   const addPort = () => {
@@ -203,150 +221,140 @@ export function ApplicationForm(props: {
   };
 
   return (
-    <Form {...form}>
-      <form
-        className={cn('space-y-8', props.className)}
-        onSubmit={form.handleSubmit(async (data) => {
-          const payload = {
-            ...data,
-            additionalResources:
-              data.additionalResources && data.additionalResources.length > 0
-                ? data.additionalResources
-                : undefined,
-            volumeMounts:
-              data.volumeMounts && data.volumeMounts.length > 0
-                ? data.volumeMounts
-                : undefined,
-          };
-          const result =
-            mode === 'create'
-              ? await createApp(payload)
-              : await updateApp(payload);
-          console.log(result);
-        })}
+    <div className={cn('space-y-8', props.className)}>
+      <AlertDialog
+        open={hasDataChanged}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleExternalUpdateCancel();
+          }
+        }}
       >
-        <AppBasicsSection lens={lens} mode={mode} />
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>External update detected</AlertDialogTitle>
+            <AlertDialogDescription>
+              This app was updated elsewhere. Do you want to load the latest
+              values? Unsaved changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleExternalUpdateCancel}>
+              Keep editing
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleExternalUpdateConfirm}>
+              Load new values
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AppBasicsSection lens={lens} mode={mode} />
 
-        <ResourceLimitsField lens={lens.focus('resources')} />
+      <ResourceLimitsField lens={lens.focus('resources')} />
 
-        <Separator className="my-2" />
+      <Separator className="my-2" />
 
-        <PortsSection
-          portsLens={lens.focus('ports')}
-          ingressLens={lens.focus('ingress')}
-          fields={portFields}
-          onAdd={addPort}
-          onRemove={handleRemovePort}
-          setValue={form.setValue}
-        />
+      <PortsSection
+        portsLens={lens.focus('ports')}
+        ingressLens={lens.focus('ingress')}
+        fields={portFields}
+        onAdd={addPort}
+        onRemove={handleRemovePort}
+        setValue={form.setValue}
+      />
 
-        <HealthCheckSection healthLens={lens.focus('health')} ports={ports} />
+      <HealthCheckSection healthLens={lens.focus('health')} ports={ports} />
 
-        <EnvironmentVariablesSection
-          envVariablesLens={lens.focus('envVariables')}
-          additionalResourcesLens={lens.focus('additionalResources')}
-          fields={fields}
-          onAdd={addEnvVariable}
-          onRemove={removeEnvVariable}
-        />
+      <EnvironmentVariablesSection
+        envVariablesLens={lens.focus('envVariables')}
+        additionalResourcesLens={lens.focus('additionalResources')}
+        fields={fields}
+        onAdd={addEnvVariable}
+        onRemove={removeEnvVariable}
+      />
 
-        <VolumeMountsSection
-          volumeMountsLens={lens.focus('volumeMounts')}
-          volumeMountFields={volumeMountFields}
-          persistentVolumeClaims={persistentVolumeClaims}
-          onAdd={addVolumeMount}
-          onRemove={removeVolumeMount}
-        />
+      <VolumeMountsSection
+        volumeMountsLens={lens.focus('volumeMounts')}
+        volumeMountFields={volumeMountFields}
+        persistentVolumeClaims={persistentVolumeClaims}
+        onAdd={addVolumeMount}
+        onRemove={removeVolumeMount}
+      />
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <InsetSectionTitle id="additional-resources-title" className="pb-0">
-              Additional Resources
-            </InsetSectionTitle>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-6 px-2 text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                  data-testid="additional-resource-trigger"
-                >
-                  <Plus className="mr-1 h-3 w-3" />
-                  Add Resource
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={addAuthClientResource}>
-                  <Shield className="text-muted-foreground h-4 w-4" />
-                  Auth Client
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={addPersistentVolumeClaimResource}>
-                  <HardDrive className="text-muted-foreground h-4 w-4" />
-                  Persistent Volume
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          {additionalResourceFields.length ? (
-            <div className="space-y-4">
-              {additionalResourceFields.map((resourceField, index) => {
-                const resource = additionalResources[index];
-                if (!resource) {
-                  return null;
-                }
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <InsetSectionTitle id="additional-resources-title" className="pb-0">
+            Additional Resources
+          </InsetSectionTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-6 px-2 text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                data-testid="additional-resource-trigger"
+              >
+                <Plus className="mr-1 h-3 w-3" />
+                Add Resource
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={addAuthClientResource}>
+                <Shield className="text-muted-foreground h-4 w-4" />
+                Auth Client
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={addPersistentVolumeClaimResource}>
+                <HardDrive className="text-muted-foreground h-4 w-4" />
+                Persistent Volume
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        {additionalResourceFields.length ? (
+          <div className="space-y-4">
+            {additionalResourceFields.map((resourceField, index) => {
+              const resource = additionalResources[index];
+              if (!resource) {
+                return null;
+              }
 
-                if (resource.kind === 'PersistentVolumeClaim') {
-                  return (
-                    <PersistentVolumeClaimCard
-                      key={resourceField.id}
-                      index={index}
-                      lens={additionalResourcesLens
-                        .focus(index)
-                        .narrow('kind', 'PersistentVolumeClaim')}
-                      onRemove={removeAdditionalResource}
-                    />
-                  );
-                }
-
-                if (resource.kind !== 'AuthClient') {
-                  return null;
-                }
-
+              if (resource.kind === 'PersistentVolumeClaim') {
                 return (
-                  <AuthClientCard
+                  <PersistentVolumeClaimCard
                     key={resourceField.id}
                     index={index}
                     lens={additionalResourcesLens
                       .focus(index)
-                      .narrow('kind', 'AuthClient')}
+                      .narrow('kind', 'PersistentVolumeClaim')}
                     onRemove={removeAdditionalResource}
                   />
                 );
-              })}
-            </div>
-          ) : (
-            <InsetGroup>
-              <div className="text-muted-foreground p-8 text-center text-sm">
-                No additional resources.
-              </div>
-            </InsetGroup>
-          )}
-        </div>
+              }
 
-        <div className="flex gap-3 pt-4">
-          {form.formState.isSubmitting ? (
-            <Button type="submit" className="flex-1" disabled>
-              <Loader2Icon className="animate-spin" />
-              {mode === 'create' ? 'Creating...' : 'Updating...'}
-            </Button>
-          ) : (
-            <Button type="submit" className="flex-1">
-              <Rocket className="mr-2 h-4 w-4" />
-              {mode === 'create' ? 'Create' : 'Update'}
-            </Button>
-          )}
-        </div>
-      </form>
-    </Form>
+              if (resource.kind !== 'AuthClient') {
+                return null;
+              }
+
+              return (
+                <AuthClientCard
+                  key={resourceField.id}
+                  index={index}
+                  lens={additionalResourcesLens
+                    .focus(index)
+                    .narrow('kind', 'AuthClient')}
+                  onRemove={removeAdditionalResource}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <InsetGroup>
+            <div className="text-muted-foreground p-8 text-center text-sm">
+              No additional resources.
+            </div>
+          </InsetGroup>
+        )}
+      </div>
+    </div>
   );
 }

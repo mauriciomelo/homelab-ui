@@ -378,8 +378,8 @@ export function EnvironmentVariablesSection({
                       variant="ghost"
                       size="icon"
                       onClick={() => onRemove(index)}
-                      disabled={fields.length === 1}
-                      className="text-muted-foreground h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                      aria-label="Remove variable"
+                      className="text-muted-foreground h-8 w-8 shrink-0"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
