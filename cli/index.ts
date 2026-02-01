@@ -4,8 +4,8 @@ import path from 'node:path';
 import YAML from 'yaml';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import * as z from 'zod/v4';
 
-import type { ArgumentsCamelCase } from 'yargs';
 import { AppSchema, appSchema, defaultAppData } from '@/app/api/schemas';
 
 type ValidationOutcome =
@@ -13,6 +13,10 @@ type ValidationOutcome =
   | { ok: false; filePath: string; errors: string[] };
 
 type NodeError = Error & { code?: string };
+
+const schemaFormats = ['yaml', 'json'] as const;
+type SchemaFormat = (typeof schemaFormats)[number];
+const schemaFormatSchema = z.enum(schemaFormats);
 
 const isValidationFailure = (
   outcome: ValidationOutcome,
@@ -104,6 +108,16 @@ const validateAppFile = async (appPath: string): Promise<ValidationOutcome> => {
   }
 };
 
+const formatAppSchema = (format: SchemaFormat) => {
+  const jsonSchema = z.toJSONSchema(appSchema, { io: 'input' });
+
+  if (format === 'json') {
+    return JSON.stringify(jsonSchema, null, 2);
+  }
+
+  return YAML.stringify(jsonSchema);
+};
+
 const run = async () => {
   yargs(hideBin(process.argv))
     .scriptName('tess')
@@ -173,6 +187,25 @@ const run = async () => {
               await fs.writeFile(filePath, YAML.stringify(appData), 'utf8');
 
               process.stdout.write(`Created ${filePath}\n`);
+            },
+          )
+          .command(
+            'schema',
+            'Print the app schema',
+            {
+              format: {
+                type: 'string',
+                choices: schemaFormats,
+                default: 'yaml',
+                describe: 'Output format for the schema',
+              },
+            },
+            async (argv) => {
+              const format = schemaFormatSchema
+                .catch('yaml')
+                .parse(argv.format);
+              const output = formatAppSchema(format);
+              process.stdout.write(`${output}\n`);
             },
           )
           .demandCommand(1, 'Provide an app command to run')
