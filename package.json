@@ -13,6 +13,7 @@
     "dev:electron": "electron .",
     "test": "vitest",
     "test:ci": "vitest --watch=false --browser.headless",
+    "test:play": "vitest --browser.ui=false --browser.headless=false --watch=true --isolate=false",
     "tsc": "tsc --noEmit",
     "lint": "eslint . --fix",
     "dance": "concurrently --kill-others-on-fail -n \"lint,test,tsc\" \"pnpm run lint\" \"pnpm run test:ci --silent passed-only\" \"pnpm run tsc\"",

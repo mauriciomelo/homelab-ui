@@ -3,6 +3,8 @@ import { playwright } from '@vitest/browser-playwright';
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
+const viewport = { width: 1920, height: 1080 };
+
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   test: {
@@ -24,10 +26,18 @@ export default defineConfig({
           include: ['./**/*browser.test.tsx'],
           browser: {
             enabled: true,
-            provider: playwright(),
+            viewport,
+            provider: playwright({
+              contextOptions: {
+                // Allow the viewport to be resized dynamically
+                viewport: null,
+              },
+            }),
             screenshotFailures: false,
             instances: [
-              { browser: 'chromium', viewport: { width: 1440, height: 920 } },
+              {
+                browser: 'chromium',
+              },
             ],
           },
         },
