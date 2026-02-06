@@ -3,7 +3,7 @@ import {
   extractAmountAndUnit,
   isUnitValid,
   MEMORY_UNITS,
-  sizeToResource,
+  resourceLimitPreset,
 } from '@/lib/resource-utils';
 import { z } from 'zod';
 import { authClientSchema } from './auth-client-schema';
@@ -251,7 +251,7 @@ export const defaultAppData = {
   },
   volumeMounts: [],
   resources: {
-    limits: sizeToResource.small.limits,
+    limits: resourceLimitPreset.small.limits,
   },
   ingress: {
     port: { name: 'http' },

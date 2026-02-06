@@ -65,7 +65,7 @@ export const storageConfig = {
 
 type SizeKey = 'small' | 'medium' | 'large';
 
-export const sizeToResource = {
+export const resourceLimitPreset = {
   small: {
     limits: { cpu: '500m', memory: '512Mi' },
     label: '0.5 vCPU, 512Mi RAM',

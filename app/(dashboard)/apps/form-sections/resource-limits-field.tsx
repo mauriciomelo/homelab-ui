@@ -20,7 +20,7 @@ import {
 import { ResourceField } from '@/components/resource-field';
 import { cpuConfig, memoryConfig } from '@/lib/resource-utils';
 import { AppSchema } from '@/app/api/schemas';
-import { sizeToResource } from '@/lib/resource-utils';
+import { resourceLimitPreset } from '@/lib/resource-utils';
 
 type SizeKey = 'small' | 'medium' | 'large';
 
@@ -41,7 +41,7 @@ function detectSelectedSize(resources?: {
   }
 
   for (const key of sizeOptions) {
-    const resource = sizeToResource[key];
+    const resource = resourceLimitPreset[key];
     if (
       resource.limits.cpu === resources.limits.cpu &&
       resource.limits.memory === resources.limits.memory
@@ -93,7 +93,7 @@ export function ResourceLimitsField({
                   if (value === 'custom' || isSizeKey(value)) {
                     setSelectedSize(value);
                     if (isSizeKey(value)) {
-                      resourcesField.onChange(sizeToResource[value]);
+                      resourcesField.onChange(resourceLimitPreset[value]);
                     }
                   }
                 }}
@@ -105,7 +105,7 @@ export function ResourceLimitsField({
                 </FormControl>
                 <SelectContent>
                   {sizeOptions.map((key) => {
-                    const { label } = sizeToResource[key];
+                    const { label } = resourceLimitPreset[key];
                     return (
                       <SelectItem key={key} value={key}>
                         <div className="flex items-center gap-2 text-left">

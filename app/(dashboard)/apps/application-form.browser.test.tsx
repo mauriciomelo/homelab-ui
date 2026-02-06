@@ -13,6 +13,7 @@ import { produce } from 'immer';
 import { Apps } from './apps';
 import { page } from 'vitest/browser';
 import YAML from 'yaml';
+import { resourceLimitPreset } from '@/lib/resource-utils';
 
 vi.mock('server-only', () => ({}));
 vi.mock('./actions', () => {
@@ -166,37 +167,130 @@ describe('ApplicationForm', () => {
   describe('update application', () => {
     test('populates form fields with initial data', async ({ worker }) => {
       const user = userEvent.setup();
+      const openwebuiApp = produce(baseApp, (app) => {
+        app.spec.name = 'openwebui';
+        app.spec.image = 'ghcr.io/open-webui/open-webui:main';
+        app.spec.ports = [{ name: 'web', containerPort: 8080 }];
+        app.spec.envVariables = [
+          {
+            name: 'OAUTH_CLIENT_ID',
+            valueFrom: {
+              secretKeyRef: {
+                name: 'openwebui-auth-client',
+                key: 'client-id',
+              },
+            },
+          },
+          {
+            name: 'OAUTH_CLIENT_SECRET',
+            valueFrom: {
+              secretKeyRef: {
+                name: 'openwebui-auth-client',
+                key: 'client-secret',
+              },
+            },
+          },
+          { name: 'OAUTH_PROVIDER_NAME', value: 'tesselar' },
+          {
+            name: 'OPENID_PROVIDER_URL',
+            value:
+              'https://zitadel.home.example.com/.well-known/openid-configuration',
+          },
+          {
+            name: 'OPENID_REDIRECT_URI',
+            value: 'https://openwebui.home.example.com/oauth/oidc/callback',
+          },
+          {
+            name: 'WEBUI_URL',
+            value: 'https://openwebui.home.example.com',
+          },
+          { name: 'ENABLE_OAUTH_SIGNUP', value: 'true' },
+          { name: 'ENABLE_LOGIN_FORM', value: 'false' },
+          { name: 'OAUTH_MERGE_ACCOUNTS_BY_EMAIL', value: 'true' },
+        ];
+        app.spec.resources.limits = resourceLimitPreset.small.limits;
+        app.spec.ingress = { port: { name: 'web' } };
+        app.spec.health = {
+          check: {
+            type: 'httpGet',
+            path: '/',
+            port: 'web',
+          },
+        };
+        app.spec.additionalResources = [
+          {
+            apiVersion: 'tesselar.io/v1',
+            kind: 'AuthClient',
+            metadata: { name: 'openwebui-auth-client' },
+            spec: {
+              redirectUris: [
+                'https://openwebui.home.example.com/oauth/oidc/callback',
+              ],
+            },
+          },
+          {
+            apiVersion: 'v1',
+            kind: 'PersistentVolumeClaim',
+            metadata: { name: 'openwebui-data-pvc' },
+            spec: {
+              accessModes: ['ReadWriteOnce'],
+              storageClassName: 'longhorn',
+              resources: {
+                requests: {
+                  storage: '2Gi',
+                },
+              },
+            },
+          },
+        ];
+        app.spec.volumeMounts = [
+          {
+            name: 'openwebui-data',
+            mountPath: '/app/backend/data',
+          },
+        ];
+      });
+
       worker.use(
         http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
-            produce(baseApp, (app) => {
-              app.spec.name = 'my-app';
-              app.spec.image = 'postgres:16';
-              app.spec.envVariables = [
-                { name: 'DB_NAME', value: 'production' },
-              ];
-              app.spec.ingress = { port: { name: 'http' } };
-            }),
-          ]);
+          return trpcJsonResponse([openwebuiApp]);
         }),
       );
 
       await renderWithProviders(<Apps />);
 
       // Open the form sheet
-      await user.click(page.getByText('my-app'));
+      await user.click(page.getByText('openwebui'));
 
       const nameInput = page.getByPlaceholder('App Name');
       const imageInput = page.getByPlaceholder(
         'nginx:latest or registry.example.com/my-app:v1.0.0',
       );
-      const envNameInput = page.getByPlaceholder('VARIABLE_NAME');
-      const envValueInput = page.getByPlaceholder('value');
+      const envNameInputs = page.getByPlaceholder('VARIABLE_NAME');
+      const envValueInputs = page.getByPlaceholder('value');
 
-      await expect.element(nameInput).toHaveValue('my-app');
-      await expect.element(imageInput).toHaveValue('postgres:16');
-      await expect.element(envNameInput).toHaveValue('DB_NAME');
-      await expect.element(envValueInput).toHaveValue('production');
+      await expect.element(nameInput).toHaveValue('openwebui');
+      await expect
+        .element(imageInput)
+        .toHaveValue('ghcr.io/open-webui/open-webui:main');
+
+      await expect.poll(() => envNameInputs.elements().length).toBe(9);
+      await expect.poll(() => envValueInputs.elements().length).toBe(7);
+
+      await expect.element(envNameInputs.nth(0)).toHaveValue('OAUTH_CLIENT_ID');
+      await expect
+        .element(envNameInputs.nth(1))
+        .toHaveValue('OAUTH_CLIENT_SECRET');
+      await expect.element(envNameInputs.nth(5)).toHaveValue('WEBUI_URL');
+      await expect
+        .element(envValueInputs.nth(3))
+        .toHaveValue('https://openwebui.home.example.com');
+      await expect
+        .poll(() => page.getByText('Client ID').elements().length)
+        .toBeGreaterThan(0);
+      await expect
+        .poll(() => page.getByText('Client Secret').elements().length)
+        .toBeGreaterThan(0);
 
       await expect
         .element(page.getByRole('button', { name: /Web Port/ }).nth(0))
@@ -205,8 +299,34 @@ describe('ApplicationForm', () => {
       const portNameInput = page.getByLabelText('Port Name').nth(0);
       const portNumberInput = page.getByLabelText('Port Number').nth(0);
 
-      await expect.element(portNameInput).toHaveValue('http');
-      await expect.element(portNumberInput).toHaveValue(80);
+      await expect.element(portNameInput).toHaveValue('web');
+      await expect.element(portNumberInput).toHaveValue(8080);
+
+      const authClientNameInput = page
+        .getByRole('group', { name: 'Auth Client' })
+        .getByLabelText('Name');
+      const redirectUriInput = page.getByLabelText('Redirect URIs');
+      const pvcNameInput = page
+        .getByRole('group', { name: 'Persistent Volume' })
+        .getByLabelText('Name');
+      const pvcStorageInput = page.getByRole('textbox', { name: 'Storage' });
+      const mountPathInput = page.getByPlaceholder('/data');
+      const mountVolumeSelect = page.getByRole('combobox', {
+        name: 'Persistent Volume',
+      });
+
+      await expect
+        .element(authClientNameInput)
+        .toHaveValue('openwebui-auth-client');
+      await expect
+        .element(redirectUriInput)
+        .toHaveValue('https://openwebui.home.example.com/oauth/oidc/callback');
+      await expect.element(pvcNameInput).toHaveValue('openwebui-data-pvc');
+      await expect.element(pvcStorageInput).toHaveValue('2');
+      await expect.element(mountPathInput).toHaveValue('/app/backend/data');
+      await expect
+        .element(mountVolumeSelect)
+        .toHaveTextContent('openwebui-data');
     });
 
     test('resets form when switching apps and creating new app', async ({
