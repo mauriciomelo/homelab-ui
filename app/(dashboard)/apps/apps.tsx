@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { ApplicationForm, useApplicationForm } from './application-form';
-import { useTRPC } from '@/trpc/client';
+import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import { useQuery } from '@tanstack/react-query';
 import { APP_STATUS } from '@/app/constants';
 import {
@@ -35,8 +35,10 @@ import { defaultAppData } from '@/app/api/schemas';
 type FormMode = 'edit' | 'create' | null;
 
 export function Apps() {
-  const trpc = useTRPC();
-  const apps = useQuery({ ...trpc.apps.queryOptions(), refetchInterval: 2000 });
+  const apps = useQuery({
+    ...controlPlaneOrpc.apps.list.queryOptions(),
+    refetchInterval: 2000,
+  });
   const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>(null);
 

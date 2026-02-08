@@ -65,6 +65,11 @@ const handlers = [
       },
     );
   }),
+  http.post('*/api/control-plane/rpc/apps/list', () => {
+    return HttpResponse.json({
+      json: appsData,
+    });
+  }),
 ];
 
 export const worker = setupWorker(...handlers);

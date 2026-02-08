@@ -6,7 +6,7 @@ import {
   userEvent,
   renderWithProviders,
   test,
-  trpcJsonResponse,
+  orpcJsonResponse,
 } from '@/test-utils/browser';
 import { baseApp, basePersistentVolumeClaim } from '@/test-utils/fixtures';
 import { produce } from 'immer';
@@ -29,8 +29,8 @@ describe('Apps Page', () => {
     const scale = 1;
     page.viewport(1440 * scale, 920 * scale);
     worker.use(
-      http.get('*/api/trpc/apps', () => {
-        return trpcJsonResponse([
+      http.post('*/api/control-plane/rpc/apps/list', () => {
+        return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.spec.name = 'myapp';
           }),
@@ -60,8 +60,8 @@ describe('Apps Page', () => {
 
   test('displays list of applications', async ({ worker }) => {
     worker.use(
-      http.get('*/api/trpc/apps', () => {
-        return trpcJsonResponse([
+      http.post('*/api/control-plane/rpc/apps/list', () => {
+        return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.spec.name = 'myapp';
           }),
@@ -82,8 +82,8 @@ describe('Apps Page', () => {
   test('opens form sheet when clicking on an app row', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.get('*/api/trpc/apps', () => {
-        return trpcJsonResponse([
+      http.post('*/api/control-plane/rpc/apps/list', () => {
+        return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.spec.name = 'myapp';
           }),
@@ -107,8 +107,8 @@ describe('ApplicationForm', () => {
   test('displays validation error when CPU is 0', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.get('*/api/trpc/apps', () => {
-        return trpcJsonResponse([
+      http.post('*/api/control-plane/rpc/apps/list', () => {
+        return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.spec.name = 'test-app';
             app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
@@ -137,8 +137,8 @@ describe('ApplicationForm', () => {
   test('displays validation error when Memory is 0', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.get('*/api/trpc/apps', () => {
-        return trpcJsonResponse([
+      http.post('*/api/control-plane/rpc/apps/list', () => {
+        return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.spec.name = 'test-app';
             app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
@@ -252,8 +252,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([openwebuiApp]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([openwebuiApp]);
         }),
       );
 
@@ -343,8 +343,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([appOne, appTwo]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([appOne, appTwo]);
         }),
       );
 
@@ -381,8 +381,8 @@ describe('ApplicationForm', () => {
     test('renders existing auth clients', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'auth-app';
               app.spec.additionalResources = [
@@ -431,8 +431,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -465,8 +465,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -504,8 +504,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -533,8 +533,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -568,8 +568,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -603,8 +603,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -659,8 +659,8 @@ describe('ApplicationForm', () => {
     test('renders multiple ports correctly', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.ports = [
@@ -691,8 +691,8 @@ describe('ApplicationForm', () => {
     test('adds new port', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
@@ -716,8 +716,8 @@ describe('ApplicationForm', () => {
     test('removes port', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.ports = [
@@ -761,8 +761,8 @@ describe('ApplicationForm', () => {
     test('updates web port when toggle is clicked', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
@@ -804,8 +804,8 @@ describe('ApplicationForm', () => {
     test('adds new environment variable', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.image = 'nginx:latest';
@@ -832,8 +832,8 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.image = 'nginx:latest';
@@ -900,9 +900,9 @@ describe('ApplicationForm', () => {
       let responseCount = 0;
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
+        http.post('*/api/control-plane/rpc/apps/list', () => {
           responseCount += 1;
-          return trpcJsonResponse([responseCount === 1 ? app : updatedApp]);
+          return orpcJsonResponse([responseCount === 1 ? app : updatedApp]);
         }),
       );
 
@@ -937,9 +937,9 @@ describe('ApplicationForm', () => {
       let responseCount = 0;
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
+        http.post('*/api/control-plane/rpc/apps/list', () => {
           responseCount += 1;
-          return trpcJsonResponse([responseCount === 1 ? app : updatedApp]);
+          return orpcJsonResponse([responseCount === 1 ? app : updatedApp]);
         }),
       );
 
@@ -992,8 +992,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -1062,8 +1062,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -1125,8 +1125,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -1159,8 +1159,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -1219,8 +1219,8 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([app]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([app]);
         }),
       );
 
@@ -1247,8 +1247,8 @@ describe('ApplicationForm', () => {
     test('app name field is readonly', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'locked-app';
               app.spec.image = 'nginx:latest';
@@ -1272,8 +1272,8 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.image = 'nginx:latest';
@@ -1311,8 +1311,8 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
@@ -1340,8 +1340,8 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.spec.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
@@ -1375,8 +1375,8 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([]);
         }),
       );
 
@@ -1430,8 +1430,8 @@ describe('ApplicationForm', () => {
     test('fills form from dropped yaml file', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([]);
         }),
       );
 
@@ -1508,8 +1508,8 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
 
       worker.use(
-        http.get('*/api/trpc/apps', () => {
-          return trpcJsonResponse([]);
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([]);
         }),
       );
 

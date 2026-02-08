@@ -64,3 +64,9 @@ export function trpcJsonResponse(data: unknown) {
     },
   ]);
 }
+
+export function orpcJsonResponse(data: unknown) {
+  return HttpResponse.json({
+    json: data,
+  });
+}
