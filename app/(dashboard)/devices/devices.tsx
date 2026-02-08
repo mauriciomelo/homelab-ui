@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { useTRPC } from '@/trpc/client';
+import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import {
   useIsMutating,
   useMutation,
@@ -88,9 +88,9 @@ function nodeApps(apps: App[], nodeName: string) {
 
 function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   const items = nodeApps(props.apps, props.node);
-  const trpc = useTRPC();
-
-  const restartAppMutation = useMutation(trpc.restartApp.mutationOptions());
+  const restartAppMutation = useMutation(
+    controlPlaneOrpc.devices.restartApp.mutationOptions(),
+  );
 
   const transitions = useTransition(items, {
     keys: (item) => item.spec.name,
@@ -130,7 +130,6 @@ export function Devices({
   discoveredNodesPollIntervalMs = DISCOVERED_NODES_POLL_INTERVAL_MS,
   appsPollIntervalMs = APPS_POLL_INTERVAL_MS,
 }: DevicesProps) {
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const [activeModal, setActiveModal] = useState<
@@ -140,32 +139,37 @@ export function Devices({
   // Check if the reset mutation is in progress to pause updates, so the apps animation can happen in bulk.
   const isResetting =
     useIsMutating({
-      mutationKey: trpc.resetDevice.mutationKey(),
+      mutationKey: controlPlaneOrpc.devices.reset.mutationKey(),
     }) > 0;
 
   const devices = useQuery({
-    ...trpc.devices.queryOptions(),
+    ...controlPlaneOrpc.devices.list.queryOptions(),
     refetchInterval: devicesPollIntervalMs,
     enabled: !isResetting,
   });
 
   const discoveredNodes = useQuery({
-    ...trpc.discoveredNodes.queryOptions(),
+    ...controlPlaneOrpc.devices.discoveredNodes.queryOptions(),
+    select: (entries) => new Map(entries),
     refetchInterval: discoveredNodesPollIntervalMs,
     enabled: !isResetting,
   });
   const apps = useQuery({
-    ...trpc.apps.queryOptions(),
+    ...controlPlaneOrpc.devices.apps.queryOptions(),
     refetchInterval: appsPollIntervalMs,
     enabled: !isResetting,
   });
 
   const invalidateQueries = () => {
-    queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });
     queryClient.invalidateQueries({
-      queryKey: trpc.discoveredNodes.queryKey(),
+      queryKey: controlPlaneOrpc.devices.list.queryKey(),
     });
-    queryClient.invalidateQueries({ queryKey: trpc.apps.queryKey() });
+    queryClient.invalidateQueries({
+      queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: controlPlaneOrpc.devices.apps.queryKey(),
+    });
   };
 
   const currentDevices = useMemo(
@@ -191,10 +195,12 @@ export function Devices({
     return a.name.localeCompare(b.name);
   });
 
-  const adoptDeviceMutation = useMutation(trpc.adoptDevice.mutationOptions());
+  const adoptDeviceMutation = useMutation(
+    controlPlaneOrpc.devices.adopt.mutationOptions(),
+  );
 
   const drainCurrentNodeAppsMutation = useMutation(
-    trpc.drainCurrentNodeApps.mutationOptions(),
+    controlPlaneOrpc.devices.drainCurrentNodeApps.mutationOptions(),
   );
 
   const handleAdoptDevice = async (device: Device) => {
@@ -474,19 +480,23 @@ function ResetDeviceDialog({
   open: boolean;
   close?: () => void;
 }) {
-  const trpc = useTRPC();
-
   const queryClient = useQueryClient();
 
   const invalidateQueries = () => {
-    queryClient.invalidateQueries({ queryKey: trpc.devices.queryKey() });
     queryClient.invalidateQueries({
-      queryKey: trpc.discoveredNodes.queryKey(),
+      queryKey: controlPlaneOrpc.devices.list.queryKey(),
     });
-    queryClient.invalidateQueries({ queryKey: trpc.apps.queryKey() });
+    queryClient.invalidateQueries({
+      queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: controlPlaneOrpc.devices.apps.queryKey(),
+    });
   };
 
-  const resetDeviceMutation = useMutation(trpc.resetDevice.mutationOptions());
+  const resetDeviceMutation = useMutation(
+    controlPlaneOrpc.devices.reset.mutationOptions(),
+  );
 
   const handleDelete = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();

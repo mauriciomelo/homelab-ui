@@ -1,11 +1,15 @@
 import { describe, expect } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { http } from 'msw';
 import { produce } from 'immer';
 import { page } from 'vitest/browser';
-import superjson from 'superjson';
 import { Devices } from './devices';
 import { DEVICE_STATUS } from '@/app/constants';
-import { test, renderWithProviders, userEvent } from '@/test-utils/browser';
+import {
+  test,
+  renderWithProviders,
+  userEvent,
+  orpcJsonResponse,
+} from '@/test-utils/browser';
 import { baseApp } from '@/test-utils/fixtures';
 import type { ClusterNode } from '@/app/api/devices';
 import type { DiscoveredNode } from '@/mdns';
@@ -47,28 +51,40 @@ const baseDiscoveredNode: DiscoveredNode = {
   },
 };
 
-async function readTrpcInput(request: Request): Promise<unknown> {
+async function readOrpcInput(request: Request): Promise<unknown> {
   const body = await request.json();
 
-  if (!isRecord(body)) {
-    throw new Error('Expected tRPC body to be an object');
+  if (!isRecord(body) || !('json' in body)) {
+    throw new Error('Expected oRPC payload with json field');
   }
 
-  if ('json' in body) {
-    return body.json;
-  }
-
-  const firstBatchEntry = body['0'];
-
-  if (isRecord(firstBatchEntry) && 'json' in firstBatchEntry) {
-    return firstBatchEntry.json;
-  }
-
-  throw new Error('Expected tRPC payload with json input');
+  return body.json;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function mockDevicesQueries({
+  clusterNodes,
+  discoveredNodes,
+  apps,
+}: {
+  clusterNodes: ClusterNode[];
+  discoveredNodes: DiscoveredNode[];
+  apps: (typeof baseApp)[];
+}) {
+  return [
+    http.post('*/api/control-plane/rpc/devices/list', () => {
+      return orpcJsonResponse(clusterNodes);
+    }),
+    http.post('*/api/control-plane/rpc/devices/discoveredNodes', () => {
+      return orpcJsonResponse(discoveredNodes.map((node) => [node.ip, node]));
+    }),
+    http.post('*/api/control-plane/rpc/devices/apps', () => {
+      return orpcJsonResponse(apps);
+    }),
+  ];
 }
 
 describe('Devices Page', () => {
@@ -87,24 +103,11 @@ describe('Devices Page', () => {
       draft.port = 4001;
     });
 
-    const discoveredNodesPayload = superjson.serialize(
-      new Map([[discoveredNode.ip, discoveredNode]]),
-    );
-
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
-        return HttpResponse.json([
-          { result: { data: { json: [adoptedNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [] } } },
-        ]);
+      ...mockDevicesQueries({
+        clusterNodes: [adoptedNode],
+        discoveredNodes: [discoveredNode],
+        apps: [],
       }),
     );
 
@@ -137,22 +140,11 @@ describe('Devices Page', () => {
       draft.status = DEVICE_STATUS.HEALTHY;
     });
 
-    const discoveredNodesPayload = superjson.serialize(new Map());
-
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
-        return HttpResponse.json([
-          { result: { data: { json: [adoptedNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [] } } },
-        ]);
+      ...mockDevicesQueries({
+        clusterNodes: [adoptedNode],
+        discoveredNodes: [],
+        apps: [],
       }),
     );
 
@@ -187,49 +179,39 @@ describe('Devices Page', () => {
     let devicesRequestCount = 0;
 
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
+      http.post('*/api/control-plane/rpc/devices/list', () => {
         devicesRequestCount += 1;
 
-        const discoveredNodesMap =
+        return orpcJsonResponse(
           devicesRequestCount === 1
-            ? new Map([[discoveredNode.ip, discoveredNode]])
-            : new Map();
-
-        const discoveredNodesPayload = superjson.serialize(discoveredNodesMap);
-
-        return HttpResponse.json([
-          {
-            result: {
-              data: {
-                json:
-                  devicesRequestCount === 1
-                    ? []
-                    : [
-                        {
-                          ...baseClusterNode,
-                          name: discoveredNode.name,
-                          ip: discoveredNode.ip,
-                          status: DEVICE_STATUS.HEALTHY,
-                        },
-                      ],
-              },
-            },
-          },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [] } } },
-        ]);
+            ? []
+            : [
+                {
+                  ...baseClusterNode,
+                  name: discoveredNode.name,
+                  ip: discoveredNode.ip,
+                  status: DEVICE_STATUS.HEALTHY,
+                },
+              ],
+        );
       }),
-      http.post(/\/api\/trpc\/adoptDevice(\?.*)?$/, async ({ request }) => {
-        adoptPayload = await readTrpcInput(request);
-        return HttpResponse.json([{ result: { data: { json: null } } }]);
+      http.post('*/api/control-plane/rpc/devices/discoveredNodes', () => {
+        return orpcJsonResponse(
+          devicesRequestCount === 1
+            ? [[discoveredNode.ip, discoveredNode]]
+            : [],
+        );
       }),
+      http.post('*/api/control-plane/rpc/devices/apps', () => {
+        return orpcJsonResponse([]);
+      }),
+      http.post(
+        '*/api/control-plane/rpc/devices/adopt',
+        async ({ request }) => {
+          adoptPayload = await readOrpcInput(request);
+          return orpcJsonResponse(null);
+        },
+      ),
     );
 
     await renderWithProviders(<Devices />);
@@ -274,29 +256,19 @@ describe('Devices Page', () => {
       draft.port = 4010;
     });
 
-    const discoveredNodesPayload = superjson.serialize(
-      new Map([[discoveredPortNode.ip, discoveredPortNode]]),
-    );
-
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
-        return HttpResponse.json([
-          { result: { data: { json: [nonMasterNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [] } } },
-        ]);
+      ...mockDevicesQueries({
+        clusterNodes: [nonMasterNode],
+        discoveredNodes: [discoveredPortNode],
+        apps: [],
       }),
-      http.post(/\/api\/trpc\/resetDevice(\?.*)?$/, async ({ request }) => {
-        resetPayload = await readTrpcInput(request);
-        return HttpResponse.json([{ result: { data: { json: null } } }]);
-      }),
+      http.post(
+        '*/api/control-plane/rpc/devices/reset',
+        async ({ request }) => {
+          resetPayload = await readOrpcInput(request);
+          return orpcJsonResponse(null);
+        },
+      ),
     );
 
     await renderWithProviders(<Devices />);
@@ -339,24 +311,11 @@ describe('Devices Page', () => {
       draft.port = 4011;
     });
 
-    const discoveredNodesPayload = superjson.serialize(
-      new Map([[discoveredPortNode.ip, discoveredPortNode]]),
-    );
-
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
-        return HttpResponse.json([
-          { result: { data: { json: [masterNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [] } } },
-        ]);
+      ...mockDevicesQueries({
+        clusterNodes: [masterNode],
+        discoveredNodes: [discoveredPortNode],
+        apps: [],
       }),
     );
 
@@ -386,8 +345,6 @@ describe('Devices Page', () => {
       draft.ip = '192.168.1.22';
       draft.isMaster = false;
     });
-
-    const discoveredNodesPayload = superjson.serialize(new Map());
 
     const appOnAlpha = produce(baseApp, (draft) => {
       draft.spec.name = 'app-alpha';
@@ -436,19 +393,10 @@ describe('Devices Page', () => {
     });
 
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
-        return HttpResponse.json([
-          { result: { data: { json: [alphaNode, betaNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [appOnAlpha, appOnBeta] } } },
-        ]);
+      ...mockDevicesQueries({
+        clusterNodes: [alphaNode, betaNode],
+        discoveredNodes: [],
+        apps: [appOnAlpha, appOnBeta],
       }),
     );
 
@@ -480,8 +428,6 @@ describe('Devices Page', () => {
       draft.ip = '192.168.1.21';
     });
 
-    const discoveredNodesPayload = superjson.serialize(new Map());
-
     const appOnAlpha = produce(baseApp, (draft) => {
       draft.spec.name = 'app-alpha';
       draft.iconUrl = 'https://cdn.simpleicons.org/docker';
@@ -506,24 +452,18 @@ describe('Devices Page', () => {
     });
 
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
-        return HttpResponse.json([
-          { result: { data: { json: [alphaNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [appOnAlpha] } } },
-        ]);
+      ...mockDevicesQueries({
+        clusterNodes: [alphaNode],
+        discoveredNodes: [],
+        apps: [appOnAlpha],
       }),
-      http.post(/\/api\/trpc\/restartApp(\?.*)?$/, async ({ request }) => {
-        restartPayload = await readTrpcInput(request);
-        return HttpResponse.json([{ result: { data: { json: null } } }]);
-      }),
+      http.post(
+        '*/api/control-plane/rpc/devices/restartApp',
+        async ({ request }) => {
+          restartPayload = await readOrpcInput(request);
+          return orpcJsonResponse(null);
+        },
+      ),
     );
 
     await renderWithProviders(<Devices />);
@@ -543,28 +483,17 @@ describe('Devices Page', () => {
       draft.ip = '192.168.1.21';
     });
 
-    const discoveredNodesPayload = superjson.serialize(new Map());
-
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
-        return HttpResponse.json([
-          { result: { data: { json: [alphaNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [] } } },
-        ]);
+      ...mockDevicesQueries({
+        clusterNodes: [alphaNode],
+        discoveredNodes: [],
+        apps: [],
       }),
       http.post(
-        /\/api\/trpc\/drainCurrentNodeApps(\?.*)?$/,
+        '*/api/control-plane/rpc/devices/drainCurrentNodeApps',
         async ({ request }) => {
-          drainPayload = await readTrpcInput(request);
-          return HttpResponse.json([{ result: { data: { json: null } } }]);
+          drainPayload = await readOrpcInput(request);
+          return orpcJsonResponse(null);
         },
       ),
     );
@@ -594,22 +523,11 @@ describe('Devices Page', () => {
       draft.ip = '192.168.1.25';
     });
 
-    const discoveredNodesPayload = superjson.serialize(new Map());
-
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
-        return HttpResponse.json([
-          { result: { data: { json: [zetaNode, alphaNode, gammaNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [] } } },
-        ]);
+      ...mockDevicesQueries({
+        clusterNodes: [zetaNode, alphaNode, gammaNode],
+        discoveredNodes: [],
+        apps: [],
       }),
     );
 
@@ -649,31 +567,22 @@ describe('Devices Page', () => {
       draft.port = 4010;
     });
 
-    const discoveredNodesPayload = superjson.serialize(
-      new Map([[discoveredPortNode.ip, discoveredPortNode]]),
-    );
-
     worker.use(
-      http.get('*/api/trpc/devices,discoveredNodes,apps', () => {
+      http.post('*/api/control-plane/rpc/devices/list', () => {
         queryRequestCount += 1;
-        return HttpResponse.json([
-          { result: { data: { json: [nonMasterNode] } } },
-          {
-            result: {
-              data: {
-                json: discoveredNodesPayload.json,
-                meta: discoveredNodesPayload.meta,
-              },
-            },
-          },
-          { result: { data: { json: [] } } },
-        ]);
+        return orpcJsonResponse([nonMasterNode]);
       }),
-      http.post(/\/api\/trpc\/resetDevice(\?.*)?$/, async () => {
+      http.post('*/api/control-plane/rpc/devices/discoveredNodes', () => {
+        return orpcJsonResponse([[discoveredPortNode.ip, discoveredPortNode]]);
+      }),
+      http.post('*/api/control-plane/rpc/devices/apps', () => {
+        return orpcJsonResponse([]);
+      }),
+      http.post('*/api/control-plane/rpc/devices/reset', async () => {
         await new Promise<void>((resolve) => {
           releaseResetMutation = resolve;
         });
-        return HttpResponse.json([{ result: { data: { json: null } } }]);
+        return orpcJsonResponse(null);
       }),
     );
 
