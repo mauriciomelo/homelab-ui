@@ -44,4 +44,5 @@ next-env.d.ts
 certificates
 
 # vitest browser screenshots
-/app/(dashboard)/apps/__screenshots__
+/__screenshots__/browser
+.vitest-attachments

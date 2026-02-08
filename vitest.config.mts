@@ -6,6 +6,9 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 const viewport = { width: 1920, height: 1080 };
 
+const visualTestPattern = './**/*.visual.browser.test.tsx';
+const browserTestPattern = './**/*.browser.test.tsx';
+
 export default defineConfig({
   plugins: [
     tsconfigPaths(),
@@ -27,18 +30,22 @@ export default defineConfig({
           name: 'unit',
           setupFiles: ['./vitest.unit.setup.ts'],
           environment: 'jsdom',
-          exclude: [...configDefaults.exclude, './**/*.browser.test.tsx'],
+          exclude: [...configDefaults.exclude, browserTestPattern],
         },
       },
       {
         extends: true,
+
         test: {
           name: 'browser',
           setupFiles: ['./vitest.browser.setup.ts'],
-          include: ['./**/*browser.test.tsx'],
+          include: [browserTestPattern],
+          exclude: [...configDefaults.exclude, visualTestPattern],
           browser: {
             enabled: true,
             viewport,
+            screenshotDirectory: './__screenshots__/browser',
+
             provider: playwright({
               contextOptions: {
                 // Allow the viewport to be resized dynamically
@@ -49,6 +56,33 @@ export default defineConfig({
             instances: [
               {
                 browser: 'chromium',
+              },
+            ],
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'visual',
+          setupFiles: ['./vitest.browser.setup.ts'],
+          include: [visualTestPattern],
+
+          browser: {
+            enabled: true,
+            headless: true,
+            ui: false,
+            provider: playwright({
+              contextOptions: {
+                // Set a high device scale factor for better screenshot quality
+                deviceScaleFactor: 3,
+              },
+            }),
+            screenshotFailures: false,
+            instances: [
+              {
+                browser: 'chromium',
+                viewport,
               },
             ],
           },
