@@ -1,4 +1,4 @@
-import { TRPCReactProvider } from '@/trpc/client';
+import { QueryProvider } from '@/lib/query-provider';
 import { render } from '@testing-library/react';
 
 export * from '@testing-library/react';
@@ -8,7 +8,7 @@ export function renderWithProviders(ui: React.ReactElement) {
   return render(ui, {
     wrapper: () => (
       <>
-        <TRPCReactProvider>{ui}</TRPCReactProvider>
+        <QueryProvider>{ui}</QueryProvider>
       </>
     ),
   });

@@ -1,4 +1,4 @@
-import { TRPCReactProvider } from '@/trpc/client';
+import { QueryProvider } from '@/lib/query-provider';
 import { render } from 'vitest-browser-react';
 import { test as testBase } from 'vitest';
 import { worker } from './mocks/browser';
@@ -11,7 +11,7 @@ export function renderWithProviders(ui: React.ReactElement) {
     wrapper: ({ children }) => (
       <>
         <Cursor />
-        <TRPCReactProvider>{children}</TRPCReactProvider>
+        <QueryProvider>{children}</QueryProvider>
       </>
     ),
   });
@@ -53,18 +53,6 @@ export const test = testBase.extend<CustomFixtures>({
     },
   ],
 });
-
-export function trpcJsonResponse(data: unknown) {
-  return HttpResponse.json([
-    {
-      result: {
-        data: {
-          json: data,
-        },
-      },
-    },
-  ]);
-}
 
 export function orpcJsonResponse(data: unknown) {
   return HttpResponse.json({

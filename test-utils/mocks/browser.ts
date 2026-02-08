@@ -46,25 +46,6 @@ const appsData = [
 ];
 
 const handlers = [
-  http.get('*/api/trpc/*', () => {
-    // TRPC returns an array of responses for batch requests
-    // Each item has a result with data property
-    return HttpResponse.json(
-      [
-        {
-          result: {
-            data: appsData,
-          },
-        },
-      ],
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
-    );
-  }),
   http.post('*/api/control-plane/rpc/apps/list', () => {
     return HttpResponse.json({
       json: appsData,
