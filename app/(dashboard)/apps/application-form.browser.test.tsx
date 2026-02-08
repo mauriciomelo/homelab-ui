@@ -1,6 +1,5 @@
 import '../../globals.css';
-import * as actions from './actions';
-import { beforeEach, describe, expect, vi } from 'vitest';
+import { describe, expect, vi } from 'vitest';
 import { http } from 'msw';
 import {
   userEvent,
@@ -14,14 +13,18 @@ import { Apps } from './apps';
 import { page } from 'vitest/browser';
 import YAML from 'yaml';
 import { resourceLimitPreset } from '@/lib/resource-utils';
+import { appSchema, type AppSchema } from '@/app/api/schemas';
 
 vi.mock('server-only', () => ({}));
-vi.mock('./actions', () => {
-  return {
-    updateApp: vi.fn(),
-    createApp: vi.fn(),
-  };
-});
+
+async function readOrpcInput(request: Request): Promise<unknown> {
+  const body = await request.json();
+  if (typeof body !== 'object' || body === null || !('json' in body)) {
+    throw new Error('Expected oRPC payload with json field');
+  }
+
+  return body.json;
+}
 
 describe('Apps Page', () => {
   test('renders the Apps component with table', async ({ worker }) => {
@@ -100,10 +103,6 @@ describe('Apps Page', () => {
 });
 
 describe('ApplicationForm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   test('displays validation error when CPU is 0', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
@@ -828,7 +827,7 @@ describe('ApplicationForm', () => {
     });
 
     test('handles successful update', async ({ worker }) => {
-      vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      let submittedApp: AppSchema | undefined;
       const user = userEvent.setup();
 
       worker.use(
@@ -842,6 +841,13 @@ describe('ApplicationForm', () => {
             }),
           ]);
         }),
+        http.post(
+          '*/api/control-plane/rpc/apps/update',
+          async ({ request }) => {
+            submittedApp = appSchema.parse(await readOrpcInput(request));
+            return orpcJsonResponse({ success: true });
+          },
+        ),
       );
 
       await renderWithProviders(<Apps />);
@@ -870,8 +876,8 @@ describe('ApplicationForm', () => {
       await user.click(page.getByText('Update'));
 
       await expect
-        .poll(() => vi.mocked(actions.updateApp))
-        .toHaveBeenCalledWith({
+        .poll(() => submittedApp)
+        .toEqual({
           name: 'test-app',
           image: 'redis:7-alpine',
           ports: [{ name: 'http', containerPort: 80 }],
@@ -971,7 +977,7 @@ describe('ApplicationForm', () => {
     test('links environment variable to auth client secret', async ({
       worker,
     }) => {
-      vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      let submittedApp: AppSchema | undefined;
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
         app.spec.name = 'auth-secret-app';
@@ -995,6 +1001,13 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
+        http.post(
+          '*/api/control-plane/rpc/apps/update',
+          async ({ request }) => {
+            submittedApp = appSchema.parse(await readOrpcInput(request));
+            return orpcJsonResponse({ success: true });
+          },
+        ),
       );
 
       await renderWithProviders(<Apps />);
@@ -1012,8 +1025,8 @@ describe('ApplicationForm', () => {
       await user.click(page.getByText('Update'));
 
       await expect
-        .poll(() => vi.mocked(actions.updateApp))
-        .toHaveBeenCalledWith({
+        .poll(() => submittedApp)
+        .toEqual({
           name: 'auth-secret-app',
           image: 'postgres:16',
           ports: [{ name: 'http', containerPort: 80 }],
@@ -1049,7 +1062,7 @@ describe('ApplicationForm', () => {
     });
 
     test('links volume mount to persistent volume', async ({ worker }) => {
-      vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      let submittedApp: AppSchema | undefined;
       const user = userEvent.setup();
       const volumeResource = produce(basePersistentVolumeClaim, (draft) => {
         draft.metadata.name = 'data';
@@ -1065,6 +1078,13 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
+        http.post(
+          '*/api/control-plane/rpc/apps/update',
+          async ({ request }) => {
+            submittedApp = appSchema.parse(await readOrpcInput(request));
+            return orpcJsonResponse({ success: true });
+          },
+        ),
       );
 
       await renderWithProviders(<Apps />);
@@ -1085,8 +1105,8 @@ describe('ApplicationForm', () => {
       await user.click(page.getByText('Update'));
 
       await expect
-        .poll(() => vi.mocked(actions.updateApp))
-        .toHaveBeenCalledWith({
+        .poll(() => submittedApp)
+        .toEqual({
           ...app.spec,
           volumeMounts: [{ mountPath: '/data', name: 'data' }],
           additionalResources: [volumeResource],
@@ -1148,7 +1168,7 @@ describe('ApplicationForm', () => {
     });
 
     test('handles custom resource limits', async ({ worker }) => {
-      vi.mocked(actions.updateApp).mockResolvedValue({ success: true });
+      let submittedApp: AppSchema | undefined;
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
         app.spec.name = 'test-app';
@@ -1162,6 +1182,13 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
+        http.post(
+          '*/api/control-plane/rpc/apps/update',
+          async ({ request }) => {
+            submittedApp = appSchema.parse(await readOrpcInput(request));
+            return orpcJsonResponse({ success: true });
+          },
+        ),
       );
 
       await renderWithProviders(<Apps />);
@@ -1196,8 +1223,8 @@ describe('ApplicationForm', () => {
 
       // Verify the action was called with custom values
       await expect
-        .poll(() => vi.mocked(actions.updateApp))
-        .toHaveBeenCalledWith({
+        .poll(() => submittedApp)
+        .toEqual({
           ...app.spec,
           resources: {
             limits: { cpu: '750m', memory: '768Mi' },
@@ -1371,13 +1398,20 @@ describe('ApplicationForm', () => {
     test('captures default health check inputs on create', async ({
       worker,
     }) => {
-      vi.mocked(actions.createApp).mockResolvedValue({ success: true });
+      let submittedApp: AppSchema | undefined;
       const user = userEvent.setup();
 
       worker.use(
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([]);
         }),
+        http.post(
+          '*/api/control-plane/rpc/apps/create',
+          async ({ request }) => {
+            submittedApp = appSchema.parse(await readOrpcInput(request));
+            return orpcJsonResponse({ success: true });
+          },
+        ),
       );
 
       await renderWithProviders(<Apps />);
@@ -1405,8 +1439,8 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('button', { name: 'Create' }));
 
       await expect
-        .poll(() => vi.mocked(actions.createApp))
-        .toHaveBeenCalledWith({
+        .poll(() => submittedApp)
+        .toEqual({
           name: 'new-app',
           image: 'redis:7-alpine',
           ports: [{ name: 'http', containerPort: 80 }],
@@ -1504,13 +1538,20 @@ describe('ApplicationForm', () => {
     });
 
     test('handles successful app creation', async ({ worker }) => {
-      vi.mocked(actions.createApp).mockResolvedValue({ success: true });
+      let submittedApp: AppSchema | undefined;
       const user = userEvent.setup();
 
       worker.use(
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([]);
         }),
+        http.post(
+          '*/api/control-plane/rpc/apps/create',
+          async ({ request }) => {
+            submittedApp = appSchema.parse(await readOrpcInput(request));
+            return orpcJsonResponse({ success: true });
+          },
+        ),
       );
 
       await renderWithProviders(<Apps />);
@@ -1541,8 +1582,8 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('button', { name: 'Create' }));
 
       await expect
-        .poll(() => vi.mocked(actions.createApp))
-        .toHaveBeenCalledWith({
+        .poll(() => submittedApp)
+        .toEqual({
           name: 'new-app',
           image: 'redis:7-alpine',
           ports: [{ name: 'http', containerPort: 80 }],

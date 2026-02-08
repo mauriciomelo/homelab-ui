@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useLens } from '@hookform/lenses';
 import { useMemo, useState } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
+import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Plus, Shield, HardDrive } from 'lucide-react';
 import type { App } from '@/app/api/applications';
@@ -14,7 +15,7 @@ import {
   defaultAppData,
   type PersistentVolumeClaimSchema,
 } from '@/app/api/schemas';
-import { updateApp } from './actions';
+import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import { Separator } from '@radix-ui/react-separator';
 import { cn } from '@/lib/utils';
 import {
@@ -34,7 +35,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { InsetGroup, InsetSectionTitle } from '@/components/ui/inset-group';
-import { createApp } from './actions';
 import { AuthClientCard } from './auth-client-card';
 import { ResourceLimitsField } from './form-sections/resource-limits-field';
 import { PersistentVolumeClaimCard } from './persistent-volume-claim-card';
@@ -79,9 +79,18 @@ export function useApplicationForm({
     defaultValues: data ?? defaultAppData,
   });
 
+  const createAppMutation = useMutation(
+    controlPlaneOrpc.apps.create.mutationOptions(),
+  );
+  const updateAppMutation = useMutation(
+    controlPlaneOrpc.apps.update.mutationOptions(),
+  );
+
   const onSubmit = form.handleSubmit(async (formData) => {
     const result =
-      mode === 'create' ? await createApp(formData) : await updateApp(formData);
+      mode === 'create'
+        ? await createAppMutation.mutateAsync(formData)
+        : await updateAppMutation.mutateAsync(formData);
     // TODO: remove log and handle success/failure
     console.log(result);
   });
