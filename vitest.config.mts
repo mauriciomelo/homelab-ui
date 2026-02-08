@@ -2,11 +2,23 @@ import { configDefaults, defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 const viewport = { width: 1920, height: 1080 };
 
 export default defineConfig({
-  plugins: [tsconfigPaths(), react()],
+  plugins: [
+    tsconfigPaths(),
+    react(),
+    nodePolyfills({
+      include: ['assert'],
+      globals: {
+        process: true,
+        Buffer: true,
+      },
+      protocolImports: true,
+    }),
+  ],
   test: {
     projects: [
       {

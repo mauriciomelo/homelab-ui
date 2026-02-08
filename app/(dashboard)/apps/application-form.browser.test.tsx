@@ -1,4 +1,3 @@
-import '../../globals.css';
 import { describe, expect, vi } from 'vitest';
 import { http } from 'msw';
 import {

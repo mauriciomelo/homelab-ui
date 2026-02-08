@@ -4,6 +4,7 @@ import { test as testBase } from 'vitest';
 import { worker } from './mocks/browser';
 import { HttpResponse } from 'msw';
 import Cursor from '@/app/(dashboard)/apps/Cursor';
+import '../app/globals.css';
 
 export function renderWithProviders(ui: React.ReactElement) {
   return render(ui, {
