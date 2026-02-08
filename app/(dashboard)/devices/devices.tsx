@@ -70,6 +70,16 @@ import {
 } from '@/components/ui/context-menu';
 type Device = DiscoveredNode | (ClusterNode & { port?: number });
 
+export const DEVICES_POLL_INTERVAL_MS = 10_000;
+export const DISCOVERED_NODES_POLL_INTERVAL_MS = 5_000;
+export const APPS_POLL_INTERVAL_MS = 5_000;
+
+type DevicesProps = {
+  devicesPollIntervalMs?: number;
+  discoveredNodesPollIntervalMs?: number;
+  appsPollIntervalMs?: number;
+};
+
 function nodeApps(apps: App[], nodeName: string) {
   return apps.filter((app) =>
     app.pods.some((pod) => pod.spec.nodeName === nodeName),
@@ -115,7 +125,11 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   );
 }
 
-export function Devices() {
+export function Devices({
+  devicesPollIntervalMs = DEVICES_POLL_INTERVAL_MS,
+  discoveredNodesPollIntervalMs = DISCOVERED_NODES_POLL_INTERVAL_MS,
+  appsPollIntervalMs = APPS_POLL_INTERVAL_MS,
+}: DevicesProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -131,18 +145,18 @@ export function Devices() {
 
   const devices = useQuery({
     ...trpc.devices.queryOptions(),
-    refetchInterval: 10_000,
+    refetchInterval: devicesPollIntervalMs,
     enabled: !isResetting,
   });
 
   const discoveredNodes = useQuery({
     ...trpc.discoveredNodes.queryOptions(),
-    refetchInterval: 5_000,
+    refetchInterval: discoveredNodesPollIntervalMs,
     enabled: !isResetting,
   });
   const apps = useQuery({
     ...trpc.apps.queryOptions(),
-    refetchInterval: 5_000,
+    refetchInterval: appsPollIntervalMs,
     enabled: !isResetting,
   });
 

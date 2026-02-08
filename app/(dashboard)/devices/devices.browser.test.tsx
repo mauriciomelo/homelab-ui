@@ -630,6 +630,9 @@ describe('Devices Page', () => {
     worker,
   }) => {
     const user = userEvent.setup();
+    const testDevicesPollIntervalMs = 1000;
+    const testDiscoveredNodesPollIntervalMs = 500;
+    const testAppsPollIntervalMs = 500;
     let queryRequestCount = 0;
     let releaseResetMutation: (() => void) | undefined;
 
@@ -674,7 +677,13 @@ describe('Devices Page', () => {
       }),
     );
 
-    await renderWithProviders(<Devices />);
+    await renderWithProviders(
+      <Devices
+        devicesPollIntervalMs={testDevicesPollIntervalMs}
+        discoveredNodesPollIntervalMs={testDiscoveredNodesPollIntervalMs}
+        appsPollIntervalMs={testAppsPollIntervalMs}
+      />,
+    );
 
     await expect.poll(() => queryRequestCount).toBeGreaterThan(0);
 
@@ -685,14 +694,18 @@ describe('Devices Page', () => {
     await expect.poll(() => typeof releaseResetMutation).toBe('function');
     const countWhileResetPending = queryRequestCount;
 
-    await new Promise((resolve) => setTimeout(resolve, 6200));
+    await new Promise((resolve) => {
+      setTimeout(resolve, testAppsPollIntervalMs * 2);
+    });
 
     expect(queryRequestCount).toBe(countWhileResetPending);
 
     releaseResetMutation?.();
 
     await expect
-      .poll(() => queryRequestCount)
+      .poll(() => queryRequestCount, {
+        timeout: testAppsPollIntervalMs * 4,
+      })
       .toBeGreaterThan(countWhileResetPending);
   });
 });
