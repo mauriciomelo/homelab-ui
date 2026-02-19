@@ -9,7 +9,7 @@ NODEUSER=$(whoami)
 # The home directory for the user. This is determined automatically.
 HOMEDIR="/home/$NODEUSER"
 # The full path to the script that the user will be allowed to run.
-JOIN_SCRIPT_PATH="$HOME/homelab-ui/join_cluster.sh"
+JOIN_SCRIPT_PATH="$HOME/homelab-ui/apps/web/join_cluster.sh"
 # The name of the file to be created in the /etc/sudoers.d/ directory.
 # Using a number prefix (e.g., 91-) is a common convention.
 SUDOERS_FILENAME="homelab_permissions"

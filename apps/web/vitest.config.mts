@@ -6,8 +6,8 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 const viewport = { width: 1920, height: 1080 };
 
-const visualTestPattern = './**/*.visual.browser.test.tsx';
-const browserTestPattern = './**/*.browser.test.tsx';
+const visualTestPattern = '**/*.visual.browser.test.tsx';
+const browserTestPattern = '**/*.browser.test.tsx';
 
 export default defineConfig({
   plugins: [
