@@ -544,16 +544,14 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
       const postLogoutInput = page.getByLabelText('Post-logout URIs');
-      await user.click(postLogoutInput);
-      await user.keyboard(
+      await user.fill(
+        postLogoutInput,
         'https://example.com/logout, https://example.com/logout-next',
       );
 
-      await expect
-        .element(postLogoutInput)
-        .toHaveValue(
-          'https://example.com/logout, https://example.com/logout-next',
-        );
+      await expect.element(postLogoutInput).toHaveValue(
+        'https://example.com/logout,\nhttps://example.com/logout-next',
+      );
     });
 
     test('shows validation error for invalid redirect uri', async ({
@@ -579,8 +577,7 @@ describe('ApplicationForm', () => {
       await user.click(page.getByRole('menuitem', { name: 'Auth Client' }));
 
       const redirectInput = page.getByLabelText('Redirect URIs');
-      await user.click(redirectInput);
-      await user.keyboard('https://example.com/callback, not-a-url');
+      await user.fill(redirectInput, 'https://example.com/callback, not-a-url');
 
       await user.click(page.getByText('Update'));
 

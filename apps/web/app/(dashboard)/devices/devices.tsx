@@ -88,6 +88,7 @@ function nodeApps(apps: App[], nodeName: string) {
 
 function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   const items = nodeApps(props.apps, props.node);
+  const AnimatedDiv = animated('div');
   const restartAppMutation = useMutation(
     controlPlaneOrpc.devices.restartApp.mutationOptions(),
   );
@@ -103,8 +104,7 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   return (
     <div className="flex flex-wrap gap-2">
       {transitions((style, item) => (
-        // @ts-expect-error TODO: Upgrade this package, this looks like a bug in react-spring
-        <animated.div style={style} className={cn('size-5', props.className)}>
+        <AnimatedDiv style={style} className={cn('size-5', props.className)}>
           <ContextMenu>
             <ContextMenuTrigger>
               <AppIcon app={item} />
@@ -119,7 +119,7 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
-        </animated.div>
+        </AnimatedDiv>
       ))}
     </div>
   );
