@@ -7,11 +7,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { useSelectedLayoutSegments } from 'next/navigation';
+import { useRouterState } from '@tanstack/react-router';
 import React from 'react';
 
 export function AppBreadcrumb({ className }: React.ComponentProps<'nav'>) {
-  const segments = useSelectedLayoutSegments();
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const segments = pathname.split('/').filter(Boolean);
 
   return (
     <Breadcrumb className={className}>

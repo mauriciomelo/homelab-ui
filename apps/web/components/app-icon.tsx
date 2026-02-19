@@ -25,7 +25,6 @@ export function AppIcon({
       <TooltipTrigger asChild>
         <div className="relative">
           <div className="overflow-hidden rounded-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imageError ? fallbackSrc : app.iconUrl}
               alt={app.spec.name}

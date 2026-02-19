@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import {
   Tooltip,
   TooltipContent,
@@ -107,7 +107,7 @@ function SidebarButton({
           })}
           asChild
         >
-          <Link href={href}>
+          <Link to={href}>
             <IconComponent className="text-gray-600 group-data-[open=false]:scale-140 group-data-[open=false]:p-0" />
             <span className="group-data-[open=false]:hidden">{title}</span>
           </Link>

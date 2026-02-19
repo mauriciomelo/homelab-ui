@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { ChevronRight, MoreHorizontal } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 
 import { cn } from '@/lib/utils';
 
@@ -33,14 +33,19 @@ function BreadcrumbItem({ className, ...props }: React.ComponentProps<'li'>) {
 
 function BreadcrumbLink({
   className,
+  href,
+  children,
   ...props
-}: React.ComponentProps<typeof Link>) {
+}: React.ComponentProps<'a'> & { href: string }) {
   return (
     <Link
       data-slot="breadcrumb-link"
       className={cn('hover:text-foreground transition-colors', className)}
+      to={href}
       {...props}
-    />
+    >
+      {children}
+    </Link>
   );
 }
 

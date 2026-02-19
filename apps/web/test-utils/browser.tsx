@@ -25,6 +25,7 @@ export * from './userEvent';
 
 export const test = testBase.extend<CustomFixtures>({
   worker: [
+    // eslint-disable-next-line no-empty-pattern
     async ({}, use) => {
       await worker.start({
         quiet: true,

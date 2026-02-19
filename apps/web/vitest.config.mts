@@ -10,6 +10,16 @@ const visualTestPattern = '**/*.visual.browser.test.tsx';
 const browserTestPattern = '**/*.browser.test.tsx';
 
 export default defineConfig({
+  optimizeDeps: {
+    include: [
+      'vitest-browser-react',
+      'vite-plugin-node-polyfills/shims/buffer',
+      'vite-plugin-node-polyfills/shims/global',
+      'vite-plugin-node-polyfills/shims/process',
+      'immer',
+      'server-only',
+    ],
+  },
   plugins: [
     tsconfigPaths(),
     react(),
@@ -23,6 +33,13 @@ export default defineConfig({
     }),
   ],
   test: {
+    deps: {
+      optimizer: {
+        web: {
+          enabled: false,
+        },
+      },
+    },
     projects: [
       {
         extends: true,
