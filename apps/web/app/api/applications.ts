@@ -1,4 +1,3 @@
-import 'server-only';
 import fs from 'fs';
 import YAML from 'yaml';
 import * as z from 'zod';

@@ -13,7 +13,7 @@ import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import { useQuery } from '@tanstack/react-query';
 import { APP_STATUS } from '@/app/constants';
 import { useState } from 'react';
-import { App } from '@/app/api/applications';
+import type { App } from '@/app/api/applications';
 import { Status } from '@/components/ui/status';
 import { PageContent } from '@/components/page-content';
 import { AppIcon, appStatusProps } from '@/components/app-icon';

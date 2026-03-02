@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/tooltip';
 import { ComponentProps, useState } from 'react';
 import { Status } from './ui/status';
-import { App } from '@/app/api/applications';
+import type { App } from '@/app/api/applications';
 
 export function AppIcon({
   app,

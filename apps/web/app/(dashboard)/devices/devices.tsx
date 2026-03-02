@@ -54,10 +54,10 @@ import {
 import { faucet } from '@lucide/lab';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PageContent } from '@/components/page-content';
-import { DiscoveredNode } from '@/mdns';
-import { ClusterNode } from '@/app/api/devices';
+import type { DiscoveredNode } from '@/mdns';
+import type { ClusterNode } from '@/app/api/devices';
 import _ from 'lodash';
-import { App } from '@/app/api/applications';
+import type { App } from '@/app/api/applications';
 import { AppIcon } from '@/components/app-icon';
 import { useTransition, animated } from '@react-spring/web';
 import { useGLTF } from '@react-three/drei';

@@ -17,7 +17,6 @@ export default defineConfig({
       'vite-plugin-node-polyfills/shims/global',
       'vite-plugin-node-polyfills/shims/process',
       'immer',
-      'server-only',
     ],
   },
   plugins: [

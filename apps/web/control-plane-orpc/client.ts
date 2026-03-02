@@ -1,8 +1,8 @@
 import { createORPCClient, onError } from '@orpc/client';
 import { RPCLink } from '@orpc/client/fetch';
 import { createTanstackQueryUtils } from '@orpc/tanstack-query';
-import { RouterClient } from '@orpc/server';
-import { controlPlaneRouter } from './router';
+import type { RouterClient } from '@orpc/server';
+import type { controlPlaneRouter } from './router';
 import { getOptionalConfig } from '@/app/(dashboard)/apps/config';
 
 function getUrl() {

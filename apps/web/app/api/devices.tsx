@@ -1,4 +1,3 @@
-import 'server-only';
 import * as _ from 'lodash';
 import { DEVICE_STATUS } from '@/app/constants';
 import crypto from 'crypto';
