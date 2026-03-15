@@ -1,6 +1,7 @@
 import type { App } from '@/app/api/applications';
 import { APP_STATUS } from '@/app/constants';
 import {
+  appBundleSchema,
   appSchema,
   deploymentSchema,
   ingressSchema,
@@ -26,8 +27,13 @@ export const baseAppManifest: z.infer<typeof appSchema> = Object.freeze({
   },
 });
 
+export const baseAppBundle: z.infer<typeof appBundleSchema> = Object.freeze({
+  app: baseAppManifest,
+  additionalResources: [],
+});
+
 export const baseApp: App = Object.freeze({
-  ...baseAppManifest,
+  ...baseAppBundle,
   status: {
     phase: APP_STATUS.RUNNING,
     pods: [],

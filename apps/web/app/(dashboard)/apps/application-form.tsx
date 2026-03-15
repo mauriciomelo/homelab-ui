@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Plus, Shield, HardDrive } from 'lucide-react';
 import isEqual from 'lodash/isEqual';
 import {
-  AppSchema,
-  appSchema,
-  defaultAppData,
+  AppBundleSchema,
+  appBundleSchema,
+  defaultAppBundleData,
   type PersistentVolumeClaimSchema,
 } from '@/app/api/schemas';
 import { controlPlaneOrpc } from '@/control-plane-orpc/client';
@@ -70,12 +70,12 @@ export function useApplicationForm({
   data,
   mode,
 }: {
-  data?: AppSchema;
+  data?: AppBundleSchema;
   mode: FormMode;
 }) {
-  const form = useForm<AppSchema>({
-    resolver: zodResolver(appSchema),
-    defaultValues: data ?? defaultAppData,
+  const form = useForm<AppBundleSchema>({
+    resolver: zodResolver(appBundleSchema),
+    defaultValues: data ?? defaultAppBundleData,
   });
 
   const createAppMutation = useMutation(
@@ -105,10 +105,9 @@ export function ApplicationForm(
   const { form, mode } = props;
 
   const lens = useLens({ control: form.control });
-  const appSpecLens = lens.focus('spec');
-  const additionalResourcesLens = appSpecLens
-    .focus('additionalResources')
-    .defined();
+  const appLens = lens.focus('app');
+  const appSpecLens = appLens.focus('spec');
+  const additionalResourcesLens = lens.focus('additionalResources').defined();
 
   const [lastSeenData, setLastSeenData] = useState(props.data);
 
@@ -130,7 +129,7 @@ export function ApplicationForm(
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: 'spec.envVariables',
+    name: 'app.spec.envVariables',
   });
 
   const {
@@ -139,7 +138,7 @@ export function ApplicationForm(
     remove: removeAdditionalResource,
   } = useFieldArray({
     control: form.control,
-    name: 'spec.additionalResources',
+    name: 'additionalResources',
   });
 
   const {
@@ -148,7 +147,7 @@ export function ApplicationForm(
     remove: removePort,
   } = useFieldArray({
     control: form.control,
-    name: 'spec.ports',
+    name: 'app.spec.ports',
   });
 
   const {
@@ -157,12 +156,12 @@ export function ApplicationForm(
     remove: removeVolumeMount,
   } = useFieldArray({
     control: form.control,
-    name: 'spec.volumeMounts',
+    name: 'app.spec.volumeMounts',
   });
 
   const additionalResources =
-    useWatch({ control: form.control, name: 'spec.additionalResources' }) ?? [];
-  const ports = useWatch({ control: form.control, name: 'spec.ports' });
+    useWatch({ control: form.control, name: 'additionalResources' }) ?? [];
+  const ports = useWatch({ control: form.control, name: 'app.spec.ports' });
   const persistentVolumeClaims = additionalResources.filter(
     (resource): resource is PersistentVolumeClaimSchema =>
       resource.kind === 'PersistentVolumeClaim',
@@ -186,7 +185,7 @@ export function ApplicationForm(
 
   const addAuthClientResource = () => {
     const newAuthClient: NonNullable<
-      AppSchema['spec']['additionalResources']
+      AppBundleSchema['additionalResources']
     >[number] = {
       apiVersion: 'tesselar.io/v1',
       kind: 'AuthClient',
@@ -202,7 +201,7 @@ export function ApplicationForm(
   const createPersistentVolumeClaimResource = () => {
     const volumeName = getNextPersistentVolumeName(persistentVolumeClaims);
     const newPersistentVolumeClaim: NonNullable<
-      AppSchema['spec']['additionalResources']
+      AppBundleSchema['additionalResources']
     >[number] = {
       apiVersion: 'v1',
       kind: 'PersistentVolumeClaim',
@@ -260,7 +259,7 @@ export function ApplicationForm(
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AppBasicsSection lens={lens} mode={mode} />
+      <AppBasicsSection lens={appLens} mode={mode} />
 
       <ResourceLimitsField lens={appSpecLens.focus('resources')} />
 
@@ -282,7 +281,7 @@ export function ApplicationForm(
 
       <EnvironmentVariablesSection
         envVariablesLens={appSpecLens.focus('envVariables')}
-        additionalResourcesLens={appSpecLens.focus('additionalResources')}
+         additionalResourcesLens={lens.focus('additionalResources')}
         fields={fields}
         onAdd={addEnvVariable}
         onRemove={removeEnvVariable}

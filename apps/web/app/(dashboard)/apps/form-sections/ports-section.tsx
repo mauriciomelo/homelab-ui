@@ -22,16 +22,16 @@ import { cn } from '@/lib/utils';
 import type { Lens } from '@hookform/lenses';
 import { Globe, Plus, Trash2 } from 'lucide-react';
 import type { FieldArrayWithId, UseFormSetValue } from 'react-hook-form';
-import type { AppSchema } from '@/app/api/schemas';
+import type { AppBundleSchema } from '@/app/api/schemas';
 import { useWatch } from 'react-hook-form';
 
 type PortsSectionProps = {
-  portsLens: Lens<AppSchema['spec']['ports']>;
-  ingressLens: Lens<AppSchema['spec']['ingress']>;
-  fields: FieldArrayWithId<AppSchema, 'spec.ports', 'id'>[];
+  portsLens: Lens<AppBundleSchema['app']['spec']['ports']>;
+  ingressLens: Lens<AppBundleSchema['app']['spec']['ingress']>;
+  fields: FieldArrayWithId<AppBundleSchema, 'app.spec.ports', 'id'>[];
   onAdd: () => void;
   onRemove: (index: number) => void;
-  setValue: UseFormSetValue<AppSchema>;
+  setValue: UseFormSetValue<AppBundleSchema>;
 };
 
 export function PortsSection({
@@ -131,7 +131,7 @@ export function PortsSection({
                         size="icon"
                         onClick={() => {
                           if (currentPortName) {
-                            setValue('spec.ingress.port.name', currentPortName);
+                              setValue('app.spec.ingress.port.name', currentPortName);
                           }
                         }}
                       className={cn(

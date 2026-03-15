@@ -6,13 +6,6 @@ import {
   resourceLimitPreset,
 } from '@/lib/resource-utils';
 import { z } from 'zod';
-import { authClientSchema } from './auth-client-schema';
-import { persistentVolumeClaimSchema } from './persistent-volume-claim-schema';
-
-const additionalResourceSchema = z.union([
-  authClientSchema,
-  persistentVolumeClaimSchema,
-]);
 const envVariableSchema = z.union([
   z.object({
     name: z
@@ -200,9 +193,6 @@ export const appSchema = z
         health: healthSchema
           .optional()
           .meta({ description: 'Optional health check configuration' }),
-        additionalResources: z.array(additionalResourceSchema).optional().meta({
-          description: 'Additional resources required by the app.',
-        }),
       })
       .meta({ description: 'Desired state for the app resource' }),
   })
@@ -232,23 +222,7 @@ export const appSchema = z
       path: ['spec', 'health', 'check', 'port'],
     },
   )
-  .superRefine((data, ctx) => {
-    validateBrokenEnvReferences(data).forEach(({ index }) => {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Secret reference must match an existing resource',
-        path: ['spec', 'envVariables', index, 'value'],
-      });
-    });
-
-    validateBrokenVolumeMountReferences(data).forEach(({ index }) => {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Volume mount must reference a persistent volume',
-        path: ['spec', 'volumeMounts', index, 'name'],
-      });
-    });
-  });
+  ;
 
 export type AppSchema = z.infer<typeof appSchema>;
 export type AppSpecSchema = AppSchema['spec'];
@@ -277,60 +251,5 @@ export const defaultAppData = {
     ingress: {
       port: { name: 'http' },
     },
-    additionalResources: [],
   },
 } satisfies AppSchema;
-
-function validateBrokenEnvReferences(data: AppSchema) {
-  const authClientNames = new Set(
-    deriveResourceReferences(data.spec.additionalResources).map(
-      (reference) => reference.name,
-    ),
-  );
-
-  return data.spec.envVariables.flatMap((envVariable, index) => {
-    if ('valueFrom' in envVariable) {
-      const secretName = envVariable.valueFrom.secretKeyRef.name;
-      if (!authClientNames.has(secretName)) {
-        return [{ index, secretName }];
-      }
-    }
-
-    return [];
-  });
-}
-
-function validateBrokenVolumeMountReferences(data: AppSchema) {
-  const pvcNames = new Set(
-    data.spec.additionalResources
-      ?.filter((resource) => resource.kind === 'PersistentVolumeClaim')
-      .map((resource) => resource.metadata.name) ?? [],
-  );
-
-  return (data.spec.volumeMounts ?? []).flatMap((volumeMount, index) => {
-    if (!pvcNames.has(volumeMount.name)) {
-      return [{ index, name: volumeMount.name }];
-    }
-
-    return [];
-  });
-}
-
-export function deriveResourceReferences(
-  resources: AppSpecSchema['additionalResources'],
-) {
-  const references = resources
-    ?.map((resource) => {
-      if (resource.kind === 'AuthClient') {
-        return {
-          name: resource.metadata.name,
-          kind: resource.kind,
-          keys: ['client-id', 'client-secret'] as const,
-        };
-      }
-      return null;
-    })
-    .filter((resource) => resource !== null);
-
-  return references ?? [];
-}

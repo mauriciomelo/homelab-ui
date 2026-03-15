@@ -94,7 +94,7 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   );
 
   const transitions = useTransition(items, {
-    keys: (item) => item.metadata.name,
+    keys: (item) => item.app.metadata.name,
     from: { opacity: 0, scale: 0 },
     enter: { opacity: 1, scale: 1 },
     leave: { opacity: 0, scale: 0 },
@@ -112,7 +112,7 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
             <ContextMenuContent>
                 <ContextMenuItem
                   onClick={() =>
-                    restartAppMutation.mutate({ name: item.metadata.name })
+                    restartAppMutation.mutate({ name: item.app.metadata.name })
                   }
                 >
                 Restart App

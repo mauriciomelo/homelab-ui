@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-import { AppSchema } from './schemas';
+import { AdditionalResourceSchema, AppBundleSchema, AppSchema } from './schemas';
 import {
   deploymentSchema,
   ingressSchema,
@@ -35,7 +35,15 @@ const HEALTH_DEFAULTS = {
  * Generates Kubernetes manifests (Deployment, Ingress, Kustomization, etc.)
  * from the base app schema.
  */
-export function toManifests(app: AppSchema) {
+export type AppManifests = {
+  deployment: z.infer<typeof deploymentSchema>;
+  ingress: z.infer<typeof ingressSchema>;
+  service: z.infer<typeof serviceSchema>;
+  namespace: z.infer<typeof namespaceSchema>;
+  additionalResources: AdditionalResourceSchema[];
+};
+
+export function toManifests(app: AppSchema): AppManifests {
   const healthProbes = app.spec.health
     ? buildHealthProbes(app.spec.health.check)
     : {};
@@ -148,11 +156,19 @@ export function toManifests(app: AppSchema) {
     ingress,
     service,
     namespace,
-    additionalResources: app.spec.additionalResources ?? [],
+    additionalResources: [],
   };
 }
 
-export type AppManifests = ReturnType<typeof toManifests>;
+export function toBundleManifests({
+  app,
+  additionalResources,
+}: AppBundleSchema): AppManifests {
+  return {
+    ...toManifests(app),
+    additionalResources,
+  };
+}
 
 /**
  * Builds the base app schema from Kubernetes manifests.
@@ -161,7 +177,7 @@ export function fromManifests({
   deployment,
   ingress,
   additionalResources = [],
-}: AppManifests): AppSchema {
+}: AppManifests): AppBundleSchema {
   const container = deployment.spec.template.spec.containers[0];
   const appName = deployment.metadata.name;
   const ingressPortName =
@@ -180,13 +196,15 @@ export function fromManifests({
       envVariables: container.env || [],
       resources: container.resources,
       ingress: { port: { name: ingressPortName } },
-      additionalResources: additionalResources,
       volumeMounts: container.volumeMounts,
       ...(health ? { health } : {}),
     },
   };
 
-  return app;
+  return {
+    app,
+    additionalResources,
+  };
 }
 
 function buildHealthProbes(check: HealthCheck) {

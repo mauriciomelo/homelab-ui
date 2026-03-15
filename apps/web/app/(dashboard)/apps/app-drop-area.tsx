@@ -5,7 +5,7 @@ import { useState, type DragEvent } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { FileUp } from 'lucide-react';
 import YAML from 'yaml';
-import { appSchema, type AppSchema } from '@/app/api/schemas';
+import { appBundleSchema, type AppBundleSchema } from '@/app/api/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 export const useAppDropArea = ({
   form,
 }: {
-  form: UseFormReturn<AppSchema>;
+  form: UseFormReturn<AppBundleSchema>;
 }) => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -97,7 +97,7 @@ export const useAppDropArea = ({
       }
 
       const parsed = YAML.parse(content);
-      const result = appSchema.safeParse(parsed);
+      const result = appBundleSchema.safeParse(parsed);
 
       if (!result.success) {
         const issues = result.error.issues.map((issue) => issue.message);

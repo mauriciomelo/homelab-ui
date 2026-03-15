@@ -32,7 +32,7 @@ export function Apps() {
   const [formMode, setFormMode] = useState<FormMode>(null);
 
   const selectedApp = selectedAppName
-    ? (apps.data?.find((app) => app.metadata.name === selectedAppName) ?? null)
+    ? (apps.data?.find((app) => app.app.metadata.name === selectedAppName) ?? null)
     : null;
 
   const handleCreateApp = () => {
@@ -41,7 +41,7 @@ export function Apps() {
   };
 
   const handleEditApp = (app: App) => {
-    setSelectedAppName(app.metadata.name);
+    setSelectedAppName(app.app.metadata.name);
     setFormMode('edit');
   };
 
@@ -78,8 +78,8 @@ export function Apps() {
           </TableHeader>
           <TableBody>
             {apps.data?.map((app) => (
-              <TableRow
-                key={app.metadata.name}
+                <TableRow
+                key={app.app.metadata.name}
                 className={cn({
                   'animate-pulse': app.status.phase === APP_STATUS.PENDING,
                 })}
@@ -94,10 +94,10 @@ export function Apps() {
                 </TableCell>
                 <TableCell
                   className="cursor-pointer font-medium"
-                  onClick={() => handleEditApp(app)}
+                    onClick={() => handleEditApp(app)}
                 >
                   <div className="flex min-h-9 items-center">
-                    {app.metadata.name}
+                    {app.app.metadata.name}
                   </div>
                 </TableCell>
 

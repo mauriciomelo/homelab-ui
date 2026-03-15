@@ -3,7 +3,7 @@ import YAML from 'yaml';
 import * as z from 'zod';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import path from 'path';
-import { AppSchema, appSchema } from './schemas';
+import { AppBundleSchema, appBundleSchema } from './schemas';
 import * as _ from 'lodash';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
@@ -18,7 +18,11 @@ import {
   serviceSchema,
 } from './schemas';
 import * as k from './k8s';
-import { AppManifests, fromManifests, toManifests } from './app-k8s-adapter';
+import {
+  AppManifests,
+  fromManifests,
+  toBundleManifests,
+} from './app-k8s-adapter';
 
 export type AppResourceType =
   | z.infer<typeof authClientSchema>
@@ -82,7 +86,7 @@ export type AppRuntimeStatus = {
   };
 };
 
-export type App = AppSchema & {
+export type App = AppBundleSchema & {
   status: AppRuntimeStatus;
 };
 
@@ -173,7 +177,7 @@ async function getAppByName(name: string) {
         pods.map((pod) => pod.status?.phase || APP_STATUS.UNKNOWN),
       );
 
-  const app = fromManifests({
+  const appBundle = fromManifests({
     deployment: deployment,
     ingress: ingress,
     service: service,
@@ -181,7 +185,7 @@ async function getAppByName(name: string) {
     additionalResources: additionalResources,
   });
   return {
-    ...app,
+    ...appBundle,
     status: {
       phase: appStatus,
       pods,
@@ -208,9 +212,9 @@ async function getAppByName(name: string) {
   } satisfies App;
 }
 
-export async function updateApp(app: AppSchema) {
-  const parsedApp = appSchema.parse(app);
-  const appDir = getAppDir(parsedApp.metadata.name);
+export async function updateApp(appBundle: AppBundleSchema) {
+  const parsedAppBundle = appBundleSchema.parse(appBundle);
+  const appDir = getAppDir(parsedAppBundle.app.metadata.name);
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
   const {
@@ -219,7 +223,7 @@ export async function updateApp(app: AppSchema) {
     service,
     namespace,
     additionalResources,
-  } = toManifests(parsedApp);
+  } = toBundleManifests(parsedAppBundle);
 
   const previousDeployment = await getFile({
     path: deploymentFilePath,
@@ -232,7 +236,7 @@ export async function updateApp(app: AppSchema) {
     ...updatedDeployment,
   } satisfies z.infer<typeof deploymentSchema>;
 
-  await writeResourcesToFileSystem(parsedApp.metadata.name, [
+  await writeResourcesToFileSystem(parsedAppBundle.app.metadata.name, [
     namespace,
     deployment,
     service,
@@ -241,8 +245,8 @@ export async function updateApp(app: AppSchema) {
   ]);
 
   await commitAndPushChanges(
-    parsedApp.metadata.name,
-    `Update app ${parsedApp.metadata.name}`,
+    parsedAppBundle.app.metadata.name,
+    `Update app ${parsedAppBundle.app.metadata.name}`,
   );
 
   return { success: true };
@@ -331,12 +335,12 @@ async function commitAndPushChanges(appName: string, message: string) {
   });
 }
 
-export async function createApp(app: AppSchema) {
-  const parsedApp = appSchema.parse(app);
+export async function createApp(appBundle: AppBundleSchema) {
+  const parsedAppBundle = appBundleSchema.parse(appBundle);
   const { deployment, ingress, service, namespace, additionalResources } =
-    toManifests(parsedApp);
+    toBundleManifests(parsedAppBundle);
 
-  await writeResourcesToFileSystem(parsedApp.metadata.name, [
+  await writeResourcesToFileSystem(parsedAppBundle.app.metadata.name, [
     namespace,
     deployment,
     service,
@@ -345,8 +349,8 @@ export async function createApp(app: AppSchema) {
   ]);
 
   await commitAndPushChanges(
-    parsedApp.metadata.name,
-    `Create app ${parsedApp.metadata.name}`,
+    parsedAppBundle.app.metadata.name,
+    `Create app ${parsedAppBundle.app.metadata.name}`,
   );
 
   return { success: true };

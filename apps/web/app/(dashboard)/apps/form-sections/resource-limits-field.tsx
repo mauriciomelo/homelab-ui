@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { ResourceField } from '@/components/resource-field';
 import { cpuConfig, memoryConfig } from '@/lib/resource-utils';
-import { AppSchema } from '@/app/api/schemas';
+import { AppBundleSchema } from '@/app/api/schemas';
 import { resourceLimitPreset } from '@/lib/resource-utils';
 
 type SizeKey = 'small' | 'medium' | 'large';
@@ -60,7 +60,7 @@ function isSizeKey(value: string): value is SizeKey {
 export function ResourceLimitsField({
   lens,
 }: {
-  lens: Lens<AppSchema['spec']['resources']>;
+  lens: Lens<AppBundleSchema['app']['spec']['resources']>;
 }) {
   const { control, name } = lens.interop();
   const resources = useWatch({ control, name });
@@ -68,7 +68,7 @@ export function ResourceLimitsField({
   const [selectedSize, setSelectedSize] = useState<SizeKey | 'custom'>(() =>
     detectSelectedSize(resources),
   );
-  const { errors } = useFormState<AppSchema>();
+  const { errors } = useFormState<AppBundleSchema>();
   const cpuInterop = lens.focus('limits').focus('cpu').interop();
   const memoryInterop = lens.focus('limits').focus('memory').interop();
 
@@ -144,7 +144,7 @@ export function ResourceLimitsField({
                         id="resource-limits-cpu"
                         value={field.value}
                         onChange={field.onChange}
-                         error={errors.spec?.resources?.limits?.cpu?.message}
+                         error={errors.app?.spec?.resources?.limits?.cpu?.message}
                         dataTestId="resource-limits-cpu-input"
                         config={cpuConfig}
                       />
@@ -167,7 +167,7 @@ export function ResourceLimitsField({
                         id="resource-limits-memory"
                         value={field.value}
                         onChange={field.onChange}
-                         error={errors.spec?.resources?.limits?.memory?.message}
+                         error={errors.app?.spec?.resources?.limits?.memory?.message}
                         dataTestId="resource-limits-memory-input"
                         config={memoryConfig}
                       />

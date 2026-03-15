@@ -21,10 +21,10 @@ import {
 } from '@/components/ui/tooltip';
 import { HelpCircle, Package } from 'lucide-react';
 import type { Lens } from '@hookform/lenses';
-import type { AppSchema } from '@/app/api/schemas';
+import type { AppBundleSchema } from '@/app/api/schemas';
 
 type AppBasicsSectionProps = {
-  lens: Lens<AppSchema>;
+  lens: Lens<AppBundleSchema['app']>;
   mode: 'edit' | 'create';
 };
 

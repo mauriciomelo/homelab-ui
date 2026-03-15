@@ -347,7 +347,7 @@ describe('Devices Page', () => {
     });
 
     const appOnAlpha = produce(baseApp, (draft) => {
-      draft.metadata.name = 'app-alpha';
+      draft.app.metadata.name = 'app-alpha';
             draft.status.pods = [
         {
           name: undefined,
@@ -369,7 +369,7 @@ describe('Devices Page', () => {
     });
 
     const appOnBeta = produce(baseApp, (draft) => {
-      draft.metadata.name = 'app-beta';
+      draft.app.metadata.name = 'app-beta';
             draft.status.pods = [
         {
           name: undefined,
@@ -427,7 +427,7 @@ describe('Devices Page', () => {
     });
 
     const appOnAlpha = produce(baseApp, (draft) => {
-      draft.metadata.name = 'app-alpha';
+      draft.app.metadata.name = 'app-alpha';
             draft.status.pods = [
         {
           name: undefined,

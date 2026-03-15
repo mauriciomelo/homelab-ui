@@ -6,6 +6,7 @@ import YAML from 'yaml';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import git, { PushResult } from 'isomorphic-git';
 import {
+  AppBundleSchema,
   AppSchema,
   authClientSchema,
   deploymentSchema,
@@ -33,6 +34,16 @@ import z from 'zod';
 
 const gotkSyncPath =
   '/test-project/clusters/my-cluster/flux-system/gotk-sync.yaml';
+
+function createBundle(
+  app: AppSchema,
+  additionalResources: AppBundleSchema['additionalResources'] = [],
+): AppBundleSchema {
+  return {
+    app,
+    additionalResources,
+  };
+}
 
 vi.mock('server-only', () => ({}));
 
@@ -154,7 +165,7 @@ describe('updateApp', () => {
       },
     } satisfies AppSchema;
 
-    await expect(updateApp(newSpec)).resolves.toEqual({
+    await expect(updateApp(createBundle(newSpec))).resolves.toEqual({
       success: true,
     });
 
@@ -246,10 +257,9 @@ describe('updateApp', () => {
       draft.spec.ports = [{ name: 'http', containerPort: 80 }];
       draft.spec.envVariables = [];
       draft.spec.ingress = { port: { name: 'http' } };
-      draft.spec.additionalResources = [pvc];
     });
 
-    await updateApp(newSpec);
+    await updateApp(createBundle(newSpec, [pvc]));
 
     const { data: updatedKustomization } = await getFile({
       path: '/test-project/clusters/my-cluster/my-applications/test-app/kustomization.yaml',
@@ -279,27 +289,29 @@ describe('createApp', () => {
     const memory = '256Mi';
     const replicas = 1;
 
-    await createApp({
-      apiVersion: 'tesselar.io/v1alpha1',
-      kind: 'App',
-      metadata: {
-        name: appName,
-      },
-      spec: {
-        image,
-        ports: [{ name: 'http', containerPort: 80 }],
-        envVariables: [],
-        resources: {
-          limits: { cpu, memory },
+    await createApp(
+      createBundle({
+        apiVersion: 'tesselar.io/v1alpha1',
+        kind: 'App',
+        metadata: {
+          name: appName,
         },
-        ingress: { port: { name: 'http' } },
-      },
-    });
+        spec: {
+          image,
+          ports: [{ name: 'http', containerPort: 80 }],
+          envVariables: [],
+          resources: {
+            limits: { cpu, memory },
+          },
+          ingress: { port: { name: 'http' } },
+        },
+      }),
+    );
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.metadata.name === appName);
+    const createdApp = apps.find((app) => app.app.metadata.name === appName);
     expect(createdApp).toBeDefined();
-    expect(createdApp?.spec.image).toBe(image);
+    expect(createdApp?.app.spec.image).toBe(image);
     expect(createdApp?.status.deployment.spec.replicas).toBe(replicas);
   });
 
@@ -307,22 +319,24 @@ describe('createApp', () => {
     const appName = 'custom-port-app';
     const customPort = 8080;
 
-    await createApp({
-      apiVersion: 'tesselar.io/v1alpha1',
-      kind: 'App',
-      metadata: {
-        name: appName,
-      },
-      spec: {
-        image: 'my-app:latest',
-        ports: [{ name: 'http', containerPort: customPort }],
-        envVariables: [],
-        resources: {
-          limits: { cpu: '1', memory: '1Gi' },
+    await createApp(
+      createBundle({
+        apiVersion: 'tesselar.io/v1alpha1',
+        kind: 'App',
+        metadata: {
+          name: appName,
         },
-        ingress: { port: { name: 'http' } },
-      },
-    });
+        spec: {
+          image: 'my-app:latest',
+          ports: [{ name: 'http', containerPort: customPort }],
+          envVariables: [],
+          resources: {
+            limits: { cpu: '1', memory: '1Gi' },
+          },
+          ingress: { port: { name: 'http' } },
+        },
+      }),
+    );
 
     const { data: ingress } = await getFile({
       path: '/test-project/clusters/my-cluster/my-applications/custom-port-app/ingress.yaml',
@@ -343,7 +357,7 @@ describe('createApp', () => {
       draft.spec.ingress = { port: { name: 'http' } };
     });
 
-    await createApp(app);
+    await createApp(createBundle(app));
 
     const { data: deployment } = await getFile({
       path: `/test-project/clusters/my-cluster/my-applications/${appName}/deployment.yaml`,
@@ -377,7 +391,7 @@ describe('createApp', () => {
       draft.metadata.labels = { name: appName };
     });
 
-    await createApp(app);
+    await createApp(createBundle(app));
 
     const { data: service } = await getFile({
       path: `/test-project/clusters/my-cluster/my-applications/${appName}/service.yaml`,
@@ -409,7 +423,7 @@ describe('createApp', () => {
       };
     });
 
-    await createApp(app);
+    await createApp(createBundle(app));
 
     const { data: deployment } = await getFile({
       path: `/test-project/clusters/my-cluster/my-applications/${appName}/deployment.yaml`,
@@ -456,10 +470,10 @@ describe('createApp', () => {
       };
     });
 
-    await expect(createApp(app)).rejects.toMatchObject({
+    await expect(createApp(createBundle(app))).rejects.toMatchObject({
       issues: [
         {
-          path: ['spec', 'health', 'check', 'port'],
+          path: ['app', 'spec', 'health', 'check', 'port'],
           message:
             'Health check port must reference a port in the defined ports list',
         },
@@ -482,10 +496,9 @@ describe('createApp', () => {
 
     const app = produce(baseAppManifest, (draft) => {
       draft.metadata.name = appName;
-      draft.spec.additionalResources = [expectedAuthClient];
     });
 
-    await createApp(app);
+    await createApp(createBundle(app, [expectedAuthClient]));
 
     const { data: persistedAuthClient } = await getFile({
       path: `/test-project/clusters/my-cluster/my-applications/${appName}/myauthclient.authclient.yaml`,
@@ -495,9 +508,11 @@ describe('createApp', () => {
     expect(persistedAuthClient).toEqual(expectedAuthClient);
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.metadata.name === app.metadata.name);
+    const createdApp = apps.find(
+      (resource) => resource.app.metadata.name === app.metadata.name,
+    );
 
-    expect(createdApp?.spec.additionalResources).toEqual([expectedAuthClient]);
+    expect(createdApp?.additionalResources).toEqual([expectedAuthClient]);
   });
 
   it('creates persistent volume resources', async () => {
@@ -513,10 +528,9 @@ describe('createApp', () => {
 
     const app = produce(baseAppManifest, (draft) => {
       draft.metadata.name = appName;
-      draft.spec.additionalResources = [expectedPersistentVolumeClaim];
     });
 
-    await createApp(app);
+    await createApp(createBundle(app, [expectedPersistentVolumeClaim]));
 
     const { data: persistedPersistentVolumeClaim } = await getFile({
       path: `/test-project/clusters/my-cluster/my-applications/${appName}/app-data.persistentvolumeclaim.yaml`,
@@ -528,9 +542,9 @@ describe('createApp', () => {
     );
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.metadata.name === appName);
+    const createdApp = apps.find((app) => app.app.metadata.name === appName);
 
-    expect(createdApp?.spec.additionalResources).toEqual([
+    expect(createdApp?.additionalResources).toEqual([
       expectedPersistentVolumeClaim,
     ]);
   });
@@ -548,7 +562,6 @@ describe('createApp', () => {
 
     const app = produce(baseAppManifest, (draft) => {
       draft.metadata.name = appName;
-      draft.spec.additionalResources = [expectedPersistentVolumeClaim];
       draft.spec.envVariables = [];
       draft.spec.volumeMounts = [
         {
@@ -558,26 +571,25 @@ describe('createApp', () => {
       ];
     });
 
-    await createApp(app);
+    await createApp(createBundle(app, [expectedPersistentVolumeClaim]));
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.metadata.name === appName);
+    const createdApp = apps.find((app) => app.app.metadata.name === appName);
 
-    expect(createdApp?.spec.volumeMounts).toEqual(app.spec.volumeMounts);
+    expect(createdApp?.app.spec.volumeMounts).toEqual(app.spec.volumeMounts);
   });
 
   it('rejects volume mounts without matching persistent volumes', async () => {
     const app = produce(baseAppManifest, (draft) => {
       draft.metadata.name = 'invalid-volume-app';
-      draft.spec.additionalResources = [];
       draft.spec.envVariables = [];
       draft.spec.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
     });
 
-    await expect(createApp(app)).rejects.toMatchObject({
+    await expect(createApp(createBundle(app))).rejects.toMatchObject({
       issues: [
         {
-          path: ['spec', 'volumeMounts', 0, 'name'],
+          path: ['app', 'spec', 'volumeMounts', 0, 'name'],
           message: 'Volume mount must reference a persistent volume',
         },
       ],
@@ -645,12 +657,12 @@ describe('getApps', () => {
     const apps = await getApps();
 
     expect(apps).toHaveLength(2);
-    expect(apps[0].metadata.name).toBe('app1');
-    expect(apps[0].spec.image).toBe('nginx:latest');
+    expect(apps[0].app.metadata.name).toBe('app1');
+    expect(apps[0].app.spec.image).toBe('nginx:latest');
     expect(apps[0].status.phase).toBe(APP_STATUS.RUNNING);
 
-    expect(apps[1].metadata.name).toBe('app2');
-    expect(apps[1].spec.image).toBe('redis:7');
+    expect(apps[1].app.metadata.name).toBe('app2');
+    expect(apps[1].app.spec.image).toBe('redis:7');
     expect(apps[1].status.phase).toBe(APP_STATUS.RUNNING);
   });
 
@@ -664,17 +676,16 @@ describe('getApps', () => {
         limits: { cpu: '100m', memory: '256Mi' },
       };
       draft.spec.ingress = { port: { name: 'http' } };
-      draft.spec.additionalResources = [];
     }) satisfies AppSchema;
 
-    await createApp(expectedSpec);
+    await createApp(createBundle(expectedSpec));
 
     const apps = await getApps();
     const createdApp = apps.find(
-      (app) => app.metadata.name === expectedSpec.metadata.name,
+      (app) => app.app.metadata.name === expectedSpec.metadata.name,
     );
     expect(createdApp).toBeDefined();
-    expect(createdApp).toMatchObject(expectedSpec);
+    expect(createdApp?.app).toMatchObject(expectedSpec);
   });
 });
 

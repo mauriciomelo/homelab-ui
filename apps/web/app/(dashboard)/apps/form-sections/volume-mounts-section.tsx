@@ -18,11 +18,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import type { AppSchema, PersistentVolumeClaimSchema } from '@/app/api/schemas';
+import type { AppBundleSchema, PersistentVolumeClaimSchema } from '@/app/api/schemas';
 
 type VolumeMountsSectionProps = {
-  volumeMountsLens: Lens<AppSchema['spec']['volumeMounts']>;
-  volumeMountFields: FieldArrayWithId<AppSchema, 'spec.volumeMounts', 'id'>[];
+  volumeMountsLens: Lens<AppBundleSchema['app']['spec']['volumeMounts']>;
+  volumeMountFields: FieldArrayWithId<AppBundleSchema, 'app.spec.volumeMounts', 'id'>[];
   persistentVolumeClaims: PersistentVolumeClaimSchema[];
   onAdd: () => void;
   onRemove: (index: number) => void;

@@ -26,10 +26,10 @@ import { Link2, Plus, Shield, Trash2, Unlink2 } from 'lucide-react';
 import type { Lens } from '@hookform/lenses';
 import { useController, useWatch } from 'react-hook-form';
 import type { FieldArrayWithId } from 'react-hook-form';
-import { deriveResourceReferences, type AppSchema } from '@/app/api/schemas';
+import { deriveResourceReferences, type AppBundleSchema } from '@/app/api/schemas';
 import { cn } from '@/lib/utils';
 
-type EnvVariable = AppSchema['spec']['envVariables'][number];
+type EnvVariable = AppBundleSchema['app']['spec']['envVariables'][number];
 const authClientKeys = ['client-id', 'client-secret'] as const;
 type AuthClientKey = (typeof authClientKeys)[number];
 type AuthClientReference = ReturnType<typeof deriveResourceReferences>[number];
@@ -59,8 +59,8 @@ type AuthClientLinkMenuProps = {
 };
 
 type UseAuthClientEnvLinksArgs = {
-  envVariablesLens: Lens<AppSchema['spec']['envVariables']>;
-  additionalResourcesLens: Lens<AppSchema['spec']['additionalResources']>;
+  envVariablesLens: Lens<AppBundleSchema['app']['spec']['envVariables']>;
+  additionalResourcesLens: Lens<AppBundleSchema['additionalResources']>;
 };
 
 const authClientKeyLabels = {
@@ -286,9 +286,9 @@ function AuthClientLinkMenu({
 }
 
 type EnvironmentVariablesSectionProps = {
-  envVariablesLens: Lens<AppSchema['spec']['envVariables']>;
-  additionalResourcesLens: Lens<AppSchema['spec']['additionalResources']>;
-  fields: FieldArrayWithId<AppSchema, 'spec.envVariables', 'id'>[];
+  envVariablesLens: Lens<AppBundleSchema['app']['spec']['envVariables']>;
+  additionalResourcesLens: Lens<AppBundleSchema['additionalResources']>;
+  fields: FieldArrayWithId<AppBundleSchema, 'app.spec.envVariables', 'id'>[];
   onAdd: () => void;
   onRemove: (index: number) => void;
 };
