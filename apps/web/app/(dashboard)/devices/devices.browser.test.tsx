@@ -347,9 +347,8 @@ describe('Devices Page', () => {
     });
 
     const appOnAlpha = produce(baseApp, (draft) => {
-      draft.spec.name = 'app-alpha';
-      draft.iconUrl = 'https://cdn.simpleicons.org/docker';
-      draft.pods = [
+      draft.metadata.name = 'app-alpha';
+            draft.status.pods = [
         {
           name: undefined,
           metadata: {
@@ -370,9 +369,8 @@ describe('Devices Page', () => {
     });
 
     const appOnBeta = produce(baseApp, (draft) => {
-      draft.spec.name = 'app-beta';
-      draft.iconUrl = 'https://cdn.simpleicons.org/ubuntu';
-      draft.pods = [
+      draft.metadata.name = 'app-beta';
+            draft.status.pods = [
         {
           name: undefined,
           metadata: {
@@ -429,9 +427,8 @@ describe('Devices Page', () => {
     });
 
     const appOnAlpha = produce(baseApp, (draft) => {
-      draft.spec.name = 'app-alpha';
-      draft.iconUrl = 'https://cdn.simpleicons.org/docker';
-      draft.pods = [
+      draft.metadata.name = 'app-alpha';
+            draft.status.pods = [
         {
           name: undefined,
           metadata: {

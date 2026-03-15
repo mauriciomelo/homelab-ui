@@ -60,7 +60,7 @@ function isSizeKey(value: string): value is SizeKey {
 export function ResourceLimitsField({
   lens,
 }: {
-  lens: Lens<AppSchema['resources']>;
+  lens: Lens<AppSchema['spec']['resources']>;
 }) {
   const { control, name } = lens.interop();
   const resources = useWatch({ control, name });
@@ -144,7 +144,7 @@ export function ResourceLimitsField({
                         id="resource-limits-cpu"
                         value={field.value}
                         onChange={field.onChange}
-                        error={errors.resources?.limits?.cpu?.message}
+                         error={errors.spec?.resources?.limits?.cpu?.message}
                         dataTestId="resource-limits-cpu-input"
                         config={cpuConfig}
                       />
@@ -167,7 +167,7 @@ export function ResourceLimitsField({
                         id="resource-limits-memory"
                         value={field.value}
                         onChange={field.onChange}
-                        error={errors.resources?.limits?.memory?.message}
+                         error={errors.spec?.resources?.limits?.memory?.message}
                         dataTestId="resource-limits-memory-input"
                         config={memoryConfig}
                       />

@@ -21,8 +21,8 @@ import { cn } from '@/lib/utils';
 import type { AppSchema, PersistentVolumeClaimSchema } from '@/app/api/schemas';
 
 type VolumeMountsSectionProps = {
-  volumeMountsLens: Lens<AppSchema['volumeMounts']>;
-  volumeMountFields: FieldArrayWithId<AppSchema, 'volumeMounts', 'id'>[];
+  volumeMountsLens: Lens<AppSchema['spec']['volumeMounts']>;
+  volumeMountFields: FieldArrayWithId<AppSchema, 'spec.volumeMounts', 'id'>[];
   persistentVolumeClaims: PersistentVolumeClaimSchema[];
   onAdd: () => void;
   onRemove: (index: number) => void;

@@ -10,7 +10,7 @@ vi.mock('server-only', () => ({}));
 describe('app-form-sheet visual', () => {
   test('renders a full-featured app edit sheet', async () => {
     const fullFeaturedApp = produce(baseApp, (app) => {
-      app.spec.name = 'openwebui';
+      app.metadata.name = 'openwebui';
       app.spec.image = 'ghcr.io/open-webui/open-webui:main';
       app.spec.ports = [
         { name: 'web', containerPort: 8080 },
@@ -89,7 +89,7 @@ describe('app-form-sheet visual', () => {
         open
         mode="edit"
         selectedApp={fullFeaturedApp}
-        selectedAppName={fullFeaturedApp.spec.name}
+        selectedAppName={fullFeaturedApp.metadata.name}
         onOpenChange={() => {}}
       />,
     );

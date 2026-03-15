@@ -82,7 +82,7 @@ type DevicesProps = {
 
 function nodeApps(apps: App[], nodeName: string) {
   return apps.filter((app) =>
-    app.pods.some((pod) => pod.spec.nodeName === nodeName),
+    app.status.pods.some((pod) => pod.spec.nodeName === nodeName),
   );
 }
 
@@ -94,7 +94,7 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   );
 
   const transitions = useTransition(items, {
-    keys: (item) => item.spec.name,
+    keys: (item) => item.metadata.name,
     from: { opacity: 0, scale: 0 },
     enter: { opacity: 1, scale: 1 },
     leave: { opacity: 0, scale: 0 },
@@ -110,11 +110,11 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
               <AppIcon app={item} />
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem
-                onClick={() =>
-                  restartAppMutation.mutate({ name: item.spec.name })
-                }
-              >
+                <ContextMenuItem
+                  onClick={() =>
+                    restartAppMutation.mutate({ name: item.metadata.name })
+                  }
+                >
                 Restart App
               </ContextMenuItem>
             </ContextMenuContent>

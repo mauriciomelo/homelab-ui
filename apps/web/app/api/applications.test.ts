@@ -17,7 +17,7 @@ import {
 } from './schemas';
 import { setupMockGitRepo } from '../../test-utils';
 import {
-  baseApp,
+  baseAppManifest,
   baseDeployment,
   baseIngress,
   baseKustomization,
@@ -137,16 +137,22 @@ describe('updateApp', () => {
     });
 
     const newSpec = {
-      name: appName,
-      image: 'new-image:2.0',
-      ports: [{ name: 'http', containerPort: 80 }],
-      envVariables: [
-        { name: 'API_KEY', value: 'secret-key' },
-        { name: 'DEBUG', value: 'true' },
-      ],
-      resources: currentDeployment.spec.template.spec.containers[0].resources,
-      ingress: { port: { name: 'http' } },
-    } satisfies Partial<AppSchema>;
+      apiVersion: 'tesselar.io/v1alpha1',
+      kind: 'App',
+      metadata: {
+        name: appName,
+      },
+      spec: {
+        image: 'new-image:2.0',
+        ports: [{ name: 'http', containerPort: 80 }],
+        envVariables: [
+          { name: 'API_KEY', value: 'secret-key' },
+          { name: 'DEBUG', value: 'true' },
+        ],
+        resources: currentDeployment.spec.template.spec.containers[0].resources,
+        ingress: { port: { name: 'http' } },
+      },
+    } satisfies AppSchema;
 
     await expect(updateApp(newSpec)).resolves.toEqual({
       success: true,
@@ -234,13 +240,13 @@ describe('updateApp', () => {
       fs,
     });
 
-    const newSpec = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.image = 'new-image:2.0';
-      draft.ports = [{ name: 'http', containerPort: 80 }];
-      draft.envVariables = [];
-      draft.ingress = { port: { name: 'http' } };
-      draft.additionalResources = [pvc];
+    const newSpec = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.image = 'new-image:2.0';
+      draft.spec.ports = [{ name: 'http', containerPort: 80 }];
+      draft.spec.envVariables = [];
+      draft.spec.ingress = { port: { name: 'http' } };
+      draft.spec.additionalResources = [pvc];
     });
 
     await updateApp(newSpec);
@@ -274,21 +280,27 @@ describe('createApp', () => {
     const replicas = 1;
 
     await createApp({
-      name: appName,
-      image,
-      ports: [{ name: 'http', containerPort: 80 }],
-      envVariables: [],
-      resources: {
-        limits: { cpu, memory },
+      apiVersion: 'tesselar.io/v1alpha1',
+      kind: 'App',
+      metadata: {
+        name: appName,
       },
-      ingress: { port: { name: 'http' } },
+      spec: {
+        image,
+        ports: [{ name: 'http', containerPort: 80 }],
+        envVariables: [],
+        resources: {
+          limits: { cpu, memory },
+        },
+        ingress: { port: { name: 'http' } },
+      },
     });
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === appName);
+    const createdApp = apps.find((app) => app.metadata.name === appName);
     expect(createdApp).toBeDefined();
     expect(createdApp?.spec.image).toBe(image);
-    expect(createdApp?.deployment.spec.replicas).toBe(replicas);
+    expect(createdApp?.status.deployment.spec.replicas).toBe(replicas);
   });
 
   it('creates ingress with custom port', async () => {
@@ -296,14 +308,20 @@ describe('createApp', () => {
     const customPort = 8080;
 
     await createApp({
-      name: appName,
-      image: 'my-app:latest',
-      ports: [{ name: 'http', containerPort: customPort }],
-      envVariables: [],
-      resources: {
-        limits: { cpu: '1', memory: '1Gi' },
+      apiVersion: 'tesselar.io/v1alpha1',
+      kind: 'App',
+      metadata: {
+        name: appName,
       },
-      ingress: { port: { name: 'http' } },
+      spec: {
+        image: 'my-app:latest',
+        ports: [{ name: 'http', containerPort: customPort }],
+        envVariables: [],
+        resources: {
+          limits: { cpu: '1', memory: '1Gi' },
+        },
+        ingress: { port: { name: 'http' } },
+      },
     });
 
     const { data: ingress } = await getFile({
@@ -319,10 +337,10 @@ describe('createApp', () => {
   it('defaults deployments to recreate strategy', async () => {
     const appName = 'recreate-app';
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.ports = [{ name: 'http', containerPort: 8080 }];
-      draft.ingress = { port: { name: 'http' } };
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.ports = [{ name: 'http', containerPort: 8080 }];
+      draft.spec.ingress = { port: { name: 'http' } };
     });
 
     await createApp(app);
@@ -339,11 +357,11 @@ describe('createApp', () => {
     const appName = 'required-resources-app';
     const port = 8080;
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.ports = [{ name: 'http', containerPort: port }];
-      draft.envVariables = [];
-      draft.ingress = { port: { name: 'http' } };
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.ports = [{ name: 'http', containerPort: port }];
+      draft.spec.envVariables = [];
+      draft.spec.ingress = { port: { name: 'http' } };
     });
 
     const expectedService = produce(baseService, (draft) => {
@@ -378,11 +396,11 @@ describe('createApp', () => {
   it('adds default health probes', async () => {
     const appName = 'health-probe-app';
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.ports = [{ name: 'http', containerPort: 8080 }];
-      draft.ingress = { port: { name: 'http' } };
-      draft.health = {
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.ports = [{ name: 'http', containerPort: 8080 }];
+      draft.spec.ingress = { port: { name: 'http' } };
+      draft.spec.health = {
         check: {
           type: 'httpGet',
           path: '/',
@@ -426,10 +444,10 @@ describe('createApp', () => {
   });
 
   it('rejects health check ports outside defined ports', async () => {
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = 'invalid-health-port-app';
-      draft.ports = [{ name: 'http', containerPort: 8080 }];
-      draft.health = {
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = 'invalid-health-port-app';
+      draft.spec.ports = [{ name: 'http', containerPort: 8080 }];
+      draft.spec.health = {
         check: {
           type: 'httpGet',
           path: '/',
@@ -441,7 +459,7 @@ describe('createApp', () => {
     await expect(createApp(app)).rejects.toMatchObject({
       issues: [
         {
-          path: ['health', 'check', 'port'],
+          path: ['spec', 'health', 'check', 'port'],
           message:
             'Health check port must reference a port in the defined ports list',
         },
@@ -462,9 +480,9 @@ describe('createApp', () => {
 
     const appName = 'myapp';
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.additionalResources = [expectedAuthClient];
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.additionalResources = [expectedAuthClient];
     });
 
     await createApp(app);
@@ -477,7 +495,7 @@ describe('createApp', () => {
     expect(persistedAuthClient).toEqual(expectedAuthClient);
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === app.spec.name);
+    const createdApp = apps.find((app) => app.metadata.name === app.metadata.name);
 
     expect(createdApp?.spec.additionalResources).toEqual([expectedAuthClient]);
   });
@@ -493,9 +511,9 @@ describe('createApp', () => {
 
     const appName = 'storage-app';
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.additionalResources = [expectedPersistentVolumeClaim];
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.additionalResources = [expectedPersistentVolumeClaim];
     });
 
     await createApp(app);
@@ -510,7 +528,7 @@ describe('createApp', () => {
     );
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === appName);
+    const createdApp = apps.find((app) => app.metadata.name === appName);
 
     expect(createdApp?.spec.additionalResources).toEqual([
       expectedPersistentVolumeClaim,
@@ -528,11 +546,11 @@ describe('createApp', () => {
 
     const appName = 'volume-app';
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.additionalResources = [expectedPersistentVolumeClaim];
-      draft.envVariables = [];
-      draft.volumeMounts = [
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.additionalResources = [expectedPersistentVolumeClaim];
+      draft.spec.envVariables = [];
+      draft.spec.volumeMounts = [
         {
           mountPath: '/data',
           name: expectedPersistentVolumeClaim.metadata.name,
@@ -543,23 +561,23 @@ describe('createApp', () => {
     await createApp(app);
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === appName);
+    const createdApp = apps.find((app) => app.metadata.name === appName);
 
-    expect(createdApp?.spec.volumeMounts).toEqual(app.volumeMounts);
+    expect(createdApp?.spec.volumeMounts).toEqual(app.spec.volumeMounts);
   });
 
   it('rejects volume mounts without matching persistent volumes', async () => {
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = 'invalid-volume-app';
-      draft.additionalResources = [];
-      draft.envVariables = [];
-      draft.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = 'invalid-volume-app';
+      draft.spec.additionalResources = [];
+      draft.spec.envVariables = [];
+      draft.spec.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
     });
 
     await expect(createApp(app)).rejects.toMatchObject({
       issues: [
         {
-          path: ['volumeMounts', 0, 'name'],
+          path: ['spec', 'volumeMounts', 0, 'name'],
           message: 'Volume mount must reference a persistent volume',
         },
       ],
@@ -627,36 +645,36 @@ describe('getApps', () => {
     const apps = await getApps();
 
     expect(apps).toHaveLength(2);
-    expect(apps[0].spec.name).toBe('app1');
+    expect(apps[0].metadata.name).toBe('app1');
     expect(apps[0].spec.image).toBe('nginx:latest');
-    expect(apps[0].status).toBe(APP_STATUS.RUNNING);
-    expect(apps[0].link).toBe('https://app1.local');
+    expect(apps[0].status.phase).toBe(APP_STATUS.RUNNING);
 
-    expect(apps[1].spec.name).toBe('app2');
+    expect(apps[1].metadata.name).toBe('app2');
     expect(apps[1].spec.image).toBe('redis:7');
-    expect(apps[1].status).toBe(APP_STATUS.RUNNING);
-    expect(apps[1].link).toBe('https://app2.local');
+    expect(apps[1].status.phase).toBe(APP_STATUS.RUNNING);
   });
 
   it('correctly transforms the spec to files and back ', async () => {
-    const expectedSpec = produce(baseApp.spec, (draft) => {
-      draft.name = 'homeassistant';
-      draft.image = 'homeassistant/home-assistant:stable';
-      draft.ports = [{ name: 'http', containerPort: 8081 }];
-      draft.envVariables = [];
-      draft.resources = {
+    const expectedSpec = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = 'homeassistant';
+      draft.spec.image = 'homeassistant/home-assistant:stable';
+      draft.spec.ports = [{ name: 'http', containerPort: 8081 }];
+      draft.spec.envVariables = [];
+      draft.spec.resources = {
         limits: { cpu: '100m', memory: '256Mi' },
       };
-      draft.ingress = { port: { name: 'http' } };
-      draft.additionalResources = [];
+      draft.spec.ingress = { port: { name: 'http' } };
+      draft.spec.additionalResources = [];
     }) satisfies AppSchema;
 
     await createApp(expectedSpec);
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === expectedSpec.name);
+    const createdApp = apps.find(
+      (app) => app.metadata.name === expectedSpec.metadata.name,
+    );
     expect(createdApp).toBeDefined();
-    expect(createdApp?.spec).toEqual(expectedSpec);
+    expect(createdApp).toMatchObject(expectedSpec);
   });
 });
 

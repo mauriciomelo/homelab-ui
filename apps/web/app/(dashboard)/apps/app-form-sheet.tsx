@@ -33,7 +33,7 @@ export function AppFormSheet({
   selectedAppName,
   onOpenChange,
 }: AppFormSheetProps) {
-  const formData: AppSchema = selectedApp?.spec ?? defaultAppData;
+  const formData: AppSchema = selectedApp ?? defaultAppData;
   const formIdentity = `${mode}-${selectedAppName ?? 'new'}`;
 
   const form = useApplicationForm({
@@ -64,7 +64,7 @@ export function AppFormSheet({
               <SheetTitle>
                 {mode === 'create'
                   ? 'Create New App'
-                  : (selectedApp?.spec.name ?? selectedAppName)}
+                  : (selectedApp?.metadata.name ?? selectedAppName)}
               </SheetTitle>
               <SheetDescription>
                 {mode === 'create'

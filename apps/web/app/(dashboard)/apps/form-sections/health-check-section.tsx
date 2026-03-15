@@ -26,8 +26,8 @@ import { useController, useWatch } from 'react-hook-form';
 import { Switch } from '@/components/ui/switch';
 
 type HealthCheckSectionProps = {
-  healthLens: Lens<AppSchema['health']>;
-  ports: AppSchema['ports'];
+  healthLens: Lens<AppSchema['spec']['health']>;
+  ports: AppSchema['spec']['ports'];
 };
 
 export function HealthCheckSection({
@@ -48,7 +48,7 @@ export function HealthCheckSection({
       return;
     }
 
-    field.onChange(defaultAppData.health);
+    field.onChange(defaultAppData.spec.health);
   };
 
   return (

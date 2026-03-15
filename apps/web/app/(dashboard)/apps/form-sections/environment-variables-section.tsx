@@ -29,7 +29,7 @@ import type { FieldArrayWithId } from 'react-hook-form';
 import { deriveResourceReferences, type AppSchema } from '@/app/api/schemas';
 import { cn } from '@/lib/utils';
 
-type EnvVariable = AppSchema['envVariables'][number];
+type EnvVariable = AppSchema['spec']['envVariables'][number];
 const authClientKeys = ['client-id', 'client-secret'] as const;
 type AuthClientKey = (typeof authClientKeys)[number];
 type AuthClientReference = ReturnType<typeof deriveResourceReferences>[number];
@@ -59,8 +59,8 @@ type AuthClientLinkMenuProps = {
 };
 
 type UseAuthClientEnvLinksArgs = {
-  envVariablesLens: Lens<AppSchema['envVariables']>;
-  additionalResourcesLens: Lens<AppSchema['additionalResources']>;
+  envVariablesLens: Lens<AppSchema['spec']['envVariables']>;
+  additionalResourcesLens: Lens<AppSchema['spec']['additionalResources']>;
 };
 
 const authClientKeyLabels = {
@@ -286,9 +286,9 @@ function AuthClientLinkMenu({
 }
 
 type EnvironmentVariablesSectionProps = {
-  envVariablesLens: Lens<AppSchema['envVariables']>;
-  additionalResourcesLens: Lens<AppSchema['additionalResources']>;
-  fields: FieldArrayWithId<AppSchema, 'envVariables', 'id'>[];
+  envVariablesLens: Lens<AppSchema['spec']['envVariables']>;
+  additionalResourcesLens: Lens<AppSchema['spec']['additionalResources']>;
+  fields: FieldArrayWithId<AppSchema, 'spec.envVariables', 'id'>[];
   onAdd: () => void;
   onRemove: (index: number) => void;
 };

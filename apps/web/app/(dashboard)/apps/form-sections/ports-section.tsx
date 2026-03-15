@@ -26,9 +26,9 @@ import type { AppSchema } from '@/app/api/schemas';
 import { useWatch } from 'react-hook-form';
 
 type PortsSectionProps = {
-  portsLens: Lens<AppSchema['ports']>;
-  ingressLens: Lens<AppSchema['ingress']>;
-  fields: FieldArrayWithId<AppSchema, 'ports', 'id'>[];
+  portsLens: Lens<AppSchema['spec']['ports']>;
+  ingressLens: Lens<AppSchema['spec']['ingress']>;
+  fields: FieldArrayWithId<AppSchema, 'spec.ports', 'id'>[];
   onAdd: () => void;
   onRemove: (index: number) => void;
   setValue: UseFormSetValue<AppSchema>;
@@ -128,12 +128,12 @@ export function PortsSection({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        if (currentPortName) {
-                          setValue('ingress.port.name', currentPortName);
-                        }
-                      }}
+                        size="icon"
+                        onClick={() => {
+                          if (currentPortName) {
+                            setValue('spec.ingress.port.name', currentPortName);
+                          }
+                        }}
                       className={cn(
                         'h-8 w-8 transition-colors',
                         isWebPort

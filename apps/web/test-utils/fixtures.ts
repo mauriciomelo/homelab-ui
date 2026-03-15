@@ -1,6 +1,7 @@
 import type { App } from '@/app/api/applications';
 import { APP_STATUS } from '@/app/constants';
 import {
+  appSchema,
   deploymentSchema,
   ingressSchema,
   kustomizationSchema,
@@ -10,27 +11,35 @@ import {
 } from '@/app/api/schemas';
 import z from 'zod';
 
-export const baseApp: App = Object.freeze({
-  link: 'apps/my-app',
-  spec: {
+export const baseAppManifest: z.infer<typeof appSchema> = Object.freeze({
+  apiVersion: 'tesselar.io/v1alpha1',
+  kind: 'App',
+  metadata: {
     name: 'my-app',
+  },
+  spec: {
     image: 'postgres:16',
     ports: [{ name: 'http', containerPort: 80 }],
     envVariables: [{ name: 'DB_NAME', value: 'production' }],
     resources: { limits: { cpu: '1000m', memory: '1Gi' } },
     ingress: { port: { name: 'http' } },
   },
-  status: APP_STATUS.RUNNING,
-  pods: [],
-  iconUrl: 'https://cdn.simpleicons.org/my-app',
-  deployment: {
-    spec: { replicas: 1 },
-    status: {
-      availableReplicas: 1,
-      replicas: 1,
-      readyReplicas: 1,
-      updatedReplicas: 1,
-      conditions: [],
+});
+
+export const baseApp: App = Object.freeze({
+  ...baseAppManifest,
+  status: {
+    phase: APP_STATUS.RUNNING,
+    pods: [],
+    deployment: {
+      spec: { replicas: 1 },
+      status: {
+        availableReplicas: 1,
+        replicas: 1,
+        readyReplicas: 1,
+        updatedReplicas: 1,
+        conditions: [],
+      },
     },
   },
 });

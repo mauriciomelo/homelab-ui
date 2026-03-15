@@ -6,7 +6,11 @@ import {
   test,
   orpcJsonResponse,
 } from '@/test-utils/browser';
-import { baseApp, basePersistentVolumeClaim } from '@/test-utils/fixtures';
+import {
+  baseApp,
+  baseAppManifest,
+  basePersistentVolumeClaim,
+} from '@/test-utils/fixtures';
 import { produce } from 'immer';
 import { Apps } from './apps';
 import { page } from 'vitest/browser';
@@ -34,10 +38,10 @@ describe('Apps Page', () => {
       http.post('*/api/control-plane/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
-            app.spec.name = 'myapp';
+            app.metadata.name = 'myapp';
           }),
           produce(baseApp, (app) => {
-            app.spec.name = 'homeassistant';
+            app.metadata.name = 'homeassistant';
           }),
         ]);
       }),
@@ -65,10 +69,10 @@ describe('Apps Page', () => {
       http.post('*/api/control-plane/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
-            app.spec.name = 'myapp';
+            app.metadata.name = 'myapp';
           }),
           produce(baseApp, (app) => {
-            app.spec.name = 'homeassistant';
+            app.metadata.name = 'homeassistant';
           }),
         ]);
       }),
@@ -87,7 +91,7 @@ describe('Apps Page', () => {
       http.post('*/api/control-plane/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
-            app.spec.name = 'myapp';
+            app.metadata.name = 'myapp';
           }),
         ]);
       }),
@@ -108,7 +112,7 @@ describe('ApplicationForm', () => {
       http.post('*/api/control-plane/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
-            app.spec.name = 'test-app';
+            app.metadata.name = 'test-app';
             app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
           }),
         ]);
@@ -138,7 +142,7 @@ describe('ApplicationForm', () => {
       http.post('*/api/control-plane/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
-            app.spec.name = 'test-app';
+            app.metadata.name = 'test-app';
             app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
           }),
         ]);
@@ -166,7 +170,7 @@ describe('ApplicationForm', () => {
     test('populates form fields with initial data', async ({ worker }) => {
       const user = userEvent.setup();
       const openwebuiApp = produce(baseApp, (app) => {
-        app.spec.name = 'openwebui';
+        app.metadata.name = 'openwebui';
         app.spec.image = 'ghcr.io/open-webui/open-webui:main';
         app.spec.ports = [{ name: 'web', containerPort: 8080 }];
         app.spec.envVariables = [
@@ -332,11 +336,11 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       const appOne = produce(baseApp, (app) => {
-        app.spec.name = 'app-one';
+        app.metadata.name = 'app-one';
         app.spec.image = 'redis:7-alpine';
       });
       const appTwo = produce(baseApp, (app) => {
-        app.spec.name = 'app-two';
+        app.metadata.name = 'app-two';
         app.spec.image = 'nginx:1.27';
       });
 
@@ -382,7 +386,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'auth-app';
+              app.metadata.name = 'auth-app';
               app.spec.additionalResources = [
                 {
                   apiVersion: 'tesselar.io/v1',
@@ -424,7 +428,7 @@ describe('ApplicationForm', () => {
     test('adds auth client from additional resources', async ({ worker }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'auth-app';
+        app.metadata.name = 'auth-app';
         app.spec.additionalResources = [];
       });
 
@@ -458,7 +462,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'pvc-app';
+        app.metadata.name = 'pvc-app';
         app.spec.additionalResources = [];
       });
 
@@ -497,7 +501,7 @@ describe('ApplicationForm', () => {
     test('sets a default auth client name', async ({ worker }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'default-auth-app';
+        app.metadata.name = 'default-auth-app';
         app.spec.additionalResources = [];
       });
 
@@ -526,7 +530,7 @@ describe('ApplicationForm', () => {
     test('adds optional post-logout redirect uris', async ({ worker }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'logout-auth-app';
+        app.metadata.name = 'logout-auth-app';
         app.spec.additionalResources = [];
       });
 
@@ -559,7 +563,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'invalid-auth-app';
+        app.metadata.name = 'invalid-auth-app';
         app.spec.additionalResources = [];
       });
 
@@ -593,7 +597,7 @@ describe('ApplicationForm', () => {
     test('manages multiple auth clients', async ({ worker }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'multi-auth-app';
+        app.metadata.name = 'multi-auth-app';
         app.spec.additionalResources = [];
       });
 
@@ -657,7 +661,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.ports = [
                 { name: 'http', containerPort: 80 },
                 { name: 'metrics', containerPort: 9090 },
@@ -689,7 +693,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
             }),
           ]);
@@ -714,7 +718,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.ports = [
                 { name: 'http', containerPort: 80 },
                 { name: 'metrics', containerPort: 9090 },
@@ -759,7 +763,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
               app.spec.ingress = { port: { name: 'http' } };
             }),
@@ -802,7 +806,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.image = 'nginx:latest';
               app.spec.envVariables = [{ name: 'VAR1', value: 'value1' }];
             }),
@@ -830,7 +834,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.image = 'nginx:latest';
               app.spec.envVariables = [{ name: 'OLD_VAR', value: 'old_value' }];
               app.spec.ingress = { port: { name: 'http' } };
@@ -874,17 +878,22 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
-          name: 'test-app',
-          image: 'redis:7-alpine',
-          ports: [{ name: 'http', containerPort: 80 }],
-          envVariables: [{ name: 'NEW_VAR', value: 'new_value' }],
-          resources: {
-            limits: { cpu: '1000m', memory: '1Gi' },
+          apiVersion: 'tesselar.io/v1alpha1',
+          kind: 'App',
+          metadata: {
+            name: 'test-app',
           },
-          ingress: { port: { name: 'http' } },
-          health: undefined,
-          additionalResources: [],
-          volumeMounts: [],
+          spec: {
+            image: 'redis:7-alpine',
+            ports: [{ name: 'http', containerPort: 80 }],
+            envVariables: [{ name: 'NEW_VAR', value: 'new_value' }],
+            resources: {
+              limits: { cpu: '1000m', memory: '1Gi' },
+            },
+            ingress: { port: { name: 'http' } },
+            additionalResources: [],
+            volumeMounts: [],
+          },
         });
     });
 
@@ -893,7 +902,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (draft) => {
-        draft.spec.name = 'external-update-app';
+        draft.metadata.name = 'external-update-app';
         draft.spec.image = 'nginx:latest';
       });
       const updatedApp = produce(app, (draft) => {
@@ -930,7 +939,7 @@ describe('ApplicationForm', () => {
     test('applies external updates when confirmed', async ({ worker }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (draft) => {
-        draft.spec.name = 'external-accept-app';
+        draft.metadata.name = 'external-accept-app';
         draft.spec.image = 'nginx:latest';
       });
       const updatedApp = produce(app, (draft) => {
@@ -976,7 +985,7 @@ describe('ApplicationForm', () => {
       let submittedApp: AppSchema | undefined;
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'auth-secret-app';
+        app.metadata.name = 'auth-secret-app';
         app.spec.additionalResources = [
           {
             apiVersion: 'tesselar.io/v1',
@@ -1023,37 +1032,41 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
-          name: 'auth-secret-app',
-          image: 'postgres:16',
-          ports: [{ name: 'http', containerPort: 80 }],
-          envVariables: [
-            {
-              name: 'OAUTH_CLIENT_SECRET',
-              valueFrom: {
-                secretKeyRef: {
-                  name: 'authclient',
-                  key: 'client-secret',
+          apiVersion: 'tesselar.io/v1alpha1',
+          kind: 'App',
+          metadata: {
+            name: 'auth-secret-app',
+          },
+          spec: {
+            image: 'postgres:16',
+            ports: [{ name: 'http', containerPort: 80 }],
+            envVariables: [
+              {
+                name: 'OAUTH_CLIENT_SECRET',
+                valueFrom: {
+                  secretKeyRef: {
+                    name: 'authclient',
+                    key: 'client-secret',
+                  },
                 },
               },
+            ],
+            resources: {
+              limits: { cpu: '1000m', memory: '1Gi' },
             },
-          ],
-          resources: {
-            limits: { cpu: '1000m', memory: '1Gi' },
-          },
-          ingress: { port: { name: 'http' } },
-          additionalResources: [
-            {
-              apiVersion: 'tesselar.io/v1',
-              kind: 'AuthClient',
-              metadata: { name: 'authclient' },
-              spec: {
-                redirectUris: ['https://example.com/callback'],
-                postLogoutRedirectUris: undefined,
+            ingress: { port: { name: 'http' } },
+            additionalResources: [
+              {
+                apiVersion: 'tesselar.io/v1',
+                kind: 'AuthClient',
+                metadata: { name: 'authclient' },
+                spec: {
+                  redirectUris: ['https://example.com/callback'],
+                },
               },
-            },
-          ],
-          health: undefined,
-          volumeMounts: [],
+            ],
+            volumeMounts: [],
+          },
         });
     });
 
@@ -1064,7 +1077,7 @@ describe('ApplicationForm', () => {
         draft.metadata.name = 'data';
       });
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'pvc-mount-app';
+        app.metadata.name = 'pvc-mount-app';
         app.spec.additionalResources = [volumeResource];
         app.spec.volumeMounts = [];
         app.spec.ingress = { port: { name: 'http' } };
@@ -1103,10 +1116,14 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
-          ...app.spec,
-          volumeMounts: [{ mountPath: '/data', name: 'data' }],
-          additionalResources: [volumeResource],
-          health: undefined,
+          apiVersion: app.apiVersion,
+          kind: app.kind,
+          metadata: app.metadata,
+          spec: {
+            ...app.spec,
+            volumeMounts: [{ mountPath: '/data', name: 'data' }],
+            additionalResources: [volumeResource],
+          },
         });
     });
 
@@ -1115,7 +1132,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'auth-client-removed-app';
+        app.metadata.name = 'auth-client-removed-app';
         app.spec.additionalResources = [
           {
             apiVersion: 'tesselar.io/v1',
@@ -1167,7 +1184,7 @@ describe('ApplicationForm', () => {
       let submittedApp: AppSchema | undefined;
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'test-app';
+        app.metadata.name = 'test-app';
         // sizeToResources.small.limits is used to determine 'small' is selected
         // but baseApp already has string resource limits that need to match
         app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
@@ -1190,7 +1207,7 @@ describe('ApplicationForm', () => {
       await renderWithProviders(<Apps />);
 
       // Open the form sheet
-      await user.click(await page.getByText(app.spec.name));
+      await user.click(await page.getByText(app.metadata.name));
 
       // Check current resource limits selection
       await expect(
@@ -1221,14 +1238,18 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
-          ...app.spec,
-          resources: {
-            limits: { cpu: '750m', memory: '768Mi' },
+          apiVersion: app.apiVersion,
+          kind: app.kind,
+          metadata: app.metadata,
+          spec: {
+            ...app.spec,
+            resources: {
+              limits: { cpu: '750m', memory: '768Mi' },
+            },
+            ingress: { port: { name: 'http' } },
+            additionalResources: [],
+            volumeMounts: [],
           },
-          ingress: { port: { name: 'http' } },
-          health: undefined,
-          additionalResources: [],
-          volumeMounts: [],
         });
     });
 
@@ -1237,7 +1258,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (app) => {
-        app.spec.name = 'medium-app';
+        app.metadata.name = 'medium-app';
         app.spec.resources.limits = { cpu: '1', memory: '1Gi' };
       });
 
@@ -1248,7 +1269,7 @@ describe('ApplicationForm', () => {
       );
 
       await renderWithProviders(<Apps />);
-      await user.click(await page.getByText(app.spec.name));
+      await user.click(await page.getByText(app.metadata.name));
 
       await expect(
         page.getByRole('combobox', { name: 'Preset' }),
@@ -1273,7 +1294,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'locked-app';
+              app.metadata.name = 'locked-app';
               app.spec.image = 'nginx:latest';
               app.spec.envVariables = [{ name: 'VAR', value: 'val' }];
             }),
@@ -1298,7 +1319,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.image = 'nginx:latest';
               app.spec.envVariables = [
                 { name: 'VAR1', value: 'value1' },
@@ -1337,7 +1358,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
             }),
           ]);
@@ -1366,7 +1387,7 @@ describe('ApplicationForm', () => {
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
-              app.spec.name = 'test-app';
+              app.metadata.name = 'test-app';
               app.spec.ports = [{ name: 'http', containerPort: 80 }];
             }),
           ]);
@@ -1437,23 +1458,29 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
-          name: 'new-app',
-          image: 'redis:7-alpine',
-          ports: [{ name: 'http', containerPort: 80 }],
-          envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
-          resources: {
-            limits: { cpu: '500m', memory: '512Mi' },
+          apiVersion: 'tesselar.io/v1alpha1',
+          kind: 'App',
+          metadata: {
+            name: 'new-app',
           },
-          ingress: { port: { name: 'http' } },
-          health: {
-            check: {
-              type: 'httpGet',
-              path: '/',
-              port: 'http',
+          spec: {
+            image: 'redis:7-alpine',
+            ports: [{ name: 'http', containerPort: 80 }],
+            envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
+            resources: {
+              limits: { cpu: '500m', memory: '512Mi' },
             },
+            ingress: { port: { name: 'http' } },
+            health: {
+              check: {
+                type: 'httpGet',
+                path: '/',
+                port: 'http',
+              },
+            },
+            additionalResources: [],
+            volumeMounts: [],
           },
-          additionalResources: [],
-          volumeMounts: [],
         });
     });
 
@@ -1472,14 +1499,14 @@ describe('ApplicationForm', () => {
       const nameInput = page.getByPlaceholder('App Name');
       await expect.element(nameInput).toHaveValue('');
 
-      const appSpec = produce(baseApp.spec, (app) => {
-        app.name = 'yaml-app';
-        app.image = 'redis:7-alpine';
-        app.ports = [{ name: 'http', containerPort: 8080 }];
-        app.envVariables = [{ name: 'REDIS_HOST', value: 'localhost' }];
-        app.resources = { limits: { cpu: '750m', memory: '768Mi' } };
-        app.ingress = { port: { name: 'http' } };
-        app.health = {
+      const appSpec = produce(baseAppManifest, (app) => {
+        app.metadata.name = 'yaml-app';
+        app.spec.image = 'redis:7-alpine';
+        app.spec.ports = [{ name: 'http', containerPort: 8080 }];
+        app.spec.envVariables = [{ name: 'REDIS_HOST', value: 'localhost' }];
+        app.spec.resources = { limits: { cpu: '750m', memory: '768Mi' } };
+        app.spec.ingress = { port: { name: 'http' } };
+        app.spec.health = {
           check: {
             type: 'httpGet',
             path: '/health',
@@ -1580,23 +1607,29 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
-          name: 'new-app',
-          image: 'redis:7-alpine',
-          ports: [{ name: 'http', containerPort: 80 }],
-          envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
-          resources: {
-            limits: { cpu: '500m', memory: '512Mi' },
+          apiVersion: 'tesselar.io/v1alpha1',
+          kind: 'App',
+          metadata: {
+            name: 'new-app',
           },
-          ingress: { port: { name: 'http' } },
-          health: {
-            check: {
-              type: 'httpGet',
-              path: '/',
-              port: 'http',
+          spec: {
+            image: 'redis:7-alpine',
+            ports: [{ name: 'http', containerPort: 80 }],
+            envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
+            resources: {
+              limits: { cpu: '500m', memory: '512Mi' },
             },
+            ingress: { port: { name: 'http' } },
+            health: {
+              check: {
+                type: 'httpGet',
+                path: '/',
+                port: 'http',
+              },
+            },
+            additionalResources: [],
+            volumeMounts: [],
           },
-          additionalResources: [],
-          volumeMounts: [],
         });
     });
   });

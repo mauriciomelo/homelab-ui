@@ -7,7 +7,7 @@ import { AppSchema, appSchema } from './schemas';
 import * as _ from 'lodash';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
-import { APP_STATUS } from '@/app/constants';
+import { APP_STATUS, type AppStatus } from '@/app/constants';
 import {
   authClientSchema,
   deploymentSchema,
@@ -16,7 +16,6 @@ import {
   namespaceSchema,
   persistentVolumeClaimSchema,
   serviceSchema,
-  fluxGotkKustomizationSchema,
 } from './schemas';
 import * as k from './k8s';
 import { AppManifests, fromManifests, toManifests } from './app-k8s-adapter';
@@ -33,6 +32,59 @@ export type AppResourceType =
 type AdditionalResourceSchema =
   | z.infer<typeof authClientSchema>
   | z.infer<typeof persistentVolumeClaimSchema>;
+
+export type AppRuntimeStatus = {
+  phase: AppStatus;
+  pods: Array<{
+    name: string | undefined;
+    metadata: {
+      creationTimestamp: Date | undefined;
+    };
+    spec: {
+      nodeName: string | undefined;
+    };
+    status: {
+      phase: string | undefined;
+      startTime: Date | undefined;
+      message: string | undefined;
+      reason: string | undefined;
+      conditions:
+        | Array<{
+            type: string;
+            status: string;
+            lastProbeTime: Date | undefined;
+            lastTransitionTime: Date | undefined;
+            reason: string | undefined;
+            message: string | undefined;
+          }>
+        | undefined;
+    };
+  }>;
+  deployment: {
+    spec: {
+      replicas: number | undefined;
+    };
+    status: {
+      availableReplicas: number | undefined;
+      replicas: number | undefined;
+      readyReplicas: number | undefined;
+      updatedReplicas: number | undefined;
+      conditions:
+        | Array<{
+            type: string;
+            status: string;
+            lastTransitionTime: Date | undefined;
+            reason: string | undefined;
+            message: string | undefined;
+          }>
+        | undefined;
+    };
+  };
+};
+
+export type App = AppSchema & {
+  status: AppRuntimeStatus;
+};
 
 export async function getApps() {
   const appDir = getAppsDir();
@@ -121,45 +173,44 @@ async function getAppByName(name: string) {
         pods.map((pod) => pod.status?.phase || APP_STATUS.UNKNOWN),
       );
 
-  const spec = fromManifests({
+  const app = fromManifests({
     deployment: deployment,
     ingress: ingress,
     service: service,
     namespace: namespace,
     additionalResources: additionalResources,
   });
-  const appName = spec.name;
   return {
-    spec,
-    pods,
-    iconUrl: `https://cdn.simpleicons.org/${appName}`,
-    deployment: {
-      spec: {
-        replicas: deploymentRes.spec?.replicas,
-      },
+    ...app,
+    status: {
+      phase: appStatus,
+      pods,
+      deployment: {
+        spec: {
+          replicas: deploymentRes.spec?.replicas,
+        },
 
-      status: {
-        availableReplicas: deploymentRes.status?.availableReplicas,
-        replicas: deploymentRes.status?.replicas,
-        readyReplicas: deploymentRes.status?.readyReplicas,
-        updatedReplicas: deploymentRes.status?.updatedReplicas,
-        conditions: deploymentRes.status?.conditions?.map((condition) => ({
-          type: condition.type,
-          status: condition.status,
-          lastTransitionTime: condition.lastTransitionTime,
-          reason: condition.reason,
-          message: condition.message,
-        })),
+        status: {
+          availableReplicas: deploymentRes.status?.availableReplicas,
+          replicas: deploymentRes.status?.replicas,
+          readyReplicas: deploymentRes.status?.readyReplicas,
+          updatedReplicas: deploymentRes.status?.updatedReplicas,
+          conditions: deploymentRes.status?.conditions?.map((condition) => ({
+            type: condition.type,
+            status: condition.status,
+            lastTransitionTime: condition.lastTransitionTime,
+            reason: condition.reason,
+            message: condition.message,
+          })),
+        },
       },
     },
-    status: appStatus,
-    link: await getAppLink(appName),
-  };
+  } satisfies App;
 }
 
 export async function updateApp(app: AppSchema) {
   const parsedApp = appSchema.parse(app);
-  const appDir = getAppDir(parsedApp.name);
+  const appDir = getAppDir(parsedApp.metadata.name);
   const deploymentFilePath = `${appDir}/deployment.yaml`;
 
   const {
@@ -181,7 +232,7 @@ export async function updateApp(app: AppSchema) {
     ...updatedDeployment,
   } satisfies z.infer<typeof deploymentSchema>;
 
-  await writeResourcesToFileSystem(parsedApp.name, [
+  await writeResourcesToFileSystem(parsedApp.metadata.name, [
     namespace,
     deployment,
     service,
@@ -189,12 +240,13 @@ export async function updateApp(app: AppSchema) {
     ...additionalResources,
   ]);
 
-  await commitAndPushChanges(parsedApp.name, `Update app ${parsedApp.name}`);
+  await commitAndPushChanges(
+    parsedApp.metadata.name,
+    `Update app ${parsedApp.metadata.name}`,
+  );
 
   return { success: true };
 }
-
-export type App = Awaited<ReturnType<typeof getAppByName>>;
 
 function getFileName(resource: AppResourceType) {
   if (
@@ -284,7 +336,7 @@ export async function createApp(app: AppSchema) {
   const { deployment, ingress, service, namespace, additionalResources } =
     toManifests(parsedApp);
 
-  await writeResourcesToFileSystem(parsedApp.name, [
+  await writeResourcesToFileSystem(parsedApp.metadata.name, [
     namespace,
     deployment,
     service,
@@ -292,7 +344,10 @@ export async function createApp(app: AppSchema) {
     ...additionalResources,
   ]);
 
-  await commitAndPushChanges(parsedApp.name, `Create app ${parsedApp.name}`);
+  await commitAndPushChanges(
+    parsedApp.metadata.name,
+    `Create app ${parsedApp.metadata.name}`,
+  );
 
   return { success: true };
 }
@@ -324,30 +379,6 @@ export async function getFile<T>({
   }
 
   return { data: schema.parse(matched), raw: matched };
-}
-
-async function getClusterConfig(): Promise<{ domain: string }> {
-  const config = getAppConfig();
-  const gotkSyncPath = path.join(
-    config.PROJECT_DIR,
-    'clusters',
-    config.CLUSTER_NAME,
-    'flux-system',
-    'gotk-sync.yaml',
-  );
-
-  const kustomization = await getFile({
-    path: gotkSyncPath,
-    schema: fluxGotkKustomizationSchema,
-  });
-
-  return { domain: kustomization.data.spec.postBuild.substitute.DOMAIN };
-}
-
-async function getAppLink(appName: string) {
-  const { domain } = await getClusterConfig();
-
-  return `https://${appName}.${domain}`;
 }
 
 async function getManifestsFromAppFiles(

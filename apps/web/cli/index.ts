@@ -230,5 +230,8 @@ run().catch((error) => {
 
 const createDefaultAppData = (name: string): AppSchema => ({
   ...defaultAppData,
-  name,
+  metadata: {
+    ...defaultAppData.metadata,
+    name,
+  },
 });

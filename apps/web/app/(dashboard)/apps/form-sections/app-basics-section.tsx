@@ -29,8 +29,8 @@ type AppBasicsSectionProps = {
 };
 
 export function AppBasicsSection({ lens, mode }: AppBasicsSectionProps) {
-  const nameInterop = lens.focus('name').interop();
-  const imageInterop = lens.focus('image').interop();
+  const nameInterop = lens.focus('metadata.name').interop();
+  const imageInterop = lens.focus('spec.image').interop();
 
   return (
     <div className="flex flex-col gap-2">
@@ -77,7 +77,7 @@ export function AppBasicsSection({ lens, mode }: AppBasicsSectionProps) {
                     </Tooltip>
                   </FormLabel>
                 </InsetLabel>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <FormControl>
                     <InsetInput
                       placeholder="nginx:latest or registry.example.com/my-app:v1.0.0"
