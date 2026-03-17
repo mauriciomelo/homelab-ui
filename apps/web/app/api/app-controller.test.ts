@@ -9,6 +9,7 @@ const {
   mockApiextensionsV1ApiClient,
   mockAppsApiClient,
   mockCoreApiClient,
+  mockCustomObjectsApiClient,
   mockNetworkingApiClient,
   mockWatch,
 } = vi.hoisted(() => {
@@ -16,6 +17,7 @@ const {
     mockApiextensionsV1ApiClient: {
       readCustomResourceDefinition: vi.fn(),
       createCustomResourceDefinition: vi.fn(),
+      replaceCustomResourceDefinition: vi.fn(),
     },
     mockAppsApiClient: {
       readNamespacedDeployment: vi.fn(),
@@ -24,9 +26,14 @@ const {
     },
     mockCoreApiClient: {
       readNamespacedConfigMap: vi.fn(),
+      listNamespacedPod: vi.fn(),
       readNamespacedService: vi.fn(),
       createNamespacedService: vi.fn(),
       replaceNamespacedService: vi.fn(),
+    },
+    mockCustomObjectsApiClient: {
+      getNamespacedCustomObject: vi.fn(),
+      replaceNamespacedCustomObjectStatus: vi.fn(),
     },
     mockNetworkingApiClient: {
       readNamespacedIngress: vi.fn(),
@@ -57,6 +64,10 @@ vi.mock('@kubernetes/client-node', async (importOriginal) => {
         return mockCoreApiClient;
       }
 
+      if (client === mod.CustomObjectsApi) {
+        return mockCustomObjectsApiClient;
+      }
+
       if (client === mod.NetworkingV1Api) {
         return mockNetworkingApiClient;
       }
@@ -85,9 +96,24 @@ describe('registerAppController', () => {
     mockCoreApiClient.readNamespacedConfigMap.mockResolvedValue({
       data: { domain: 'home.mauriciomelo.io' },
     });
+    mockCoreApiClient.listNamespacedPod.mockResolvedValue({ items: [] });
     mockCoreApiClient.readNamespacedService.mockRejectedValue({ code: 404 });
     mockCoreApiClient.createNamespacedService.mockResolvedValue({});
     mockCoreApiClient.replaceNamespacedService.mockResolvedValue({});
+
+    mockCustomObjectsApiClient.getNamespacedCustomObject.mockResolvedValue({
+      ...baseAppManifest,
+      metadata: { name: 'demo-app', namespace: 'demo-app' },
+      status: {
+        phase: 'Running',
+        observedGeneration: 3,
+        placements: [],
+        conditions: [],
+      },
+    });
+    mockCustomObjectsApiClient.replaceNamespacedCustomObjectStatus.mockResolvedValue(
+      {},
+    );
 
     mockNetworkingApiClient.readNamespacedIngress.mockRejectedValue({
       code: 404,
@@ -121,10 +147,52 @@ describe('registerAppController', () => {
     });
   });
 
+  it('updates the App CRD when the status subresource is missing', async () => {
+    mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockResolvedValue({
+      metadata: {
+        name: 'apps.tesselar.io',
+        resourceVersion: '1',
+      },
+      spec: {
+        versions: [
+          {
+            name: 'v1alpha1',
+            schema: { openAPIV3Schema: {} },
+          },
+        ],
+      },
+    });
+    await registerAppController();
+
+    expect(
+      mockApiextensionsV1ApiClient.replaceCustomResourceDefinition,
+    ).toHaveBeenCalledWith({
+      name: 'apps.tesselar.io',
+      body: expect.objectContaining({
+        metadata: expect.objectContaining({ resourceVersion: '1' }),
+        spec: expect.objectContaining({
+          versions: [
+            expect.objectContaining({
+              subresources: { status: {} },
+            }),
+          ],
+        }),
+      }),
+    });
+  });
+
   it('creates generated runtime resources on ADDED', async () => {
     mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockResolvedValue(
       {},
     );
+    mockCoreApiClient.listNamespacedPod.mockResolvedValue({
+      items: [
+        {
+          metadata: { labels: { app: 'demo-app' } },
+          spec: { nodeName: 'alpha-node' },
+        },
+      ],
+    });
 
     await registerAppController();
 
@@ -231,6 +299,24 @@ describe('registerAppController', () => {
         }),
       }),
     });
+
+    expect(
+      mockCustomObjectsApiClient.replaceNamespacedCustomObjectStatus,
+    ).toHaveBeenCalledWith({
+      group: 'tesselar.io',
+      version: 'v1alpha1',
+      namespace: 'demo-app',
+      plural: 'apps',
+      name: 'demo-app',
+      body: expect.objectContaining({
+        status: expect.objectContaining({
+          phase: 'Pending',
+          observedGeneration: 3,
+          placements: [{ nodeName: 'alpha-node' }],
+          conditions: [],
+        }),
+      }),
+    });
   });
 
   it('replaces generated runtime resources on MODIFIED', async () => {
@@ -238,7 +324,28 @@ describe('registerAppController', () => {
       {},
     );
     mockAppsApiClient.readNamespacedDeployment.mockResolvedValue({
-      metadata: { resourceVersion: '1' },
+      metadata: { resourceVersion: '1', generation: 7 },
+      spec: { replicas: 1 },
+      status: {
+        readyReplicas: 1,
+        conditions: [
+          {
+            type: 'Available',
+            status: 'True',
+            reason: 'MinimumReplicasAvailable',
+            message: 'Deployment has minimum availability.',
+            lastTransitionTime: new Date('2026-03-17T18:00:00Z'),
+          },
+        ],
+      },
+    });
+    mockCoreApiClient.listNamespacedPod.mockResolvedValue({
+      items: [
+        {
+          metadata: { labels: { app: 'demo-app' } },
+          spec: { nodeName: 'alpha-node' },
+        },
+      ],
     });
     mockCoreApiClient.readNamespacedService.mockResolvedValue({
       metadata: { resourceVersion: '2' },
@@ -260,6 +367,7 @@ describe('registerAppController', () => {
       metadata: {
         ...app.metadata,
         namespace: 'demo-app',
+        generation: 3,
         uid: 'app-uid',
       },
     });
@@ -279,7 +387,7 @@ describe('registerAppController', () => {
       }),
     });
     expect(
-      mockNetworkingApiClient.replaceNamespacedIngress,
+    mockNetworkingApiClient.replaceNamespacedIngress,
     ).toHaveBeenCalledWith({
       name: 'demo-app',
       namespace: 'demo-app',
@@ -294,5 +402,120 @@ describe('registerAppController', () => {
         metadata: expect.objectContaining({ resourceVersion: '3' }),
       }),
     });
+    expect(
+      mockCustomObjectsApiClient.replaceNamespacedCustomObjectStatus,
+    ).toHaveBeenCalledWith({
+      group: 'tesselar.io',
+      version: 'v1alpha1',
+      namespace: 'demo-app',
+      plural: 'apps',
+      name: 'demo-app',
+      body: expect.objectContaining({
+        status: {
+          phase: 'Running',
+          observedGeneration: 3,
+          placements: [{ nodeName: 'alpha-node' }],
+          conditions: [
+            {
+              type: 'Available',
+              status: 'True',
+              reason: 'MinimumReplicasAvailable',
+              message: 'Deployment has minimum availability.',
+              lastTransitionTime: '2026-03-17T18:00:00.000Z',
+            },
+          ],
+        },
+      }),
+    });
   });
+
+  it('skips app reconciliation on status-only app updates', async () => {
+    mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockResolvedValue(
+      {},
+    );
+
+    await registerAppController();
+
+    const watchCallback = mockWatch.watch.mock.calls[0][2];
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = 'demo-app';
+    });
+
+    await watchCallback('MODIFIED', {
+      ...app,
+      metadata: {
+        ...app.metadata,
+        namespace: 'demo-app',
+        uid: 'app-uid',
+        generation: 3,
+      },
+      status: {
+        phase: 'Running',
+        observedGeneration: 3,
+        placements: [],
+        conditions: [],
+      },
+    });
+
+    expect(mockAppsApiClient.readNamespacedDeployment).not.toHaveBeenCalled();
+    expect(mockAppsApiClient.createNamespacedDeployment).not.toHaveBeenCalled();
+    expect(mockAppsApiClient.replaceNamespacedDeployment).not.toHaveBeenCalled();
+  });
+
+  it('preserves observedGeneration during deployment-driven status refreshes', async () => {
+    mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockResolvedValue(
+      {},
+    );
+    mockAppsApiClient.readNamespacedDeployment.mockResolvedValue({
+      metadata: { resourceVersion: '1', generation: 42 },
+      spec: { replicas: 1 },
+      status: {
+        readyReplicas: 1,
+        conditions: [
+          {
+            type: 'Available',
+            status: 'True',
+            reason: 'MinimumReplicasAvailable',
+            message: 'Deployment has minimum availability.',
+            lastTransitionTime: new Date('2026-03-17T18:00:00Z'),
+          },
+        ],
+      },
+    });
+    mockCoreApiClient.listNamespacedPod.mockResolvedValue({
+      items: [
+        {
+          metadata: { labels: { app: 'demo-app' } },
+          spec: { nodeName: 'alpha-node' },
+        },
+      ],
+    });
+
+    await registerAppController();
+
+    const deploymentWatchCallback = mockWatch.watch.mock.calls[1][2];
+
+    await deploymentWatchCallback('MODIFIED', {
+      metadata: {
+        name: 'demo-app',
+        namespace: 'demo-app',
+      },
+    });
+
+    expect(
+      mockCustomObjectsApiClient.replaceNamespacedCustomObjectStatus,
+    ).toHaveBeenCalledWith({
+      group: 'tesselar.io',
+      version: 'v1alpha1',
+      namespace: 'demo-app',
+      plural: 'apps',
+      name: 'demo-app',
+      body: expect.objectContaining({
+        status: expect.objectContaining({
+          observedGeneration: 3,
+        }),
+      }),
+    });
+  });
+
 });

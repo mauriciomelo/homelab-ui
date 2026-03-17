@@ -6,8 +6,9 @@ import path from 'path';
 import { AppBundleSchema, appBundleSchema } from './schemas';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
-import { APP_STATUS, type AppStatus } from '@/app/constants';
+import { APP_STATUS } from '@/app/constants';
 import {
+  appStatusSchema,
   appSchema,
   authClientSchema,
   kustomizationSchema,
@@ -28,54 +29,7 @@ type AdditionalResourceSchema =
   | z.infer<typeof authClientSchema>
   | z.infer<typeof persistentVolumeClaimSchema>;
 
-export type AppRuntimeStatus = {
-  phase: AppStatus;
-  pods: Array<{
-    name: string | undefined;
-    metadata: {
-      creationTimestamp: Date | undefined;
-    };
-    spec: {
-      nodeName: string | undefined;
-    };
-    status: {
-      phase: string | undefined;
-      startTime: Date | undefined;
-      message: string | undefined;
-      reason: string | undefined;
-      conditions:
-        | Array<{
-            type: string;
-            status: string;
-            lastProbeTime: Date | undefined;
-            lastTransitionTime: Date | undefined;
-            reason: string | undefined;
-            message: string | undefined;
-          }>
-        | undefined;
-    };
-  }>;
-  deployment: {
-    spec: {
-      replicas: number | undefined;
-    };
-    status: {
-      availableReplicas: number | undefined;
-      replicas: number | undefined;
-      readyReplicas: number | undefined;
-      updatedReplicas: number | undefined;
-      conditions:
-        | Array<{
-            type: string;
-            status: string;
-            lastTransitionTime: Date | undefined;
-            reason: string | undefined;
-            message: string | undefined;
-          }>
-        | undefined;
-    };
-  };
-};
+export type AppRuntimeStatus = z.infer<typeof appStatusSchema>;
 
 export type App = AppBundleSchema & {
   status: AppRuntimeStatus;
@@ -122,79 +76,12 @@ export async function restartApp(name: string) {
 
 async function getAppByName(name: string) {
   const { app, additionalResources } = await getManifestsFromAppFiles(name);
-
-  const [deploymentRes, podsRes] = await Promise.all([
-    readDeploymentStatus({ name, namespace: name }),
-    k.coreApi().listNamespacedPod({ namespace: name }),
-  ]);
-
-  const desiredReplicas = deploymentRes?.spec?.replicas || 0;
-  const replicas = deploymentRes?.status?.replicas || 0;
-  const updatedReplicas = deploymentRes?.status?.updatedReplicas || 0;
-
-  const deploymentPending =
-    updatedReplicas !== desiredReplicas || replicas !== desiredReplicas;
-
-  const pods = podsRes.items.map((pod) => {
-    return {
-      name: pod.metadata?.name,
-      metadata: {
-        creationTimestamp: pod.metadata?.creationTimestamp,
-      },
-      spec: {
-        nodeName: pod.spec?.nodeName,
-      },
-      status: {
-        phase: pod.status?.phase,
-        startTime: pod.status?.startTime,
-        message: pod.status?.message,
-        reason: pod.status?.reason,
-        conditions: pod.status?.conditions?.map((condition) => ({
-          type: condition.type,
-          status: condition.status,
-          lastProbeTime: condition.lastProbeTime,
-          lastTransitionTime: condition.lastTransitionTime,
-          reason: condition.reason,
-          message: condition.message,
-        })),
-      },
-    };
-  });
-
-  const appStatus = !deploymentRes
-    ? APP_STATUS.PENDING
-    : deploymentPending
-    ? APP_STATUS.PENDING
-    : getPodsAggregatedStatus(
-        pods.map((pod) => pod.status?.phase || APP_STATUS.UNKNOWN),
-      );
+  const status = await getAppRuntimeStatus(name);
 
   return {
     app,
     additionalResources,
-    status: {
-      phase: appStatus,
-      pods,
-      deployment: {
-        spec: {
-          replicas: deploymentRes?.spec?.replicas,
-        },
-
-        status: {
-          availableReplicas: deploymentRes?.status?.availableReplicas,
-          replicas: deploymentRes?.status?.replicas,
-          readyReplicas: deploymentRes?.status?.readyReplicas,
-          updatedReplicas: deploymentRes?.status?.updatedReplicas,
-          conditions: deploymentRes?.status?.conditions?.map((condition) => ({
-            type: condition.type,
-            status: condition.status,
-            lastTransitionTime: condition.lastTransitionTime,
-            reason: condition.reason,
-            message: condition.message,
-          })),
-        },
-      },
-    },
+    status,
   } satisfies App;
 }
 
@@ -468,31 +355,32 @@ function createPersistedAppManifest(
   return app;
 }
 
-export function getPodsAggregatedStatus(statuses: string[]) {
-  const running = statuses.every((status) => status === APP_STATUS.RUNNING);
-  if (running) {
-    return APP_STATUS.RUNNING;
-  }
-
-  return APP_STATUS.UNKNOWN;
-}
-
-async function readDeploymentStatus({
-  name,
-  namespace,
-}: {
-  name: string;
-  namespace: string;
-}) {
+async function getAppRuntimeStatus(name: string): Promise<AppRuntimeStatus> {
   try {
-    return await k.appsApi().readNamespacedDeployment({ name, namespace });
-  } catch (error) {
-    if (isKubernetesNotFoundError(error)) {
-      return null;
-    }
+    const appResource = await k.customObjectsApi().getNamespacedCustomObjectStatus({
+      group: 'tesselar.io',
+      version: 'v1alpha1',
+      namespace: name,
+      plural: 'apps',
+      name,
+    });
 
-    throw error;
+    const parsed = appStatusSchema.safeParse(appResource.status);
+
+    if (parsed.success) {
+      return parsed.data;
+    }
+  } catch (error) {
+    if (!isKubernetesNotFoundError(error)) {
+      throw error;
+    }
   }
+
+  return appStatusSchema.parse({
+    phase: APP_STATUS.PENDING,
+    placements: [],
+    conditions: [],
+  });
 }
 
 function isKubernetesNotFoundError(error: unknown): error is { code: number } {

@@ -40,7 +40,7 @@ function validateBrokenEnvReferences(data: AppBundleSchema) {
   );
 
   return data.app.spec.envVariables.flatMap((envVariable, index) => {
-    if ('valueFrom' in envVariable) {
+    if (envVariable.valueFrom) {
       const secretName = envVariable.valueFrom.secretKeyRef.name;
       if (!authClientNames.has(secretName)) {
         return [{ index, secretName }];

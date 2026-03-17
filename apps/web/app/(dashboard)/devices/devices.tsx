@@ -83,7 +83,7 @@ type DevicesProps = {
 
 function nodeApps(apps: App[], nodeName: string) {
   return apps.filter((app) =>
-    app.status.pods.some((pod) => pod.spec.nodeName === nodeName),
+    app.status.placements.some((placement) => placement.nodeName === nodeName),
   );
 }
 

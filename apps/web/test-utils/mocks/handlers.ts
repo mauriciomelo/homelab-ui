@@ -17,16 +17,8 @@ export const handlers = [
           },
           status: {
             phase: APP_STATUS.RUNNING,
-            pods: [],
-            deployment: {
-              spec: { replicas: 1 },
-              status: {
-                availableReplicas: 1,
-                replicas: 1,
-                readyReplicas: 1,
-                updatedReplicas: 1,
-              },
-            },
+            placements: [],
+            conditions: [],
           },
         },
         {
@@ -41,16 +33,8 @@ export const handlers = [
           },
           status: {
             phase: APP_STATUS.RUNNING,
-            pods: [],
-            deployment: {
-              spec: { replicas: 2 },
-              status: {
-                availableReplicas: 2,
-                replicas: 2,
-                readyReplicas: 2,
-                updatedReplicas: 2,
-              },
-            },
+            placements: [],
+            conditions: [],
           },
         },
       ],

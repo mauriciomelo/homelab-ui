@@ -44,15 +44,12 @@ vi.mock('server-only', () => ({}));
 
 vi.mock('./k8s', () => ({
   customObjectsApi: vi.fn().mockReturnValue({
-    patchNamespacedCustomObject: vi.fn(),
+    getNamespacedCustomObjectStatus: vi.fn(),
   }),
   appsApi: vi.fn().mockReturnValue({
-    readNamespacedDeployment: vi.fn(),
     patchNamespacedDeployment: vi.fn(),
   }),
-  coreApi: vi.fn().mockReturnValue({
-    listNamespacedPod: vi.fn(),
-  }),
+  coreApi: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock('../(dashboard)/apps/config', () => ({
@@ -77,32 +74,26 @@ const gitPushMock = vi.spyOn(git, 'push').mockResolvedValue({
 
 const mockGetAppConfig = vi.mocked(getAppConfig);
 
-const mockReadNamespacedDeployment = vi.fn().mockResolvedValue({
-  spec: { replicas: 1 },
+const mockGetNamespacedCustomObjectStatus = vi.fn().mockResolvedValue({
   status: {
-    replicas: 1,
-    updatedReplicas: 1,
-    availableReplicas: 1,
-    readyReplicas: 1,
+    phase: APP_STATUS.RUNNING,
+    placements: [],
+    conditions: [],
   },
-});
-const mockListNamespacedPod = vi.fn().mockResolvedValue({
-  items: [],
 });
 
 vi.mocked(k.appsApi).mockReturnValue(
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   {
-    readNamespacedDeployment: mockReadNamespacedDeployment,
     patchNamespacedDeployment: vi.fn(),
   } as unknown as ReturnType<typeof k.appsApi>,
 );
 
-vi.mocked(k.coreApi).mockReturnValue(
+vi.mocked(k.customObjectsApi).mockReturnValue(
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   {
-    listNamespacedPod: mockListNamespacedPod,
-  } as unknown as ReturnType<typeof k.coreApi>,
+    getNamespacedCustomObjectStatus: mockGetNamespacedCustomObjectStatus,
+  } as unknown as ReturnType<typeof k.customObjectsApi>,
 );
 
 beforeEach(async () => {
@@ -219,7 +210,6 @@ describe('createApp', () => {
     const image = 'nginx:latest';
     const cpu = '0.5';
     const memory = '256Mi';
-    const replicas = 1;
 
     await createApp(
       createBundle({
@@ -244,7 +234,7 @@ describe('createApp', () => {
     const createdApp = apps.find((app) => app.app.metadata.name === appName);
     expect(createdApp).toBeDefined();
     expect(createdApp?.app.spec.image).toBe(image);
-    expect(createdApp?.status.deployment.spec.replicas).toBe(replicas);
+    expect(createdApp?.status.phase).toBe(APP_STATUS.RUNNING);
   });
 
   it('persists app.yaml as the canonical app manifest', async () => {
@@ -530,7 +520,7 @@ describe('getApps', () => {
   });
 
   it('reports pending status before the controller creates a deployment', async () => {
-    mockReadNamespacedDeployment.mockRejectedValueOnce({ code: 404 });
+    mockGetNamespacedCustomObjectStatus.mockRejectedValueOnce({ code: 404 });
 
     const appName = 'pending-app';
     vol.fromJSON(
@@ -554,7 +544,7 @@ describe('getApps', () => {
     const app = apps.find((resource) => resource.app.metadata.name === appName);
 
     expect(app?.status.phase).toBe(APP_STATUS.PENDING);
-    expect(app?.status.deployment.spec.replicas).toBeUndefined();
+    expect(app?.status.placements).toEqual([]);
   });
 });
 

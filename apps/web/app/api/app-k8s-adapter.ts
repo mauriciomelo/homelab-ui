@@ -77,7 +77,7 @@ export function toManifests(app: AppSchema): AppManifests {
                 name: port.name,
                 containerPort: port.containerPort,
               })),
-              env: app.spec.envVariables,
+              env: toContainerEnvVariables(app.spec.envVariables),
               resources: app.spec.resources,
               volumeMounts: app.spec.volumeMounts,
               ...healthProbes,
@@ -202,4 +202,20 @@ function deriveVolumesFromMounts(volumeMounts: AppSchema['spec']['volumeMounts']
       claimName: volumeMountName,
     },
   }));
+}
+
+function toContainerEnvVariables(envVariables: AppSchema['spec']['envVariables']) {
+  return envVariables.map((envVariable) => {
+    if (envVariable.valueFrom) {
+      return {
+        name: envVariable.name,
+        valueFrom: envVariable.valueFrom,
+      };
+    }
+
+    return {
+      name: envVariable.name,
+      value: envVariable.value ?? '',
+    };
+  });
 }

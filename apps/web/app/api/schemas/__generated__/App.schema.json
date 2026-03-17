@@ -74,69 +74,49 @@
           "description": "Environment variables for the app; can reference AuthClient secrets via valueFrom.secretKeyRef",
           "type": "array",
           "items": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "description": "Environment variable name",
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "value": {
-                    "description": "Environment variable literal value (example: \"https://example.com\")",
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "name",
-                  "value"
-                ]
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "Environment variable name",
+                "type": "string",
+                "minLength": 1
               },
-              {
+              "value": {
+                "description": "Environment variable literal value (example: \"https://example.com\")",
+                "type": "string"
+              },
+              "valueFrom": {
+                "description": "Value sourced from a secret",
                 "type": "object",
                 "properties": {
-                  "name": {
-                    "description": "Environment variable name",
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "valueFrom": {
-                    "description": "Value sourced from a secret",
+                  "secretKeyRef": {
+                    "description": "Secret key reference",
                     "type": "object",
                     "properties": {
-                      "secretKeyRef": {
-                        "description": "Secret key reference",
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "description": "Secret resource name (example: \"SSO\" to match an AuthClient named SSO)",
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "key": {
-                            "description": "Secret key to read (example: \"client-id\" or \"client-secret\")",
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": [
-                          "name",
-                          "key"
-                        ]
+                      "name": {
+                        "description": "Secret resource name (example: \"SSO\" to match an AuthClient named SSO)",
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "key": {
+                        "description": "Secret key to read (example: \"client-id\" or \"client-secret\")",
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "required": [
-                      "secretKeyRef"
+                      "name",
+                      "key"
                     ]
                   }
                 },
                 "required": [
-                  "name",
-                  "valueFrom"
+                  "secretKeyRef"
                 ]
               }
+            },
+            "required": [
+              "name"
             ]
           }
         },

@@ -5,23 +5,37 @@ import {
   MEMORY_UNITS,
   resourceLimitPreset,
 } from '@/lib/resource-utils';
+import { APP_STATUS } from '@/app/constants';
 import { z } from 'zod';
-const envVariableSchema = z.union([
-  z.object({
+
+const appConditionSchema = z.object({
+  type: z.string(),
+  status: z.string(),
+  lastTransitionTime: z.string().optional(),
+  reason: z.string().optional(),
+  message: z.string().optional(),
+});
+
+export const appStatusSchema = z.object({
+  phase: z.enum([APP_STATUS.RUNNING, APP_STATUS.PENDING, APP_STATUS.UNKNOWN]),
+  observedGeneration: z.number().int().optional(),
+  placements: z.array(
+    z.object({
+      nodeName: z.string().optional(),
+    }),
+  ),
+  conditions: z.array(appConditionSchema),
+});
+const envVariableSchema = z
+  .object({
     name: z
       .string()
       .min(1, 'Variable name is required')
       .meta({ description: 'Environment variable name' }),
-    value: z.string().min(1, 'Variable value is required').meta({
+    value: z.string().optional().meta({
       description:
         'Environment variable literal value (example: "https://example.com")',
     }),
-  }),
-  z.object({
-    name: z
-      .string()
-      .min(1, 'Variable name is required')
-      .meta({ description: 'Environment variable name' }),
     valueFrom: z
       .object({
         secretKeyRef: z
@@ -37,9 +51,37 @@ const envVariableSchema = z.union([
           })
           .meta({ description: 'Secret key reference' }),
       })
+      .optional()
       .meta({ description: 'Value sourced from a secret' }),
-  }),
-]);
+  })
+  .superRefine((envVariable, ctx) => {
+    const hasValue = envVariable.value !== undefined;
+    const hasValueFrom = envVariable.valueFrom !== undefined;
+
+    if (hasValue && hasValueFrom) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Provide either a literal value or a secret reference',
+        path: ['value'],
+      });
+    }
+
+    if (!hasValue && !hasValueFrom) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Variable value is required',
+        path: ['value'],
+      });
+    }
+
+    if (hasValue && envVariable.value?.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Variable value is required',
+        path: ['value'],
+      });
+    }
+  });
 const volumeMountSchema = z.object({
   mountPath: z
     .string()
@@ -230,6 +272,15 @@ export const appSchema = z
 
 export type AppSchema = z.infer<typeof appSchema>;
 export type AppSpecSchema = AppSchema['spec'];
+export type AppStatusSchema = z.infer<typeof appStatusSchema>;
+export const appCrdSchema = z.object({
+  spec: appSchema.shape.spec,
+  status: appStatusSchema.optional(),
+});
+export const appResourceSchema = appSchema.safeExtend({
+  status: appStatusSchema.optional(),
+});
+export type AppResourceSchema = z.infer<typeof appResourceSchema>;
 
 export const defaultAppData = {
   apiVersion: 'tesselar.io/v1alpha1',

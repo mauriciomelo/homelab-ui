@@ -40,17 +40,8 @@ export const baseApp: App = Object.freeze({
   ...baseAppBundle,
   status: {
     phase: APP_STATUS.RUNNING,
-    pods: [],
-    deployment: {
-      spec: { replicas: 1 },
-      status: {
-        availableReplicas: 1,
-        replicas: 1,
-        readyReplicas: 1,
-        updatedReplicas: 1,
-        conditions: [],
-      },
-    },
+    placements: [],
+    conditions: [],
   },
 });
 

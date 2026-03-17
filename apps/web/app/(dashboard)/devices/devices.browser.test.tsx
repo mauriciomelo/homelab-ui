@@ -348,46 +348,12 @@ describe('Devices Page', () => {
 
     const appOnAlpha = produce(baseApp, (draft) => {
       draft.app.metadata.name = 'app-alpha';
-            draft.status.pods = [
-        {
-          name: undefined,
-          metadata: {
-            creationTimestamp: undefined,
-          },
-          spec: {
-            nodeName: 'alpha-node',
-          },
-          status: {
-            phase: undefined,
-            startTime: undefined,
-            message: undefined,
-            reason: undefined,
-            conditions: undefined,
-          },
-        },
-      ];
+      draft.status.placements = [{ nodeName: 'alpha-node' }];
     });
 
     const appOnBeta = produce(baseApp, (draft) => {
       draft.app.metadata.name = 'app-beta';
-            draft.status.pods = [
-        {
-          name: undefined,
-          metadata: {
-            creationTimestamp: undefined,
-          },
-          spec: {
-            nodeName: 'beta-node',
-          },
-          status: {
-            phase: undefined,
-            startTime: undefined,
-            message: undefined,
-            reason: undefined,
-            conditions: undefined,
-          },
-        },
-      ];
+      draft.status.placements = [{ nodeName: 'beta-node' }];
     });
 
     worker.use(
@@ -428,24 +394,7 @@ describe('Devices Page', () => {
 
     const appOnAlpha = produce(baseApp, (draft) => {
       draft.app.metadata.name = 'app-alpha';
-            draft.status.pods = [
-        {
-          name: undefined,
-          metadata: {
-            creationTimestamp: undefined,
-          },
-          spec: {
-            nodeName: 'alpha-node',
-          },
-          status: {
-            phase: undefined,
-            startTime: undefined,
-            message: undefined,
-            reason: undefined,
-            conditions: undefined,
-          },
-        },
-      ];
+      draft.status.placements = [{ nodeName: 'alpha-node' }];
     });
 
     worker.use(

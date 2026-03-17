@@ -33,17 +33,14 @@ type EnvVariable = AppBundleSchema['app']['spec']['envVariables'][number];
 const authClientKeys = ['client-id', 'client-secret'] as const;
 type AuthClientKey = (typeof authClientKeys)[number];
 type AuthClientReference = ReturnType<typeof deriveResourceReferences>[number];
-type EnvVariableWithSecret = Extract<
-  EnvVariable,
-  {
-    valueFrom: {
-      secretKeyRef: {
-        name: string;
-        key: string;
-      };
+type EnvVariableWithSecret = EnvVariable & {
+  valueFrom: {
+    secretKeyRef: {
+      name: string;
+      key: string;
     };
-  }
->;
+  };
+};
 
 type EnvVariableValueFieldProps = {
   lens: Lens<EnvVariable>;
@@ -71,7 +68,7 @@ const authClientKeyLabels = {
 const hasSecretRef = (
   envVariable: EnvVariable | undefined,
 ): envVariable is EnvVariableWithSecret =>
-  Boolean(envVariable && 'valueFrom' in envVariable);
+  Boolean(envVariable?.valueFrom);
 
 const isAuthClientKey = (value: string): value is AuthClientKey =>
   authClientKeys.some((key) => key === value);
