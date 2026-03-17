@@ -1,4 +1,4 @@
-import _ from 'lodash';
+import get from 'lodash/get';
 import { Home, PencilRuler, Server, Settings } from 'lucide-react';
 import { useRouterState } from '@tanstack/react-router';
 
@@ -27,7 +27,7 @@ export function usePageInfo() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
-  const page = _.get(pathMap, pathname, defaultPageInfo);
+  const page = get(pathMap, pathname, defaultPageInfo);
 
   return { ...page, pathname };
 }

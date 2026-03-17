@@ -5,7 +5,11 @@ import { useState, type DragEvent } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { FileUp } from 'lucide-react';
 import YAML from 'yaml';
-import { appBundleSchema, type AppBundleSchema } from '@/app/api/schemas';
+import {
+  appBundleSchema,
+  appSchema,
+  type AppBundleSchema,
+} from '@/app/api/schemas';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -99,15 +103,27 @@ export const useAppDropArea = ({
       const parsed = YAML.parse(content);
       const result = appBundleSchema.safeParse(parsed);
 
-      if (!result.success) {
-        const issues = result.error.issues.map((issue) => issue.message);
-        setValidationError(`Invalid app config:\n${issues.join('\n')}`);
+      if (result.success) {
+        form.reset(result.data);
+        setIsConfirmOpen(false);
+        setPendingFile(null);
         return;
       }
 
-      form.reset(result.data);
-      setIsConfirmOpen(false);
-      setPendingFile(null);
+      const appResult = appSchema.safeParse(parsed);
+
+      if (appResult.success) {
+        form.reset({
+          app: appResult.data,
+          additionalResources: [],
+        });
+        setIsConfirmOpen(false);
+        setPendingFile(null);
+        return;
+      }
+
+      const issues = result.error.issues.map((issue) => issue.message);
+      setValidationError(`Invalid app config:\n${issues.join('\n')}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setValidationError(`Unable to read file: ${message}`);

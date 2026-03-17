@@ -32,6 +32,16 @@ export const baseAppBundle: z.infer<typeof appBundleSchema> = Object.freeze({
   additionalResources: [],
 });
 
+export const basePersistedAppManifest: z.infer<typeof appSchema> = Object.freeze({
+  ...baseAppManifest,
+  metadata: {
+    ...baseAppManifest.metadata,
+    annotations: {
+      'kustomize.toolkit.fluxcd.io/ssa': 'Ignore',
+    },
+  },
+});
+
 export const baseApp: App = Object.freeze({
   ...baseAppBundle,
   status: {
@@ -178,6 +188,7 @@ const baseKustomizationData: z.infer<typeof kustomizationSchema> = {
   },
   namespace: 'test-app',
   resources: [
+    'app.yaml',
     'deployment.yaml',
     'ingress.yaml',
     'service.yaml',

@@ -56,7 +56,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PageContent } from '@/components/page-content';
 import type { DiscoveredNode } from '@/mdns';
 import type { ClusterNode } from '@/app/api/devices';
-import _ from 'lodash';
+import capitalize from 'lodash/capitalize';
+import get from 'lodash/get';
 import type { App } from '@/app/api/applications';
 import { AppIcon } from '@/components/app-icon';
 import { useTransition, animated } from '@react-spring/web';
@@ -562,7 +563,7 @@ function NodeDetails({ node }: { node: Device }) {
 
   const osImage = node.nodeInfo.osImage ? ` (${node.nodeInfo.osImage})` : '';
   const storage = kibiBytesToGigabytes(
-    _.get(node, ['capacity', 'ephemeral-storage']),
+    get(node, ['capacity', 'ephemeral-storage']),
   );
 
   const memory = kibiBytesToGigabytes(node.capacity?.memory);
@@ -586,7 +587,7 @@ function NodeDetails({ node }: { node: Device }) {
         {
           label: 'Operating System',
           value:
-            `${_.capitalize(node.nodeInfo.operatingSystem)}${osImage}` ||
+            `${capitalize(node.nodeInfo.operatingSystem)}${osImage}` ||
             UNKNOWN,
           icon: Monitor,
           color: 'group-hover:text-orange-500',

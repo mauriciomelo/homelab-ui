@@ -9,6 +9,7 @@ import {
 import {
   baseApp,
   baseAppBundle,
+  baseAppManifest,
   basePersistentVolumeClaim,
 } from '@/test-utils/fixtures';
 import { produce } from 'immer';
@@ -1564,6 +1565,60 @@ describe('ApplicationForm', () => {
       await expect.element(portNameInput).toHaveValue('http');
       await expect.element(portNumberInput).toHaveValue(8080);
       await expect.element(pathInput).toHaveValue('/health');
+    });
+
+    test('fills form from dropped bare app manifest', async ({ worker }) => {
+      const user = userEvent.setup();
+      worker.use(
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([]);
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('Create App'));
+
+      const nameInput = page.getByPlaceholder('App Name');
+      const appSpec = produce(baseAppManifest, (app) => {
+        app.metadata.name = 'yaml-app';
+        app.spec.image = 'redis:7-alpine';
+        app.spec.ports = [{ name: 'http', containerPort: 8080 }];
+      });
+      const yamlContent = YAML.stringify(appSpec);
+      const dropArea = document.querySelector('[data-testid="app-drop-area"]');
+      if (!dropArea) {
+        throw new Error('Drop area not found');
+      }
+
+      const file = new File([yamlContent], 'app.yaml', { type: 'text/yaml' });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+
+      const createDragEvent = (eventName: string) => {
+        const event = new DragEvent(eventName, { bubbles: true });
+        Object.defineProperty(event, 'dataTransfer', {
+          value: dataTransfer,
+        });
+        return event;
+      };
+
+      ['dragenter', 'dragover', 'drop'].forEach((eventName) => {
+        dropArea.dispatchEvent(createDragEvent(eventName));
+      });
+
+      await expect
+        .poll(() => page.getByRole('button', { name: 'Use values' }))
+        .toBeInTheDocument();
+      await user.click(page.getByRole('button', { name: 'Use values' }));
+
+      const imageInput = page.getByPlaceholder(
+        'nginx:latest or registry.example.com/my-app:v1.0.0',
+      );
+
+      await expect.element(nameInput).toHaveValue('yaml-app');
+      await expect.element(imageInput).toHaveValue('redis:7-alpine');
+      await expect.element(page.getByText('No additional resources.')).toBeInTheDocument();
     });
 
     test('handles successful app creation', async ({ worker }) => {

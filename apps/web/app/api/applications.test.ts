@@ -8,6 +8,7 @@ import git, { PushResult } from 'isomorphic-git';
 import {
   AppBundleSchema,
   AppSchema,
+  appSchema,
   authClientSchema,
   deploymentSchema,
   IngressSchema,
@@ -23,6 +24,7 @@ import {
   baseIngress,
   baseKustomization,
   baseNamespace,
+  basePersistedAppManifest,
   basePersistentVolumeClaim,
   baseService,
 } from '../../test-utils/fixtures';
@@ -223,6 +225,7 @@ describe('updateApp', () => {
       draft.metadata.name = appName;
       draft.namespace = appName;
       draft.resources = [
+        'app.yaml',
         'deployment.yaml',
         'ingress.yaml',
         'service.yaml',
@@ -232,6 +235,12 @@ describe('updateApp', () => {
     });
 
     vol.fromJSON({
+      '/test-project/clusters/my-cluster/my-applications/test-app/app.yaml':
+        YAML.stringify(
+          produce(basePersistedAppManifest, (draft) => {
+            draft.metadata.name = appName;
+          }),
+        ),
       '/test-project/clusters/my-cluster/my-applications/test-app/deployment.yaml':
         YAML.stringify(currentDeployment),
       '/test-project/clusters/my-cluster/my-applications/test-app/service.yaml':
@@ -313,6 +322,34 @@ describe('createApp', () => {
     expect(createdApp).toBeDefined();
     expect(createdApp?.app.spec.image).toBe(image);
     expect(createdApp?.status.deployment.spec.replicas).toBe(replicas);
+  });
+
+  it('persists app.yaml with a Flux ignore annotation', async () => {
+    const appName = 'persisted-app';
+
+    await createApp(
+      createBundle(
+        produce(baseAppManifest, (draft) => {
+          draft.metadata.name = appName;
+        }),
+      ),
+    );
+
+    const { data: persistedApp } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/app.yaml`,
+      schema: appSchema,
+    });
+
+    expect(persistedApp.metadata.annotations).toEqual({
+      'kustomize.toolkit.fluxcd.io/ssa': 'Ignore',
+    });
+
+    const { data: persistedKustomization } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/kustomization.yaml`,
+      schema: kustomizationSchema,
+    });
+
+    expect(persistedKustomization.resources).toContain('app.yaml');
   });
 
   it('creates ingress with custom port', async () => {
@@ -607,6 +644,18 @@ describe('getApps', () => {
     seedFluxConfig();
   });
   it('retrieves all applications from file system', async () => {
+    const app1Manifest = produce(basePersistedAppManifest, (draft) => {
+      draft.metadata.name = 'app1';
+      draft.spec.image = 'nginx:latest';
+      draft.spec.envVariables = [{ name: 'ENV_VAR', value: 'production' }];
+    });
+
+    const app2Manifest = produce(basePersistedAppManifest, (draft) => {
+      draft.metadata.name = 'app2';
+      draft.spec.image = 'redis:7';
+      draft.spec.envVariables = [];
+    });
+
     const app1Deployment = produce(baseDeployment, (draft) => {
       draft.metadata.name = 'app1';
       draft.spec.template.spec.containers[0].image = 'nginx:latest';
@@ -628,6 +677,7 @@ describe('getApps', () => {
         './app1/kustomization.yaml': YAML.stringify(
           buildKustomization({ name: 'app1' }),
         ),
+        './app1/app.yaml': YAML.stringify(app1Manifest),
         './app1/ingress.yaml': YAML.stringify(buildIngress({ name: 'app1' })),
         './app1/service.yaml': YAML.stringify(buildService({ name: 'app1' })),
         './app1/namespace.yaml': YAML.stringify(
@@ -644,6 +694,7 @@ describe('getApps', () => {
         './app2/kustomization.yaml': YAML.stringify(
           buildKustomization({ name: 'app2' }),
         ),
+        './app2/app.yaml': YAML.stringify(app2Manifest),
         './app2/ingress.yaml': YAML.stringify(buildIngress({ name: 'app2' })),
         './app2/service.yaml': YAML.stringify(buildService({ name: 'app2' })),
         './app2/namespace.yaml': YAML.stringify(
@@ -664,6 +715,39 @@ describe('getApps', () => {
     expect(apps[1].app.metadata.name).toBe('app2');
     expect(apps[1].app.spec.image).toBe('redis:7');
     expect(apps[1].status.phase).toBe(APP_STATUS.RUNNING);
+  });
+
+  it('falls back to reconstructing the app when app.yaml is missing', async () => {
+    const appName = 'legacy-app';
+
+    vol.fromJSON(
+      {
+        './legacy-app/kustomization.yaml': YAML.stringify({
+          ...buildKustomization({ name: appName }),
+          resources: [
+            'namespace.yaml',
+            'deployment.yaml',
+            'service.yaml',
+            'ingress.yaml',
+          ],
+        }),
+        './legacy-app/ingress.yaml': YAML.stringify(buildIngress({ name: appName })),
+        './legacy-app/service.yaml': YAML.stringify(buildService({ name: appName })),
+        './legacy-app/namespace.yaml': YAML.stringify(buildNamespace({ name: appName })),
+        './legacy-app/deployment.yaml': YAML.stringify(
+          produce(baseDeployment, (draft) => {
+            draft.metadata.name = appName;
+            draft.spec.template.spec.containers[0].image = 'legacy:image';
+          }),
+        ),
+      },
+      '/test-project/clusters/my-cluster/my-applications/',
+    );
+
+    const apps = await getApps();
+    const app = apps.find((resource) => resource.app.metadata.name === appName);
+
+    expect(app?.app.spec.image).toBe('legacy:image');
   });
 
   it('correctly transforms the spec to files and back ', async () => {
@@ -687,6 +771,38 @@ describe('getApps', () => {
     expect(createdApp).toBeDefined();
     expect(createdApp?.app).toMatchObject(expectedSpec);
   });
+
+  it('prefers persisted app.yaml over generated manifests when reading apps', async () => {
+    const appName = 'canonical-app';
+    const persistedApp = produce(basePersistedAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.image = 'canonical:image';
+    });
+
+    const deployment = produce(baseDeployment, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.template.spec.containers[0].image = 'drifted:image';
+    });
+
+    vol.fromJSON(
+      {
+        './canonical-app/kustomization.yaml': YAML.stringify(
+          buildKustomization({ name: appName }),
+        ),
+        './canonical-app/app.yaml': YAML.stringify(persistedApp),
+        './canonical-app/ingress.yaml': YAML.stringify(buildIngress({ name: appName })),
+        './canonical-app/service.yaml': YAML.stringify(buildService({ name: appName })),
+        './canonical-app/namespace.yaml': YAML.stringify(buildNamespace({ name: appName })),
+        './canonical-app/deployment.yaml': YAML.stringify(deployment),
+      },
+      '/test-project/clusters/my-cluster/my-applications/',
+    );
+
+    const apps = await getApps();
+    const app = apps.find((resource) => resource.app.metadata.name === appName);
+
+    expect(app?.app.spec.image).toBe('canonical:image');
+  });
 });
 
 function buildKustomization({ name }: { name: string }) {
@@ -696,6 +812,7 @@ function buildKustomization({ name }: { name: string }) {
     metadata: { name: name },
     namespace: name,
     resources: [
+      'app.yaml',
       'namespace.yaml',
       'deployment.yaml',
       'service.yaml',

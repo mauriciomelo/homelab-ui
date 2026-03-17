@@ -4,11 +4,12 @@ import * as z from 'zod';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import path from 'path';
 import { AppBundleSchema, appBundleSchema } from './schemas';
-import * as _ from 'lodash';
+import merge from 'lodash/merge';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
 import { APP_STATUS, type AppStatus } from '@/app/constants';
 import {
+  appSchema,
   authClientSchema,
   deploymentSchema,
   ingressSchema,
@@ -18,13 +19,10 @@ import {
   serviceSchema,
 } from './schemas';
 import * as k from './k8s';
-import {
-  AppManifests,
-  fromManifests,
-  toBundleManifests,
-} from './app-k8s-adapter';
+import { fromManifests, toBundleManifests } from './app-k8s-adapter';
 
 export type AppResourceType =
+  | z.infer<typeof appSchema>
   | z.infer<typeof authClientSchema>
   | z.infer<typeof deploymentSchema>
   | z.infer<typeof ingressSchema>
@@ -36,6 +34,9 @@ export type AppResourceType =
 type AdditionalResourceSchema =
   | z.infer<typeof authClientSchema>
   | z.infer<typeof persistentVolumeClaimSchema>;
+
+const FLUX_IGNORE_SSA_ANNOTATION = 'kustomize.toolkit.fluxcd.io/ssa';
+const FLUX_IGNORE_SSA_VALUE = 'Ignore';
 
 export type AppRuntimeStatus = {
   phase: AppStatus;
@@ -130,8 +131,7 @@ export async function restartApp(name: string) {
 }
 
 async function getAppByName(name: string) {
-  const { ingress, deployment, service, namespace, additionalResources } =
-    await getManifestsFromAppFiles(name);
+  const { app, additionalResources } = await getManifestsFromAppFiles(name);
 
   const [deploymentRes, podsRes] = await Promise.all([
     k.appsApi().readNamespacedDeployment({ name, namespace: name }),
@@ -177,15 +177,9 @@ async function getAppByName(name: string) {
         pods.map((pod) => pod.status?.phase || APP_STATUS.UNKNOWN),
       );
 
-  const appBundle = fromManifests({
-    deployment: deployment,
-    ingress: ingress,
-    service: service,
-    namespace: namespace,
-    additionalResources: additionalResources,
-  });
   return {
-    ...appBundle,
+    app,
+    additionalResources,
     status: {
       phase: appStatus,
       pods,
@@ -214,45 +208,80 @@ async function getAppByName(name: string) {
 
 export async function updateApp(appBundle: AppBundleSchema) {
   const parsedAppBundle = appBundleSchema.parse(appBundle);
-  const appDir = getAppDir(parsedAppBundle.app.metadata.name);
-  const deploymentFilePath = `${appDir}/deployment.yaml`;
+  const appName = parsedAppBundle.app.metadata.name;
 
-  const {
-    deployment: nextDeployment,
-    ingress,
-    service,
-    namespace,
-    additionalResources,
-  } = toBundleManifests(parsedAppBundle);
+  try {
+    const appDir = getAppDir(appName);
+    const deploymentFilePath = `${appDir}/deployment.yaml`;
+    const appManifest = createPersistedAppManifest(parsedAppBundle.app);
 
-  const previousDeployment = await getFile({
-    path: deploymentFilePath,
-    schema: deploymentSchema,
-  });
+    const {
+      deployment: nextDeployment,
+      ingress,
+      service,
+      namespace,
+      additionalResources,
+    } = toBundleManifests({
+      ...parsedAppBundle,
+      app: appManifest,
+    });
 
-  const updatedDeployment = _.merge(previousDeployment.raw, nextDeployment);
+    const previousDeployment = await getFile({
+      path: deploymentFilePath,
+      schema: deploymentSchema,
+    });
 
-  const deployment = {
-    ...updatedDeployment,
-  } satisfies z.infer<typeof deploymentSchema>;
+    const updatedDeployment = merge({}, previousDeployment.raw, nextDeployment);
 
-  await writeResourcesToFileSystem(parsedAppBundle.app.metadata.name, [
-    namespace,
-    deployment,
-    service,
-    ingress,
-    ...additionalResources,
-  ]);
+    const deployment = {
+      ...updatedDeployment,
+    } satisfies z.infer<typeof deploymentSchema>;
 
-  await commitAndPushChanges(
-    parsedAppBundle.app.metadata.name,
-    `Update app ${parsedAppBundle.app.metadata.name}`,
-  );
+    await writeResourcesToFileSystem(appName, [
+      appManifest,
+      namespace,
+      deployment,
+      service,
+      ingress,
+      ...additionalResources,
+    ]);
 
-  return { success: true };
+    await commitAndPushChanges(appName, `Update app ${appName}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error(`[updateApp] Failed to update app "${appName}"`, error);
+    throw new Error(
+      `Failed to update app "${appName}": ${formatErrorMessage(error)}`,
+      {
+        cause: error,
+      },
+    );
+  }
+}
+
+function formatErrorMessage(error: unknown) {
+  if (error instanceof z.ZodError) {
+    return error.issues
+      .map((issue) => {
+        const path = issue.path.length > 0 ? issue.path.join('.') : 'root';
+        return `${path}: ${issue.message}`;
+      })
+      .join('; ');
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
 }
 
 function getFileName(resource: AppResourceType) {
+  if (resource.kind === 'App') {
+    return 'app.yaml';
+  }
+
   if (
     resource.kind === 'Deployment' ||
     resource.kind === 'Ingress' ||
@@ -337,10 +366,15 @@ async function commitAndPushChanges(appName: string, message: string) {
 
 export async function createApp(appBundle: AppBundleSchema) {
   const parsedAppBundle = appBundleSchema.parse(appBundle);
+  const appManifest = createPersistedAppManifest(parsedAppBundle.app);
   const { deployment, ingress, service, namespace, additionalResources } =
-    toBundleManifests(parsedAppBundle);
+    toBundleManifests({
+      ...parsedAppBundle,
+      app: appManifest,
+    });
 
   await writeResourcesToFileSystem(parsedAppBundle.app.metadata.name, [
+    appManifest,
     namespace,
     deployment,
     service,
@@ -385,11 +419,26 @@ export async function getFile<T>({
   return { data: schema.parse(matched), raw: matched };
 }
 
-async function getManifestsFromAppFiles(
-  appName: string,
-): Promise<AppManifests> {
+async function fileExists(filePath: string) {
+  try {
+    await fs.promises.stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function getManifestsFromAppFiles(appName: string): Promise<{
+  app: z.infer<typeof appSchema>;
+  deployment: z.infer<typeof deploymentSchema>;
+  service: z.infer<typeof serviceSchema>;
+  ingress: z.infer<typeof ingressSchema>;
+  namespace: z.infer<typeof namespaceSchema>;
+  additionalResources: AdditionalResourceSchema[];
+}> {
   const appPath = getAppDir(appName);
   const requiredFiles = new Set([
+    'app.yaml',
     'deployment.yaml',
     'ingress.yaml',
     'service.yaml',
@@ -406,25 +455,31 @@ async function getManifestsFromAppFiles(
   const additionalResourcesFileNames =
     kustomizationResources.difference(requiredFiles);
 
-  const deploymentResult = await getFile({
-    path: `${appPath}/deployment.yaml`,
-    schema: deploymentSchema,
-  });
-
-  const serviceResult = await getFile({
-    path: `${appPath}/service.yaml`,
-    schema: serviceSchema,
-  });
-
-  const ingressResult = await getFile({
-    path: `${appPath}/ingress.yaml`,
-    schema: ingressSchema,
-  });
-
-  const namespaceResult = await getFile({
-    path: `${appPath}/namespace.yaml`,
-    schema: namespaceSchema,
-  });
+  const [
+    appResult,
+    deploymentResult,
+    serviceResult,
+    ingressResult,
+    namespaceResult,
+  ] = await Promise.all([
+    getCanonicalApp(appPath),
+    getFile({
+      path: `${appPath}/deployment.yaml`,
+      schema: deploymentSchema,
+    }),
+    getFile({
+      path: `${appPath}/service.yaml`,
+      schema: serviceSchema,
+    }),
+    getFile({
+      path: `${appPath}/ingress.yaml`,
+      schema: ingressSchema,
+    }),
+    getFile({
+      path: `${appPath}/namespace.yaml`,
+      schema: namespaceSchema,
+    }),
+  ]);
 
   function schemaForFile(
     filename: string,
@@ -457,6 +512,7 @@ async function getManifestsFromAppFiles(
   );
 
   return {
+    app: appResult,
     deployment: deploymentResult.data,
     service: serviceResult.data,
     ingress: ingressResult.data,
@@ -464,6 +520,64 @@ async function getManifestsFromAppFiles(
     additionalResources: additionalResources.filter(
       (resource) => resource !== undefined,
     ),
+  };
+}
+
+async function getCanonicalApp(
+  appPath: string,
+): Promise<z.infer<typeof appSchema>> {
+  const appFilePath = `${appPath}/app.yaml`;
+
+  if (await fileExists(appFilePath)) {
+    const { data } = await getFile({
+      path: appFilePath,
+      schema: appSchema,
+    });
+
+    return data;
+  }
+
+  const [deploymentResult, ingressResult, serviceResult, namespaceResult] =
+    await Promise.all([
+      getFile({
+        path: `${appPath}/deployment.yaml`,
+        schema: deploymentSchema,
+      }),
+      getFile({
+        path: `${appPath}/ingress.yaml`,
+        schema: ingressSchema,
+      }),
+      getFile({
+        path: `${appPath}/service.yaml`,
+        schema: serviceSchema,
+      }),
+      getFile({
+        path: `${appPath}/namespace.yaml`,
+        schema: namespaceSchema,
+      }),
+    ]);
+
+  return fromManifests({
+    deployment: deploymentResult.data,
+    ingress: ingressResult.data,
+    service: serviceResult.data,
+    namespace: namespaceResult.data,
+    additionalResources: [],
+  }).app;
+}
+
+function createPersistedAppManifest(
+  app: z.infer<typeof appSchema>,
+): z.infer<typeof appSchema> {
+  return {
+    ...app,
+    metadata: {
+      ...app.metadata,
+      annotations: {
+        ...app.metadata.annotations,
+        [FLUX_IGNORE_SSA_ANNOTATION]: FLUX_IGNORE_SSA_VALUE,
+      },
+    },
   };
 }
 

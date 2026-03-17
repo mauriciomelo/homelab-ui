@@ -77,6 +77,10 @@ export const appSchema = z
           .string()
           .min(1, 'App name is required')
           .meta({ description: 'The name of the application' }),
+        annotations: z
+          .record(z.string(), z.string())
+          .optional()
+          .meta({ description: 'Optional metadata annotations for the app resource' }),
       })
       .meta({ description: 'App resource metadata' }),
     spec: z
