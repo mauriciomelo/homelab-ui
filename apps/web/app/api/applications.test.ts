@@ -717,39 +717,6 @@ describe('getApps', () => {
     expect(apps[1].status.phase).toBe(APP_STATUS.RUNNING);
   });
 
-  it('falls back to reconstructing the app when app.yaml is missing', async () => {
-    const appName = 'legacy-app';
-
-    vol.fromJSON(
-      {
-        './legacy-app/kustomization.yaml': YAML.stringify({
-          ...buildKustomization({ name: appName }),
-          resources: [
-            'namespace.yaml',
-            'deployment.yaml',
-            'service.yaml',
-            'ingress.yaml',
-          ],
-        }),
-        './legacy-app/ingress.yaml': YAML.stringify(buildIngress({ name: appName })),
-        './legacy-app/service.yaml': YAML.stringify(buildService({ name: appName })),
-        './legacy-app/namespace.yaml': YAML.stringify(buildNamespace({ name: appName })),
-        './legacy-app/deployment.yaml': YAML.stringify(
-          produce(baseDeployment, (draft) => {
-            draft.metadata.name = appName;
-            draft.spec.template.spec.containers[0].image = 'legacy:image';
-          }),
-        ),
-      },
-      '/test-project/clusters/my-cluster/my-applications/',
-    );
-
-    const apps = await getApps();
-    const app = apps.find((resource) => resource.app.metadata.name === appName);
-
-    expect(app?.app.spec.image).toBe('legacy:image');
-  });
-
   it('correctly transforms the spec to files and back ', async () => {
     const expectedSpec = produce(baseAppManifest, (draft) => {
       draft.metadata.name = 'homeassistant';

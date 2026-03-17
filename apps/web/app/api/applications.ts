@@ -19,7 +19,7 @@ import {
   serviceSchema,
 } from './schemas';
 import * as k from './k8s';
-import { fromManifests, toBundleManifests } from './app-k8s-adapter';
+import { toBundleManifests } from './app-k8s-adapter';
 
 export type AppResourceType =
   | z.infer<typeof appSchema>
@@ -419,15 +419,6 @@ export async function getFile<T>({
   return { data: schema.parse(matched), raw: matched };
 }
 
-async function fileExists(filePath: string) {
-  try {
-    await fs.promises.stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function getManifestsFromAppFiles(appName: string): Promise<{
   app: z.infer<typeof appSchema>;
   deployment: z.infer<typeof deploymentSchema>;
@@ -526,44 +517,12 @@ async function getManifestsFromAppFiles(appName: string): Promise<{
 async function getCanonicalApp(
   appPath: string,
 ): Promise<z.infer<typeof appSchema>> {
-  const appFilePath = `${appPath}/app.yaml`;
+  const { data } = await getFile({
+    path: `${appPath}/app.yaml`,
+    schema: appSchema,
+  });
 
-  if (await fileExists(appFilePath)) {
-    const { data } = await getFile({
-      path: appFilePath,
-      schema: appSchema,
-    });
-
-    return data;
-  }
-
-  const [deploymentResult, ingressResult, serviceResult, namespaceResult] =
-    await Promise.all([
-      getFile({
-        path: `${appPath}/deployment.yaml`,
-        schema: deploymentSchema,
-      }),
-      getFile({
-        path: `${appPath}/ingress.yaml`,
-        schema: ingressSchema,
-      }),
-      getFile({
-        path: `${appPath}/service.yaml`,
-        schema: serviceSchema,
-      }),
-      getFile({
-        path: `${appPath}/namespace.yaml`,
-        schema: namespaceSchema,
-      }),
-    ]);
-
-  return fromManifests({
-    deployment: deploymentResult.data,
-    ingress: ingressResult.data,
-    service: serviceResult.data,
-    namespace: namespaceResult.data,
-    additionalResources: [],
-  }).app;
+  return data;
 }
 
 function createPersistedAppManifest(

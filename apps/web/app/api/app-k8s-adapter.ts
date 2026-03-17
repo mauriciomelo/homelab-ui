@@ -170,43 +170,6 @@ export function toBundleManifests({
   };
 }
 
-/**
- * Builds the base app schema from Kubernetes manifests.
- */
-export function fromManifests({
-  deployment,
-  ingress,
-  additionalResources = [],
-}: AppManifests): AppBundleSchema {
-  const container = deployment.spec.template.spec.containers[0];
-  const appName = deployment.metadata.name;
-  const ingressPortName =
-    ingress.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name;
-  const health = deriveHealth(container);
-
-  const app: AppSchema = {
-    apiVersion: 'tesselar.io/v1alpha1',
-    kind: 'App',
-    metadata: {
-      name: appName,
-    },
-    spec: {
-      image: container.image,
-      ports: container.ports,
-      envVariables: container.env || [],
-      resources: container.resources,
-      ingress: { port: { name: ingressPortName } },
-      volumeMounts: container.volumeMounts,
-      ...(health ? { health } : {}),
-    },
-  };
-
-  return {
-    app,
-    additionalResources,
-  };
-}
-
 function buildHealthProbes(check: HealthCheck) {
   return {
     startupProbe: {
@@ -222,29 +185,6 @@ function buildHealthProbes(check: HealthCheck) {
       ...HEALTH_DEFAULTS.liveness,
     },
   };
-}
-
-function deriveHealth(
-  container: z.infer<
-    typeof deploymentSchema
-  >['spec']['template']['spec']['containers'][number],
-) {
-  const probe =
-    container.startupProbe?.httpGet ??
-    container.readinessProbe?.httpGet ??
-    container.livenessProbe?.httpGet;
-
-  if (!probe) {
-    return undefined;
-  }
-
-  const check: HealthCheck = {
-    type: 'httpGet',
-    path: probe.path,
-    port: probe.port,
-  };
-
-  return { check };
 }
 
 function deriveVolumesFromMounts(volumeMounts: AppSchema['spec']['volumeMounts']) {
