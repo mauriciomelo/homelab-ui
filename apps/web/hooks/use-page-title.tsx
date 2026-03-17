@@ -1,6 +1,6 @@
-import _ from 'lodash';
+import get from 'lodash/get';
 import { Home, PencilRuler, Server, Settings } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { useRouterState } from '@tanstack/react-router';
 
 const defaultPageInfo = { title: '', icon: null };
 
@@ -24,8 +24,10 @@ export const pathMap = {
 } as const;
 
 export function usePageInfo() {
-  const pathname = usePathname();
-  const page = _.get(pathMap, pathname, defaultPageInfo);
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const page = get(pathMap, pathname, defaultPageInfo);
 
   return { ...page, pathname };
 }

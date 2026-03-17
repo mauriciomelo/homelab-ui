@@ -1,5 +1,4 @@
-import 'server-only';
-import * as _ from 'lodash';
+import get from 'lodash/get';
 import { DEVICE_STATUS } from '@/app/constants';
 import crypto from 'crypto';
 import assert from 'assert';
@@ -127,7 +126,7 @@ export async function deleteNode(nodeName: string) {
     const coreApi = k8s.coreApi();
     await coreApi.deleteNode({ name: nodeName });
   } catch (error) {
-    if (_.get(error, 'code') === 404) {
+    if (get(error, 'code') === 404) {
       return;
     }
 

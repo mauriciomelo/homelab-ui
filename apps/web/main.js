@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+/* global require */
 const { app, BrowserWindow, shell } = require('electron');
 
 const createWindow = () => {

@@ -1,0 +1,46 @@
+import {
+  createRootRoute,
+  HeadContent,
+  Outlet,
+  Scripts,
+} from '@tanstack/react-router';
+import appCss from '@/app/globals.css?url';
+import { QueryProvider } from '@/lib/query-provider';
+
+export const Route = createRootRoute({
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      {
+        name: 'viewport',
+        content: 'width=device-width, initial-scale=1',
+      },
+      {
+        title: 'Homelab UI',
+      },
+    ],
+    links: [
+      {
+        rel: 'stylesheet',
+        href: appCss,
+      },
+    ],
+  }),
+  component: RootDocument,
+});
+
+function RootDocument() {
+  return (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body className="antialiased">
+        <QueryProvider>
+          <Outlet />
+        </QueryProvider>
+        <Scripts />
+      </body>
+    </html>
+  );
+}

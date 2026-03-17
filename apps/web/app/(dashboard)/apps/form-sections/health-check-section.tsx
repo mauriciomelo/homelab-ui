@@ -21,13 +21,13 @@ import {
 } from '@/components/ui/select';
 import type { Lens } from '@hookform/lenses';
 import { Activity } from 'lucide-react';
-import { defaultAppData, type AppSchema } from '@/app/api/schemas';
+import { defaultAppData, type AppBundleSchema } from '@/app/api/schemas';
 import { useController, useWatch } from 'react-hook-form';
 import { Switch } from '@/components/ui/switch';
 
 type HealthCheckSectionProps = {
-  healthLens: Lens<AppSchema['health']>;
-  ports: AppSchema['ports'];
+  healthLens: Lens<AppBundleSchema['app']['spec']['health']>;
+  ports: AppBundleSchema['app']['spec']['ports'];
 };
 
 export function HealthCheckSection({
@@ -48,7 +48,7 @@ export function HealthCheckSection({
       return;
     }
 
-    field.onChange(defaultAppData.health);
+    field.onChange(defaultAppData.spec.health);
   };
 
   return (

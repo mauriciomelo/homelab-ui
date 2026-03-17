@@ -22,16 +22,16 @@ import { cn } from '@/lib/utils';
 import type { Lens } from '@hookform/lenses';
 import { Globe, Plus, Trash2 } from 'lucide-react';
 import type { FieldArrayWithId, UseFormSetValue } from 'react-hook-form';
-import type { AppSchema } from '@/app/api/schemas';
+import type { AppBundleSchema } from '@/app/api/schemas';
 import { useWatch } from 'react-hook-form';
 
 type PortsSectionProps = {
-  portsLens: Lens<AppSchema['ports']>;
-  ingressLens: Lens<AppSchema['ingress']>;
-  fields: FieldArrayWithId<AppSchema, 'ports', 'id'>[];
+  portsLens: Lens<AppBundleSchema['app']['spec']['ports']>;
+  ingressLens: Lens<AppBundleSchema['app']['spec']['ingress']>;
+  fields: FieldArrayWithId<AppBundleSchema, 'app.spec.ports', 'id'>[];
   onAdd: () => void;
   onRemove: (index: number) => void;
-  setValue: UseFormSetValue<AppSchema>;
+  setValue: UseFormSetValue<AppBundleSchema>;
 };
 
 export function PortsSection({
@@ -128,12 +128,12 @@ export function PortsSection({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        if (currentPortName) {
-                          setValue('ingress.port.name', currentPortName);
-                        }
-                      }}
+                        size="icon"
+                        onClick={() => {
+                          if (currentPortName) {
+                              setValue('app.spec.ingress.port.name', currentPortName);
+                          }
+                        }}
                       className={cn(
                         'h-8 w-8 transition-colors',
                         isWebPort

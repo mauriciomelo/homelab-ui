@@ -13,7 +13,7 @@ import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import { useQuery } from '@tanstack/react-query';
 import { APP_STATUS } from '@/app/constants';
 import { useState } from 'react';
-import { App } from '@/app/api/applications';
+import type { App } from '@/app/api/applications';
 import { Status } from '@/components/ui/status';
 import { PageContent } from '@/components/page-content';
 import { AppIcon, appStatusProps } from '@/components/app-icon';
@@ -32,7 +32,7 @@ export function Apps() {
   const [formMode, setFormMode] = useState<FormMode>(null);
 
   const selectedApp = selectedAppName
-    ? (apps.data?.find((app) => app.spec.name === selectedAppName) ?? null)
+    ? (apps.data?.find((app) => app.app.metadata.name === selectedAppName) ?? null)
     : null;
 
   const handleCreateApp = () => {
@@ -41,7 +41,7 @@ export function Apps() {
   };
 
   const handleEditApp = (app: App) => {
-    setSelectedAppName(app.spec.name);
+    setSelectedAppName(app.app.metadata.name);
     setFormMode('edit');
   };
 
@@ -78,14 +78,14 @@ export function Apps() {
           </TableHeader>
           <TableBody>
             {apps.data?.map((app) => (
-              <TableRow
-                key={app.spec.name}
+                <TableRow
+                key={app.app.metadata.name}
                 className={cn({
-                  'animate-pulse': app.status === APP_STATUS.PENDING,
+                  'animate-pulse': app.status.phase === APP_STATUS.PENDING,
                 })}
               >
                 <TableCell className="w-2">
-                  <Status {...appStatusProps(app.status)} />
+                  <Status {...appStatusProps(app.status.phase)} />
                 </TableCell>
                 <TableCell>
                   <div className="size-4">
@@ -94,14 +94,14 @@ export function Apps() {
                 </TableCell>
                 <TableCell
                   className="cursor-pointer font-medium"
-                  onClick={() => handleEditApp(app)}
+                    onClick={() => handleEditApp(app)}
                 >
                   <div className="flex min-h-9 items-center">
-                    {app.spec.name}
+                    {app.app.metadata.name}
                   </div>
                 </TableCell>
 
-                <TableCell className="font-medium">{app.status}</TableCell>
+                <TableCell className="font-medium">{app.status.phase}</TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -19,6 +19,7 @@
 
 # production
 **/build
+**/dist
 **/dist-cli
 
 # misc

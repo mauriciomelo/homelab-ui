@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/sheet';
 import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
-import { defaultAppData, type AppSchema } from '@/app/api/schemas';
+import { defaultAppBundleData, type AppBundleSchema } from '@/app/api/schemas';
 import type { App } from '@/app/api/applications';
 import { ApplicationForm, useApplicationForm } from './application-form';
 import { AppDropArea, useAppDropArea } from './app-drop-area';
@@ -33,7 +33,7 @@ export function AppFormSheet({
   selectedAppName,
   onOpenChange,
 }: AppFormSheetProps) {
-  const formData: AppSchema = selectedApp?.spec ?? defaultAppData;
+  const formData: AppBundleSchema = selectedApp ?? defaultAppBundleData;
   const formIdentity = `${mode}-${selectedAppName ?? 'new'}`;
 
   const form = useApplicationForm({
@@ -64,7 +64,7 @@ export function AppFormSheet({
               <SheetTitle>
                 {mode === 'create'
                   ? 'Create New App'
-                  : (selectedApp?.spec.name ?? selectedAppName)}
+                  : (selectedApp?.app.metadata.name ?? selectedAppName)}
               </SheetTitle>
               <SheetDescription>
                 {mode === 'create'

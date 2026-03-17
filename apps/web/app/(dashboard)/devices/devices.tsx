@@ -54,10 +54,11 @@ import {
 import { faucet } from '@lucide/lab';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PageContent } from '@/components/page-content';
-import { DiscoveredNode } from '@/mdns';
-import { ClusterNode } from '@/app/api/devices';
-import _ from 'lodash';
-import { App } from '@/app/api/applications';
+import type { DiscoveredNode } from '@/mdns';
+import type { ClusterNode } from '@/app/api/devices';
+import capitalize from 'lodash/capitalize';
+import get from 'lodash/get';
+import type { App } from '@/app/api/applications';
 import { AppIcon } from '@/components/app-icon';
 import { useTransition, animated } from '@react-spring/web';
 import { useGLTF } from '@react-three/drei';
@@ -82,7 +83,7 @@ type DevicesProps = {
 
 function nodeApps(apps: App[], nodeName: string) {
   return apps.filter((app) =>
-    app.pods.some((pod) => pod.spec.nodeName === nodeName),
+    app.status.placements.some((placement) => placement.nodeName === nodeName),
   );
 }
 
@@ -94,7 +95,7 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
   );
 
   const transitions = useTransition(items, {
-    keys: (item) => item.spec.name,
+    keys: (item) => item.app.metadata.name,
     from: { opacity: 0, scale: 0 },
     enter: { opacity: 1, scale: 1 },
     leave: { opacity: 0, scale: 0 },
@@ -110,11 +111,11 @@ function NodeApps(props: { apps: App[]; node: string; className?: string }) {
               <AppIcon app={item} />
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem
-                onClick={() =>
-                  restartAppMutation.mutate({ name: item.spec.name })
-                }
-              >
+                <ContextMenuItem
+                  onClick={() =>
+                    restartAppMutation.mutate({ name: item.app.metadata.name })
+                  }
+                >
                 Restart App
               </ContextMenuItem>
             </ContextMenuContent>
@@ -562,7 +563,7 @@ function NodeDetails({ node }: { node: Device }) {
 
   const osImage = node.nodeInfo.osImage ? ` (${node.nodeInfo.osImage})` : '';
   const storage = kibiBytesToGigabytes(
-    _.get(node, ['capacity', 'ephemeral-storage']),
+    get(node, ['capacity', 'ephemeral-storage']),
   );
 
   const memory = kibiBytesToGigabytes(node.capacity?.memory);
@@ -586,7 +587,7 @@ function NodeDetails({ node }: { node: Device }) {
         {
           label: 'Operating System',
           value:
-            `${_.capitalize(node.nodeInfo.operatingSystem)}${osImage}` ||
+            `${capitalize(node.nodeInfo.operatingSystem)}${osImage}` ||
             UNKNOWN,
           icon: Monitor,
           color: 'group-hover:text-orange-500',

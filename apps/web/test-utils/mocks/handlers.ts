@@ -6,43 +6,35 @@ export const handlers = [
     return HttpResponse.json({
       json: [
         {
-          name: 'my-app',
-          spec: {
+          apiVersion: 'tesselar.io/v1alpha1',
+          kind: 'App',
+          metadata: {
             name: 'my-app',
+          },
+          spec: {
             image: 'postgres:16',
             envVariables: [{ name: 'DB_NAME', value: 'production' }],
           },
-          status: APP_STATUS.RUNNING,
-          pods: [],
-          iconUrl: 'https://cdn.simpleicons.org/my-app',
-          deployment: {
-            spec: { replicas: 1 },
-            status: {
-              availableReplicas: 1,
-              replicas: 1,
-              readyReplicas: 1,
-              updatedReplicas: 1,
-            },
+          status: {
+            phase: APP_STATUS.RUNNING,
+            placements: [],
+            conditions: [],
           },
         },
         {
-          name: 'web-app',
-          spec: {
+          apiVersion: 'tesselar.io/v1alpha1',
+          kind: 'App',
+          metadata: {
             name: 'web-app',
+          },
+          spec: {
             image: 'nginx:latest',
             envVariables: [],
           },
-          status: APP_STATUS.RUNNING,
-          pods: [],
-          iconUrl: 'https://cdn.simpleicons.org/web-app',
-          deployment: {
-            spec: { replicas: 2 },
-            status: {
-              availableReplicas: 2,
-              replicas: 2,
-              readyReplicas: 2,
-              updatedReplicas: 2,
-            },
+          status: {
+            phase: APP_STATUS.RUNNING,
+            placements: [],
+            conditions: [],
           },
         },
       ],

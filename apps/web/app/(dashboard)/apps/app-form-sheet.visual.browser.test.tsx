@@ -10,13 +10,13 @@ vi.mock('server-only', () => ({}));
 describe('app-form-sheet visual', () => {
   test('renders a full-featured app edit sheet', async () => {
     const fullFeaturedApp = produce(baseApp, (app) => {
-      app.spec.name = 'openwebui';
-      app.spec.image = 'ghcr.io/open-webui/open-webui:main';
-      app.spec.ports = [
+      app.app.metadata.name = 'openwebui';
+      app.app.spec.image = 'ghcr.io/open-webui/open-webui:main';
+      app.app.spec.ports = [
         { name: 'web', containerPort: 8080 },
         { name: 'metrics', containerPort: 9090 },
       ];
-      app.spec.envVariables = [
+      app.app.spec.envVariables = [
         {
           name: 'OAUTH_CLIENT_ID',
           valueFrom: {
@@ -40,16 +40,16 @@ describe('app-form-sheet visual', () => {
           value: 'https://openwebui.home.example.com',
         },
       ];
-      app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
-      app.spec.ingress = { port: { name: 'web' } };
-      app.spec.health = {
+      app.app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
+      app.app.spec.ingress = { port: { name: 'web' } };
+      app.app.spec.health = {
         check: {
           type: 'httpGet',
           path: '/healthz',
           port: 'web',
         },
       };
-      app.spec.additionalResources = [
+      app.additionalResources = [
         {
           apiVersion: 'tesselar.io/v1',
           kind: 'AuthClient',
@@ -75,7 +75,7 @@ describe('app-form-sheet visual', () => {
           },
         },
       ];
-      app.spec.volumeMounts = [
+      app.app.spec.volumeMounts = [
         {
           name: 'openwebui-data',
           mountPath: '/app/backend/data',
@@ -89,7 +89,7 @@ describe('app-form-sheet visual', () => {
         open
         mode="edit"
         selectedApp={fullFeaturedApp}
-        selectedAppName={fullFeaturedApp.spec.name}
+        selectedAppName={fullFeaturedApp.app.metadata.name}
         onOpenChange={() => {}}
       />,
     );

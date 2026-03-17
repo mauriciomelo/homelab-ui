@@ -6,47 +6,50 @@ import YAML from 'yaml';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import git, { PushResult } from 'isomorphic-git';
 import {
+  AppBundleSchema,
   AppSchema,
+  appSchema,
   authClientSchema,
-  deploymentSchema,
-  IngressSchema,
   kustomizationSchema,
   namespaceSchema,
   persistentVolumeClaimSchema,
-  serviceSchema,
 } from './schemas';
 import { setupMockGitRepo } from '../../test-utils';
 import {
-  baseApp,
-  baseDeployment,
-  baseIngress,
+  baseAppManifest,
   baseKustomization,
   baseNamespace,
+  basePersistedAppManifest,
   basePersistentVolumeClaim,
-  baseService,
 } from '../../test-utils/fixtures';
 import { produce } from 'immer';
 import { APP_STATUS } from '@/app/constants';
-import { ingressSchema } from './schemas';
 import * as k from './k8s';
 import z from 'zod';
 
 const gotkSyncPath =
   '/test-project/clusters/my-cluster/flux-system/gotk-sync.yaml';
 
+function createBundle(
+  app: AppSchema,
+  additionalResources: AppBundleSchema['additionalResources'] = [],
+): AppBundleSchema {
+  return {
+    app,
+    additionalResources,
+  };
+}
+
 vi.mock('server-only', () => ({}));
 
 vi.mock('./k8s', () => ({
   customObjectsApi: vi.fn().mockReturnValue({
-    patchNamespacedCustomObject: vi.fn(),
+    getNamespacedCustomObjectStatus: vi.fn(),
   }),
   appsApi: vi.fn().mockReturnValue({
-    readNamespacedDeployment: vi.fn(),
     patchNamespacedDeployment: vi.fn(),
   }),
-  coreApi: vi.fn().mockReturnValue({
-    listNamespacedPod: vi.fn(),
-  }),
+  coreApi: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock('../(dashboard)/apps/config', () => ({
@@ -71,32 +74,26 @@ const gitPushMock = vi.spyOn(git, 'push').mockResolvedValue({
 
 const mockGetAppConfig = vi.mocked(getAppConfig);
 
-const mockReadNamespacedDeployment = vi.fn().mockResolvedValue({
-  spec: { replicas: 1 },
+const mockGetNamespacedCustomObjectStatus = vi.fn().mockResolvedValue({
   status: {
-    replicas: 1,
-    updatedReplicas: 1,
-    availableReplicas: 1,
-    readyReplicas: 1,
+    phase: APP_STATUS.RUNNING,
+    placements: [],
+    conditions: [],
   },
-});
-const mockListNamespacedPod = vi.fn().mockResolvedValue({
-  items: [],
 });
 
 vi.mocked(k.appsApi).mockReturnValue(
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   {
-    readNamespacedDeployment: mockReadNamespacedDeployment,
     patchNamespacedDeployment: vi.fn(),
   } as unknown as ReturnType<typeof k.appsApi>,
 );
 
-vi.mocked(k.coreApi).mockReturnValue(
+vi.mocked(k.customObjectsApi).mockReturnValue(
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   {
-    listNamespacedPod: mockListNamespacedPod,
-  } as unknown as ReturnType<typeof k.coreApi>,
+    getNamespacedCustomObjectStatus: mockGetNamespacedCustomObjectStatus,
+  } as unknown as ReturnType<typeof k.customObjectsApi>,
 );
 
 beforeEach(async () => {
@@ -115,80 +112,8 @@ beforeEach(async () => {
 });
 
 describe('updateApp', () => {
-  it('updates the deployment file with new configuration', async () => {
-    const appName = 'test-app';
-
-    const currentDeployment = produce(baseDeployment, (draft) => {
-      draft.metadata.name = appName;
-      draft.spec.template.spec.containers[0].image = 'old-image:1.0';
-
-      // Starts with no env variables
-      draft.spec.template.spec.containers[0].env = [];
-    });
-
-    vol.fromJSON({
-      '/test-project/clusters/my-cluster/my-applications/test-app/deployment.yaml':
-        YAML.stringify(currentDeployment),
-    });
-
-    await setupMockGitRepo({
-      dir: '/test-project',
-      fs,
-    });
-
-    const newSpec = {
-      name: appName,
-      image: 'new-image:2.0',
-      ports: [{ name: 'http', containerPort: 80 }],
-      envVariables: [
-        { name: 'API_KEY', value: 'secret-key' },
-        { name: 'DEBUG', value: 'true' },
-      ],
-      resources: currentDeployment.spec.template.spec.containers[0].resources,
-      ingress: { port: { name: 'http' } },
-    } satisfies Partial<AppSchema>;
-
-    await expect(updateApp(newSpec)).resolves.toEqual({
-      success: true,
-    });
-
-    const updatedDeploymentPath =
-      '/test-project/clusters/my-cluster/my-applications/test-app/deployment.yaml';
-    const updatedDeploymentContent = fs
-      .readFileSync(updatedDeploymentPath, 'utf-8')
-      .toString();
-    const updatedDeployment = YAML.parse(updatedDeploymentContent);
-
-    expect(updatedDeployment.spec.template.spec.containers[0].image).toBe(
-      'new-image:2.0',
-    );
-
-    expect(updatedDeployment.spec.template.spec.containers[0].env).toEqual([
-      { name: 'API_KEY', value: 'secret-key' },
-      { name: 'DEBUG', value: 'true' },
-    ]);
-
-    expect(gitPushMock).toHaveBeenCalled();
-  });
-
   it('keeps all kustomization resources after update', async () => {
     const appName = 'test-app';
-
-    const currentDeployment = produce(baseDeployment, (draft) => {
-      draft.metadata.name = appName;
-      draft.spec.template.spec.containers[0].image = 'old-image:1.0';
-    });
-
-    const service = produce(baseService, (draft) => {
-      draft.metadata.name = appName;
-      draft.spec.selector.app = appName;
-    });
-
-    const ingress = produce(baseIngress, (draft) => {
-      draft.metadata.name = appName;
-      draft.spec.rules[0].host = `${appName}.\${DOMAIN}`;
-      draft.spec.rules[0].http.paths[0].backend.service.name = appName;
-    });
 
     const namespace = produce(baseNamespace, (draft) => {
       draft.metadata.name = appName;
@@ -206,21 +131,19 @@ describe('updateApp', () => {
       draft.metadata.name = appName;
       draft.namespace = appName;
       draft.resources = [
-        'deployment.yaml',
-        'ingress.yaml',
-        'service.yaml',
+        'app.yaml',
         'namespace.yaml',
         'data.persistentvolumeclaim.yaml',
       ];
     });
 
     vol.fromJSON({
-      '/test-project/clusters/my-cluster/my-applications/test-app/deployment.yaml':
-        YAML.stringify(currentDeployment),
-      '/test-project/clusters/my-cluster/my-applications/test-app/service.yaml':
-        YAML.stringify(service),
-      '/test-project/clusters/my-cluster/my-applications/test-app/ingress.yaml':
-        YAML.stringify(ingress),
+      '/test-project/clusters/my-cluster/my-applications/test-app/app.yaml':
+        YAML.stringify(
+          produce(basePersistedAppManifest, (draft) => {
+            draft.metadata.name = appName;
+          }),
+        ),
       '/test-project/clusters/my-cluster/my-applications/test-app/namespace.yaml':
         YAML.stringify(namespace),
       '/test-project/clusters/my-cluster/my-applications/test-app/data.persistentvolumeclaim.yaml':
@@ -234,16 +157,15 @@ describe('updateApp', () => {
       fs,
     });
 
-    const newSpec = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.image = 'new-image:2.0';
-      draft.ports = [{ name: 'http', containerPort: 80 }];
-      draft.envVariables = [];
-      draft.ingress = { port: { name: 'http' } };
-      draft.additionalResources = [pvc];
+    const newSpec = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.image = 'new-image:2.0';
+      draft.spec.ports = [{ name: 'http', containerPort: 80 }];
+      draft.spec.envVariables = [];
+      draft.spec.ingress = { port: { name: 'http' } };
     });
 
-    await updateApp(newSpec);
+    await updateApp(createBundle(newSpec, [pvc]));
 
     const { data: updatedKustomization } = await getFile({
       path: '/test-project/clusters/my-cluster/my-applications/test-app/kustomization.yaml',
@@ -253,6 +175,23 @@ describe('updateApp', () => {
     expect([...updatedKustomization.resources].sort()).toEqual(
       [...kustomization.resources].sort(),
     );
+    expect(
+      fs.existsSync(
+        '/test-project/clusters/my-cluster/my-applications/test-app/deployment.yaml',
+      ),
+    ).toBe(false);
+    expect(
+      fs.existsSync(
+        '/test-project/clusters/my-cluster/my-applications/test-app/service.yaml',
+      ),
+    ).toBe(false);
+    expect(
+      fs.existsSync(
+        '/test-project/clusters/my-cluster/my-applications/test-app/ingress.yaml',
+      ),
+    ).toBe(false);
+
+    expect(gitPushMock).toHaveBeenCalled();
   });
 });
 
@@ -271,87 +210,70 @@ describe('createApp', () => {
     const image = 'nginx:latest';
     const cpu = '0.5';
     const memory = '256Mi';
-    const replicas = 1;
 
-    await createApp({
-      name: appName,
-      image,
-      ports: [{ name: 'http', containerPort: 80 }],
-      envVariables: [],
-      resources: {
-        limits: { cpu, memory },
-      },
-      ingress: { port: { name: 'http' } },
-    });
+    await createApp(
+      createBundle({
+        apiVersion: 'tesselar.io/v1alpha1',
+        kind: 'App',
+        metadata: {
+          name: appName,
+        },
+        spec: {
+          image,
+          ports: [{ name: 'http', containerPort: 80 }],
+          envVariables: [],
+          resources: {
+            limits: { cpu, memory },
+          },
+          ingress: { port: { name: 'http' } },
+        },
+      }),
+    );
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === appName);
+    const createdApp = apps.find((app) => app.app.metadata.name === appName);
     expect(createdApp).toBeDefined();
-    expect(createdApp?.spec.image).toBe(image);
-    expect(createdApp?.deployment.spec.replicas).toBe(replicas);
+    expect(createdApp?.app.spec.image).toBe(image);
+    expect(createdApp?.status.phase).toBe(APP_STATUS.RUNNING);
   });
 
-  it('creates ingress with custom port', async () => {
-    const appName = 'custom-port-app';
-    const customPort = 8080;
+  it('persists app.yaml as the canonical app manifest', async () => {
+    const appName = 'persisted-app';
 
-    await createApp({
-      name: appName,
-      image: 'my-app:latest',
-      ports: [{ name: 'http', containerPort: customPort }],
-      envVariables: [],
-      resources: {
-        limits: { cpu: '1', memory: '1Gi' },
-      },
-      ingress: { port: { name: 'http' } },
-    });
-
-    const { data: ingress } = await getFile({
-      path: '/test-project/clusters/my-cluster/my-applications/custom-port-app/ingress.yaml',
-      schema: ingressSchema,
-    });
-
-    expect(ingress.spec.rules[0].http.paths[0].backend.service.port.name).toBe(
-      'http',
+    await createApp(
+      createBundle(
+        produce(baseAppManifest, (draft) => {
+          draft.metadata.name = appName;
+        }),
+      ),
     );
-  });
 
-  it('defaults deployments to recreate strategy', async () => {
-    const appName = 'recreate-app';
-
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.ports = [{ name: 'http', containerPort: 8080 }];
-      draft.ingress = { port: { name: 'http' } };
+    const { data: persistedApp } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/app.yaml`,
+      schema: appSchema,
     });
 
-    await createApp(app);
-
-    const { data: deployment } = await getFile({
-      path: `/test-project/clusters/my-cluster/my-applications/${appName}/deployment.yaml`,
-      schema: deploymentSchema,
+    expect(persistedApp).toMatchObject({
+      ...baseAppManifest,
+      metadata: { name: appName },
     });
 
-    expect(deployment.spec.strategy).toEqual({ type: 'Recreate' });
+    const { data: persistedKustomization } = await getFile({
+      path: `/test-project/clusters/my-cluster/my-applications/${appName}/kustomization.yaml`,
+      schema: kustomizationSchema,
+    });
+
+    expect(persistedKustomization.resources).toContain('app.yaml');
   });
 
-  it('creates service and namespace resources', async () => {
+  it('creates namespace and bundle resources only', async () => {
     const appName = 'required-resources-app';
-    const port = 8080;
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.ports = [{ name: 'http', containerPort: port }];
-      draft.envVariables = [];
-      draft.ingress = { port: { name: 'http' } };
-    });
-
-    const expectedService = produce(baseService, (draft) => {
+    const app = produce(baseAppManifest, (draft) => {
       draft.metadata.name = appName;
-      draft.spec.selector.app = appName;
-      draft.spec.ports[0].port = port;
-      draft.spec.ports[0].name = 'http';
-      draft.spec.ports[0].targetPort = 'http';
+      draft.spec.ports = [{ name: 'http', containerPort: 8080 }];
+      draft.spec.envVariables = [];
+      draft.spec.ingress = { port: { name: 'http' } };
     });
 
     const expectedNamespace = produce(baseNamespace, (draft) => {
@@ -359,77 +281,26 @@ describe('createApp', () => {
       draft.metadata.labels = { name: appName };
     });
 
-    await createApp(app);
-
-    const { data: service } = await getFile({
-      path: `/test-project/clusters/my-cluster/my-applications/${appName}/service.yaml`,
-      schema: serviceSchema,
-    });
+    await createApp(createBundle(app));
 
     const { data: namespace } = await getFile({
       path: `/test-project/clusters/my-cluster/my-applications/${appName}/namespace.yaml`,
       schema: namespaceSchema,
     });
 
-    expect(service).toEqual(expectedService);
+    const appDir = `/test-project/clusters/my-cluster/my-applications/${appName}`;
+
     expect(namespace).toEqual(expectedNamespace);
-  });
-
-  it('adds default health probes', async () => {
-    const appName = 'health-probe-app';
-
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.ports = [{ name: 'http', containerPort: 8080 }];
-      draft.ingress = { port: { name: 'http' } };
-      draft.health = {
-        check: {
-          type: 'httpGet',
-          path: '/',
-          port: 'http',
-        },
-      };
-    });
-
-    await createApp(app);
-
-    const { data: deployment } = await getFile({
-      path: `/test-project/clusters/my-cluster/my-applications/${appName}/deployment.yaml`,
-      schema: deploymentSchema,
-    });
-
-    const container = deployment.spec.template.spec.containers[0];
-
-    expect(container.startupProbe).toEqual({
-      httpGet: { path: '/', port: 'http' },
-      initialDelaySeconds: 5,
-      periodSeconds: 5,
-      timeoutSeconds: 2,
-      failureThreshold: 60,
-    });
-
-    expect(container.readinessProbe).toEqual({
-      httpGet: { path: '/', port: 'http' },
-      periodSeconds: 10,
-      timeoutSeconds: 2,
-      successThreshold: 1,
-      failureThreshold: 3,
-    });
-
-    expect(container.livenessProbe).toEqual({
-      httpGet: { path: '/', port: 'http' },
-      periodSeconds: 10,
-      timeoutSeconds: 2,
-      successThreshold: 1,
-      failureThreshold: 3,
-    });
+    expect(fs.existsSync(`${appDir}/deployment.yaml`)).toBe(false);
+    expect(fs.existsSync(`${appDir}/service.yaml`)).toBe(false);
+    expect(fs.existsSync(`${appDir}/ingress.yaml`)).toBe(false);
   });
 
   it('rejects health check ports outside defined ports', async () => {
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = 'invalid-health-port-app';
-      draft.ports = [{ name: 'http', containerPort: 8080 }];
-      draft.health = {
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = 'invalid-health-port-app';
+      draft.spec.ports = [{ name: 'http', containerPort: 8080 }];
+      draft.spec.health = {
         check: {
           type: 'httpGet',
           path: '/',
@@ -438,10 +309,10 @@ describe('createApp', () => {
       };
     });
 
-    await expect(createApp(app)).rejects.toMatchObject({
+    await expect(createApp(createBundle(app))).rejects.toMatchObject({
       issues: [
         {
-          path: ['health', 'check', 'port'],
+          path: ['app', 'spec', 'health', 'check', 'port'],
           message:
             'Health check port must reference a port in the defined ports list',
         },
@@ -462,12 +333,11 @@ describe('createApp', () => {
 
     const appName = 'myapp';
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.additionalResources = [expectedAuthClient];
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
     });
 
-    await createApp(app);
+    await createApp(createBundle(app, [expectedAuthClient]));
 
     const { data: persistedAuthClient } = await getFile({
       path: `/test-project/clusters/my-cluster/my-applications/${appName}/myauthclient.authclient.yaml`,
@@ -477,9 +347,11 @@ describe('createApp', () => {
     expect(persistedAuthClient).toEqual(expectedAuthClient);
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === app.spec.name);
+    const createdApp = apps.find(
+      (resource) => resource.app.metadata.name === app.metadata.name,
+    );
 
-    expect(createdApp?.spec.additionalResources).toEqual([expectedAuthClient]);
+    expect(createdApp?.additionalResources).toEqual([expectedAuthClient]);
   });
 
   it('creates persistent volume resources', async () => {
@@ -493,12 +365,11 @@ describe('createApp', () => {
 
     const appName = 'storage-app';
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.additionalResources = [expectedPersistentVolumeClaim];
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
     });
 
-    await createApp(app);
+    await createApp(createBundle(app, [expectedPersistentVolumeClaim]));
 
     const { data: persistedPersistentVolumeClaim } = await getFile({
       path: `/test-project/clusters/my-cluster/my-applications/${appName}/app-data.persistentvolumeclaim.yaml`,
@@ -510,9 +381,9 @@ describe('createApp', () => {
     );
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === appName);
+    const createdApp = apps.find((app) => app.app.metadata.name === appName);
 
-    expect(createdApp?.spec.additionalResources).toEqual([
+    expect(createdApp?.additionalResources).toEqual([
       expectedPersistentVolumeClaim,
     ]);
   });
@@ -528,11 +399,10 @@ describe('createApp', () => {
 
     const appName = 'volume-app';
 
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = appName;
-      draft.additionalResources = [expectedPersistentVolumeClaim];
-      draft.envVariables = [];
-      draft.volumeMounts = [
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = appName;
+      draft.spec.envVariables = [];
+      draft.spec.volumeMounts = [
         {
           mountPath: '/data',
           name: expectedPersistentVolumeClaim.metadata.name,
@@ -540,26 +410,25 @@ describe('createApp', () => {
       ];
     });
 
-    await createApp(app);
+    await createApp(createBundle(app, [expectedPersistentVolumeClaim]));
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === appName);
+    const createdApp = apps.find((app) => app.app.metadata.name === appName);
 
-    expect(createdApp?.spec.volumeMounts).toEqual(app.volumeMounts);
+    expect(createdApp?.app.spec.volumeMounts).toEqual(app.spec.volumeMounts);
   });
 
   it('rejects volume mounts without matching persistent volumes', async () => {
-    const app = produce(baseApp.spec, (draft) => {
-      draft.name = 'invalid-volume-app';
-      draft.additionalResources = [];
-      draft.envVariables = [];
-      draft.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = 'invalid-volume-app';
+      draft.spec.envVariables = [];
+      draft.spec.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
     });
 
-    await expect(createApp(app)).rejects.toMatchObject({
+    await expect(createApp(createBundle(app))).rejects.toMatchObject({
       issues: [
         {
-          path: ['volumeMounts', 0, 'name'],
+          path: ['app', 'spec', 'volumeMounts', 0, 'name'],
           message: 'Volume mount must reference a persistent volume',
         },
       ],
@@ -577,49 +446,41 @@ describe('getApps', () => {
     seedFluxConfig();
   });
   it('retrieves all applications from file system', async () => {
-    const app1Deployment = produce(baseDeployment, (draft) => {
+    const app1Manifest = produce(basePersistedAppManifest, (draft) => {
       draft.metadata.name = 'app1';
-      draft.spec.template.spec.containers[0].image = 'nginx:latest';
-      draft.spec.template.spec.containers[0].env = [
-        { name: 'ENV_VAR', value: 'production' },
-      ];
+      draft.spec.image = 'nginx:latest';
+      draft.spec.envVariables = [{ name: 'ENV_VAR', value: 'production' }];
     });
 
-    const app2Deployment = produce(baseDeployment, (draft) => {
+    const app2Manifest = produce(basePersistedAppManifest, (draft) => {
       draft.metadata.name = 'app2';
-      draft.spec.template.spec.containers[0].image = 'redis:7';
-      draft.spec.template.spec.containers[0].env = [];
+      draft.spec.image = 'redis:7';
+      draft.spec.envVariables = [];
     });
 
     const baseAppsDir = '/test-project/clusters/my-cluster/my-applications/';
-    // Create app1 files
     vol.fromJSON(
       {
         './app1/kustomization.yaml': YAML.stringify(
           buildKustomization({ name: 'app1' }),
         ),
-        './app1/ingress.yaml': YAML.stringify(buildIngress({ name: 'app1' })),
-        './app1/service.yaml': YAML.stringify(buildService({ name: 'app1' })),
+        './app1/app.yaml': YAML.stringify(app1Manifest),
         './app1/namespace.yaml': YAML.stringify(
           buildNamespace({ name: 'app1' }),
         ),
-        './app1/deployment.yaml': YAML.stringify(app1Deployment),
       },
       baseAppsDir,
     );
 
-    // Create app2 files
     vol.fromJSON(
       {
         './app2/kustomization.yaml': YAML.stringify(
           buildKustomization({ name: 'app2' }),
         ),
-        './app2/ingress.yaml': YAML.stringify(buildIngress({ name: 'app2' })),
-        './app2/service.yaml': YAML.stringify(buildService({ name: 'app2' })),
+        './app2/app.yaml': YAML.stringify(app2Manifest),
         './app2/namespace.yaml': YAML.stringify(
           buildNamespace({ name: 'app2' }),
         ),
-        './app2/deployment.yaml': YAML.stringify(app2Deployment),
       },
       baseAppsDir,
     );
@@ -627,36 +488,63 @@ describe('getApps', () => {
     const apps = await getApps();
 
     expect(apps).toHaveLength(2);
-    expect(apps[0].spec.name).toBe('app1');
-    expect(apps[0].spec.image).toBe('nginx:latest');
-    expect(apps[0].status).toBe(APP_STATUS.RUNNING);
-    expect(apps[0].link).toBe('https://app1.local');
+    expect(apps[0].app.metadata.name).toBe('app1');
+    expect(apps[0].app.spec.image).toBe('nginx:latest');
+    expect(apps[0].status.phase).toBe(APP_STATUS.RUNNING);
 
-    expect(apps[1].spec.name).toBe('app2');
-    expect(apps[1].spec.image).toBe('redis:7');
-    expect(apps[1].status).toBe(APP_STATUS.RUNNING);
-    expect(apps[1].link).toBe('https://app2.local');
+    expect(apps[1].app.metadata.name).toBe('app2');
+    expect(apps[1].app.spec.image).toBe('redis:7');
+    expect(apps[1].status.phase).toBe(APP_STATUS.RUNNING);
   });
 
   it('correctly transforms the spec to files and back ', async () => {
-    const expectedSpec = produce(baseApp.spec, (draft) => {
-      draft.name = 'homeassistant';
-      draft.image = 'homeassistant/home-assistant:stable';
-      draft.ports = [{ name: 'http', containerPort: 8081 }];
-      draft.envVariables = [];
-      draft.resources = {
+    const expectedSpec = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = 'homeassistant';
+      draft.spec.image = 'homeassistant/home-assistant:stable';
+      draft.spec.ports = [{ name: 'http', containerPort: 8081 }];
+      draft.spec.envVariables = [];
+      draft.spec.resources = {
         limits: { cpu: '100m', memory: '256Mi' },
       };
-      draft.ingress = { port: { name: 'http' } };
-      draft.additionalResources = [];
+      draft.spec.ingress = { port: { name: 'http' } };
     }) satisfies AppSchema;
 
-    await createApp(expectedSpec);
+    await createApp(createBundle(expectedSpec));
 
     const apps = await getApps();
-    const createdApp = apps.find((app) => app.spec.name === expectedSpec.name);
+    const createdApp = apps.find(
+      (app) => app.app.metadata.name === expectedSpec.metadata.name,
+    );
     expect(createdApp).toBeDefined();
-    expect(createdApp?.spec).toEqual(expectedSpec);
+    expect(createdApp?.app).toMatchObject(expectedSpec);
+  });
+
+  it('reports pending status before the controller creates a deployment', async () => {
+    mockGetNamespacedCustomObjectStatus.mockRejectedValueOnce({ code: 404 });
+
+    const appName = 'pending-app';
+    vol.fromJSON(
+      {
+        './pending-app/kustomization.yaml': YAML.stringify(
+          buildKustomization({ name: appName }),
+        ),
+        './pending-app/app.yaml': YAML.stringify(
+          produce(basePersistedAppManifest, (draft) => {
+            draft.metadata.name = appName;
+          }),
+        ),
+        './pending-app/namespace.yaml': YAML.stringify(
+          buildNamespace({ name: appName }),
+        ),
+      },
+      '/test-project/clusters/my-cluster/my-applications/',
+    );
+
+    const apps = await getApps();
+    const app = apps.find((resource) => resource.app.metadata.name === appName);
+
+    expect(app?.status.phase).toBe(APP_STATUS.PENDING);
+    expect(app?.status.placements).toEqual([]);
   });
 });
 
@@ -667,49 +555,10 @@ function buildKustomization({ name }: { name: string }) {
     metadata: { name: name },
     namespace: name,
     resources: [
+      'app.yaml',
       'namespace.yaml',
-      'deployment.yaml',
-      'service.yaml',
-      'ingress.yaml',
     ],
   };
-}
-
-function buildIngress({ name }: { name: string }): IngressSchema {
-  return {
-    apiVersion: 'networking.k8s.io/v1',
-    kind: 'Ingress',
-    metadata: {
-      name: name,
-      annotations: {},
-    },
-    spec: {
-      rules: [
-        {
-          http: {
-            paths: [
-              {
-                path: '/',
-                pathType: 'Prefix',
-                backend: {
-                  service: { name: name, port: { name: 'http' } },
-                },
-              },
-            ],
-          },
-        },
-      ],
-    },
-  };
-}
-
-function buildService({ name }: { name: string }) {
-  return produce(baseService, (draft) => {
-    draft.metadata.name = name;
-    draft.spec.selector.app = name;
-    draft.spec.ports[0].name = 'http';
-    draft.spec.ports[0].targetPort = 'http';
-  });
 }
 
 function buildNamespace({ name }: { name: string }) {

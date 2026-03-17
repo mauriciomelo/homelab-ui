@@ -7,12 +7,11 @@ import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Plus, Shield, HardDrive } from 'lucide-react';
-import type { App } from '@/app/api/applications';
 import isEqual from 'lodash/isEqual';
 import {
-  AppSchema,
-  appSchema,
-  defaultAppData,
+  AppBundleSchema,
+  appBundleSchema,
+  defaultAppBundleData,
   type PersistentVolumeClaimSchema,
 } from '@/app/api/schemas';
 import { controlPlaneOrpc } from '@/control-plane-orpc/client';
@@ -71,12 +70,12 @@ export function useApplicationForm({
   data,
   mode,
 }: {
-  data?: App['spec'];
+  data?: AppBundleSchema;
   mode: FormMode;
 }) {
-  const form = useForm<AppSchema>({
-    resolver: zodResolver(appSchema),
-    defaultValues: data ?? defaultAppData,
+  const form = useForm<AppBundleSchema>({
+    resolver: zodResolver(appBundleSchema),
+    defaultValues: data ?? defaultAppBundleData,
   });
 
   const createAppMutation = useMutation(
@@ -106,6 +105,8 @@ export function ApplicationForm(
   const { form, mode } = props;
 
   const lens = useLens({ control: form.control });
+  const appLens = lens.focus('app');
+  const appSpecLens = appLens.focus('spec');
   const additionalResourcesLens = lens.focus('additionalResources').defined();
 
   const [lastSeenData, setLastSeenData] = useState(props.data);
@@ -128,7 +129,7 @@ export function ApplicationForm(
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
-    name: 'envVariables',
+    name: 'app.spec.envVariables',
   });
 
   const {
@@ -146,7 +147,7 @@ export function ApplicationForm(
     remove: removePort,
   } = useFieldArray({
     control: form.control,
-    name: 'ports',
+    name: 'app.spec.ports',
   });
 
   const {
@@ -155,12 +156,12 @@ export function ApplicationForm(
     remove: removeVolumeMount,
   } = useFieldArray({
     control: form.control,
-    name: 'volumeMounts',
+    name: 'app.spec.volumeMounts',
   });
 
   const additionalResources =
     useWatch({ control: form.control, name: 'additionalResources' }) ?? [];
-  const ports = useWatch({ control: form.control, name: 'ports' });
+  const ports = useWatch({ control: form.control, name: 'app.spec.ports' });
   const persistentVolumeClaims = additionalResources.filter(
     (resource): resource is PersistentVolumeClaimSchema =>
       resource.kind === 'PersistentVolumeClaim',
@@ -183,15 +184,16 @@ export function ApplicationForm(
   };
 
   const addAuthClientResource = () => {
-    const newAuthClient: NonNullable<AppSchema['additionalResources']>[number] =
-      {
-        apiVersion: 'tesselar.io/v1',
-        kind: 'AuthClient',
-        metadata: { name: 'authclient' },
-        spec: {
-          redirectUris: [''],
-        },
-      };
+    const newAuthClient: NonNullable<
+      AppBundleSchema['additionalResources']
+    >[number] = {
+      apiVersion: 'tesselar.io/v1',
+      kind: 'AuthClient',
+      metadata: { name: 'authclient' },
+      spec: {
+        redirectUris: [''],
+      },
+    };
 
     appendAdditionalResource(newAuthClient);
   };
@@ -199,7 +201,7 @@ export function ApplicationForm(
   const createPersistentVolumeClaimResource = () => {
     const volumeName = getNextPersistentVolumeName(persistentVolumeClaims);
     const newPersistentVolumeClaim: NonNullable<
-      AppSchema['additionalResources']
+      AppBundleSchema['additionalResources']
     >[number] = {
       apiVersion: 'v1',
       kind: 'PersistentVolumeClaim',
@@ -257,33 +259,36 @@ export function ApplicationForm(
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AppBasicsSection lens={lens} mode={mode} />
+      <AppBasicsSection lens={appLens} mode={mode} />
 
-      <ResourceLimitsField lens={lens.focus('resources')} />
+      <ResourceLimitsField lens={appSpecLens.focus('resources')} />
 
       <Separator className="my-2" />
 
       <PortsSection
-        portsLens={lens.focus('ports')}
-        ingressLens={lens.focus('ingress')}
+        portsLens={appSpecLens.focus('ports')}
+        ingressLens={appSpecLens.focus('ingress')}
         fields={portFields}
         onAdd={addPort}
         onRemove={handleRemovePort}
         setValue={form.setValue}
       />
 
-      <HealthCheckSection healthLens={lens.focus('health')} ports={ports} />
+      <HealthCheckSection
+        healthLens={appSpecLens.focus('health')}
+        ports={ports}
+      />
 
       <EnvironmentVariablesSection
-        envVariablesLens={lens.focus('envVariables')}
-        additionalResourcesLens={lens.focus('additionalResources')}
+        envVariablesLens={appSpecLens.focus('envVariables')}
+         additionalResourcesLens={lens.focus('additionalResources')}
         fields={fields}
         onAdd={addEnvVariable}
         onRemove={removeEnvVariable}
       />
 
       <VolumeMountsSection
-        volumeMountsLens={lens.focus('volumeMounts')}
+        volumeMountsLens={appSpecLens.focus('volumeMounts')}
         volumeMountFields={volumeMountFields}
         persistentVolumeClaims={persistentVolumeClaims}
         onAdd={addVolumeMount}

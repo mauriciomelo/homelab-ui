@@ -26,24 +26,21 @@ import { Link2, Plus, Shield, Trash2, Unlink2 } from 'lucide-react';
 import type { Lens } from '@hookform/lenses';
 import { useController, useWatch } from 'react-hook-form';
 import type { FieldArrayWithId } from 'react-hook-form';
-import { deriveResourceReferences, type AppSchema } from '@/app/api/schemas';
+import { deriveResourceReferences, type AppBundleSchema } from '@/app/api/schemas';
 import { cn } from '@/lib/utils';
 
-type EnvVariable = AppSchema['envVariables'][number];
+type EnvVariable = AppBundleSchema['app']['spec']['envVariables'][number];
 const authClientKeys = ['client-id', 'client-secret'] as const;
 type AuthClientKey = (typeof authClientKeys)[number];
 type AuthClientReference = ReturnType<typeof deriveResourceReferences>[number];
-type EnvVariableWithSecret = Extract<
-  EnvVariable,
-  {
-    valueFrom: {
-      secretKeyRef: {
-        name: string;
-        key: string;
-      };
+type EnvVariableWithSecret = EnvVariable & {
+  valueFrom: {
+    secretKeyRef: {
+      name: string;
+      key: string;
     };
-  }
->;
+  };
+};
 
 type EnvVariableValueFieldProps = {
   lens: Lens<EnvVariable>;
@@ -59,8 +56,8 @@ type AuthClientLinkMenuProps = {
 };
 
 type UseAuthClientEnvLinksArgs = {
-  envVariablesLens: Lens<AppSchema['envVariables']>;
-  additionalResourcesLens: Lens<AppSchema['additionalResources']>;
+  envVariablesLens: Lens<AppBundleSchema['app']['spec']['envVariables']>;
+  additionalResourcesLens: Lens<AppBundleSchema['additionalResources']>;
 };
 
 const authClientKeyLabels = {
@@ -71,7 +68,7 @@ const authClientKeyLabels = {
 const hasSecretRef = (
   envVariable: EnvVariable | undefined,
 ): envVariable is EnvVariableWithSecret =>
-  Boolean(envVariable && 'valueFrom' in envVariable);
+  Boolean(envVariable?.valueFrom);
 
 const isAuthClientKey = (value: string): value is AuthClientKey =>
   authClientKeys.some((key) => key === value);
@@ -286,9 +283,9 @@ function AuthClientLinkMenu({
 }
 
 type EnvironmentVariablesSectionProps = {
-  envVariablesLens: Lens<AppSchema['envVariables']>;
-  additionalResourcesLens: Lens<AppSchema['additionalResources']>;
-  fields: FieldArrayWithId<AppSchema, 'envVariables', 'id'>[];
+  envVariablesLens: Lens<AppBundleSchema['app']['spec']['envVariables']>;
+  additionalResourcesLens: Lens<AppBundleSchema['additionalResources']>;
+  fields: FieldArrayWithId<AppBundleSchema, 'app.spec.envVariables', 'id'>[];
   onAdd: () => void;
   onRemove: (index: number) => void;
 };

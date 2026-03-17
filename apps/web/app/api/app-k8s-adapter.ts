@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-import { AppSchema } from './schemas';
+import { AdditionalResourceSchema, AppBundleSchema, AppSchema } from './schemas';
 import {
   deploymentSchema,
   ingressSchema,
@@ -8,7 +8,7 @@ import {
   serviceSchema,
 } from './schemas';
 
-type HealthCheck = NonNullable<AppSchema['health']>['check'];
+type HealthCheck = NonNullable<AppSchema['spec']['health']>['check'];
 
 const HEALTH_DEFAULTS = {
   startup: {
@@ -35,13 +35,23 @@ const HEALTH_DEFAULTS = {
  * Generates Kubernetes manifests (Deployment, Ingress, Kustomization, etc.)
  * from the base app schema.
  */
-export function toManifests(app: AppSchema) {
-  const healthProbes = app.health ? buildHealthProbes(app.health.check) : {};
+export type AppManifests = {
+  deployment: z.infer<typeof deploymentSchema>;
+  ingress: z.infer<typeof ingressSchema>;
+  service: z.infer<typeof serviceSchema>;
+  namespace: z.infer<typeof namespaceSchema>;
+  additionalResources: AdditionalResourceSchema[];
+};
+
+export function toManifests(app: AppSchema): AppManifests {
+  const healthProbes = app.spec.health
+    ? buildHealthProbes(app.spec.health.check)
+    : {};
   const deployment: z.infer<typeof deploymentSchema> = {
     apiVersion: 'apps/v1',
     kind: 'Deployment' as const,
     metadata: {
-      name: app.name,
+      name: app.metadata.name,
     },
     spec: {
       strategy: {
@@ -49,32 +59,32 @@ export function toManifests(app: AppSchema) {
       },
       selector: {
         matchLabels: {
-          app: app.name,
+          app: app.metadata.name,
         },
       },
       template: {
         metadata: {
           labels: {
-            app: app.name,
+            app: app.metadata.name,
           },
         },
         spec: {
           containers: [
             {
-              name: app.name,
-              image: app.image,
-              ports: app.ports.map((port) => ({
+              name: app.metadata.name,
+              image: app.spec.image,
+              ports: app.spec.ports.map((port) => ({
                 name: port.name,
                 containerPort: port.containerPort,
               })),
-              env: app.envVariables,
-              resources: app.resources,
-              volumeMounts: app.volumeMounts,
+              env: toContainerEnvVariables(app.spec.envVariables),
+              resources: app.spec.resources,
+              volumeMounts: app.spec.volumeMounts,
               ...healthProbes,
             },
           ],
 
-          volumes: deriveVolumesFromMounts(app.volumeMounts),
+          volumes: deriveVolumesFromMounts(app.spec.volumeMounts),
         },
       },
     },
@@ -84,13 +94,13 @@ export function toManifests(app: AppSchema) {
     apiVersion: 'networking.k8s.io/v1',
     kind: 'Ingress' as const,
     metadata: {
-      name: app.name,
+      name: app.metadata.name,
       annotations: {},
     },
     spec: {
       rules: [
         {
-          host: `${app.name}.\${DOMAIN}`,
+          host: `${app.metadata.name}.\${DOMAIN}`,
           http: {
             paths: [
               {
@@ -98,8 +108,8 @@ export function toManifests(app: AppSchema) {
                 pathType: 'Prefix' as const,
                 backend: {
                   service: {
-                    name: app.name,
-                    port: { name: app.ingress.port.name },
+                    name: app.metadata.name,
+                    port: { name: app.spec.ingress.port.name },
                   },
                 },
               },
@@ -114,14 +124,14 @@ export function toManifests(app: AppSchema) {
     apiVersion: 'v1',
     kind: 'Service' as const,
     metadata: {
-      name: app.name,
+      name: app.metadata.name,
     },
     spec: {
       type: 'ClusterIP',
       selector: {
-        app: app.name,
+        app: app.metadata.name,
       },
-      ports: app.ports.map((port) => ({
+      ports: app.spec.ports.map((port) => ({
         name: port.name,
         port: port.containerPort,
         protocol: 'TCP',
@@ -134,9 +144,9 @@ export function toManifests(app: AppSchema) {
     apiVersion: 'v1',
     kind: 'Namespace' as const,
     metadata: {
-      name: app.name,
+      name: app.metadata.name,
       labels: {
-        name: app.name,
+        name: app.metadata.name,
       },
     },
   };
@@ -146,39 +156,18 @@ export function toManifests(app: AppSchema) {
     ingress,
     service,
     namespace,
-    additionalResources: app.additionalResources ?? [],
+    additionalResources: [],
   };
 }
 
-export type AppManifests = ReturnType<typeof toManifests>;
-
-/**
- * Builds the base app schema from Kubernetes manifests.
- */
-export function fromManifests({
-  deployment,
-  ingress,
-  additionalResources = [],
-}: AppManifests): AppSchema {
-  const container = deployment.spec.template.spec.containers[0];
-  const appName = deployment.metadata.name;
-  const ingressPortName =
-    ingress.spec.rules[0]?.http?.paths[0]?.backend?.service?.port?.name;
-  const health = deriveHealth(container);
-
-  const app: AppSchema = {
-    name: appName,
-    image: container.image,
-    ports: container.ports,
-    envVariables: container.env || [],
-    resources: container.resources,
-    ingress: { port: { name: ingressPortName } },
-    additionalResources: additionalResources,
-    volumeMounts: container.volumeMounts,
-    ...(health ? { health } : {}),
+export function toBundleManifests({
+  app,
+  additionalResources,
+}: AppBundleSchema): AppManifests {
+  return {
+    ...toManifests(app),
+    additionalResources,
   };
-
-  return app;
 }
 
 function buildHealthProbes(check: HealthCheck) {
@@ -198,30 +187,7 @@ function buildHealthProbes(check: HealthCheck) {
   };
 }
 
-function deriveHealth(
-  container: z.infer<
-    typeof deploymentSchema
-  >['spec']['template']['spec']['containers'][number],
-) {
-  const probe =
-    container.startupProbe?.httpGet ??
-    container.readinessProbe?.httpGet ??
-    container.livenessProbe?.httpGet;
-
-  if (!probe) {
-    return undefined;
-  }
-
-  const check: HealthCheck = {
-    type: 'httpGet',
-    path: probe.path,
-    port: probe.port,
-  };
-
-  return { check };
-}
-
-function deriveVolumesFromMounts(volumeMounts: AppSchema['volumeMounts']) {
+function deriveVolumesFromMounts(volumeMounts: AppSchema['spec']['volumeMounts']) {
   if (!volumeMounts) {
     return;
   }
@@ -236,4 +202,20 @@ function deriveVolumesFromMounts(volumeMounts: AppSchema['volumeMounts']) {
       claimName: volumeMountName,
     },
   }));
+}
+
+function toContainerEnvVariables(envVariables: AppSchema['spec']['envVariables']) {
+  return envVariables.map((envVariable) => {
+    if (envVariable.valueFrom) {
+      return {
+        name: envVariable.name,
+        valueFrom: envVariable.valueFrom,
+      };
+    }
+
+    return {
+      name: envVariable.name,
+      value: envVariable.value ?? '',
+    };
+  });
 }

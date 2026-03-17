@@ -1,5 +1,5 @@
 import { getApps } from '@/app/api/applications';
-import { appSchema } from '@/app/api/schemas';
+import { appBundleSchema } from '@/app/api/schemas';
 import { createApp, restartApp, updateApp } from '@/app/api/applications';
 import {
   createBootstrapToken,
@@ -21,10 +21,10 @@ export const controlPlaneRouter = {
     list: os.handler(async () => {
       return getApps();
     }),
-    create: os.input(appSchema).handler(async ({ input }) => {
+    create: os.input(appBundleSchema).handler(async ({ input }) => {
       return createApp(input);
     }),
-    update: os.input(appSchema).handler(async ({ input }) => {
+    update: os.input(appBundleSchema).handler(async ({ input }) => {
       return updateApp(input);
     }),
   },

@@ -1,20 +1,23 @@
-import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
-import nextTypescript from 'eslint-config-next/typescript';
+import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import tseslint from 'typescript-eslint';
 
-const eslintConfig = [
+export default tseslint.config(
   {
     ignores: [
       'node_modules/**',
       '.next/**',
+      '.output/**',
+      'dist/**',
       'out/**',
       'build/**',
       'dist-cli/**',
-      'next-env.d.ts',
+      'public/mockServiceWorker.js',
+      'routeTree.gen.ts',
     ],
   },
-  ...nextCoreWebVitals,
-  ...nextTypescript,
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
   prettier,
   {
     rules: {
@@ -28,6 +31,4 @@ const eslintConfig = [
       ],
     },
   },
-];
-
-export default eslintConfig;
+);

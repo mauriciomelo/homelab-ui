@@ -1,4 +1,6 @@
 export * from './app-schema';
+export * from './app-bundle-schema';
+export * from './additional-resource-schema';
 export * from './auth-client-schema';
 export * from './persistent-volume-claim-schema';
 export * from './deployment-schema';
