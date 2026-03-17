@@ -34,12 +34,6 @@ export const baseAppBundle: z.infer<typeof appBundleSchema> = Object.freeze({
 
 export const basePersistedAppManifest: z.infer<typeof appSchema> = Object.freeze({
   ...baseAppManifest,
-  metadata: {
-    ...baseAppManifest.metadata,
-    annotations: {
-      'kustomize.toolkit.fluxcd.io/ssa': 'Ignore',
-    },
-  },
 });
 
 export const baseApp: App = Object.freeze({

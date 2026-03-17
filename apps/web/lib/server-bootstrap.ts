@@ -1,5 +1,6 @@
 import { getOptionalConfig } from '@/app/(dashboard)/apps/config';
 import { registerAuthClientController } from '@/app/api/auth-controller';
+import { registerAppController } from '@/app/api/app-controller';
 
 let bootstrapped = false;
 
@@ -15,5 +16,6 @@ export async function ensureServerBootstrap() {
     publishService();
   }
 
+  await registerAppController();
   await registerAuthClientController();
 }
