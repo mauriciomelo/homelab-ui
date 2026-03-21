@@ -5,6 +5,7 @@ import isEqual from 'lodash/isEqual';
 import { z } from 'zod';
 
 import { APP_STATUS } from '@/app/constants';
+import { logger } from '@/lib/logger';
 import { toManifests } from './app-k8s-adapter';
 import {
   apiextensionsV1Api,
@@ -31,6 +32,7 @@ const systemConfigNamespace = 'tesselar-system';
 const watchOptions = { allowWatchBookmarks: true };
 const openApiV3Schema = createOpenApiV3Schema();
 const reconcileQueue = new Map<string, Promise<void>>();
+const appControllerLogger = logger.child({ controller: 'app-controller' });
 
 type WatchedApp = k8s.KubernetesObject & {
   apiVersion: 'tesselar.io/v1alpha1';
@@ -85,12 +87,18 @@ function isKubernetesError(err: unknown): err is { code: number } {
 }
 
 export async function registerAppController() {
+  appControllerLogger.info('Registering app controller');
   await createCrdIfNotExists();
   watchAppResources();
+  appControllerLogger.info('App controller registered');
 }
 
 async function createCrdIfNotExists() {
   const client = apiextensionsV1Api();
+  const crdLogger = appControllerLogger.child({
+    operation: 'ensure-crd',
+    crdName: crd.metadata!.name!,
+  });
 
   try {
     const existing = await client.readCustomResourceDefinition({
@@ -98,6 +106,7 @@ async function createCrdIfNotExists() {
     });
 
     if (needsCrdUpdate(existing)) {
+      crdLogger.info('Updating App CRD');
       await client.replaceCustomResourceDefinition({
         name: crd.metadata!.name!,
         body: {
@@ -107,13 +116,21 @@ async function createCrdIfNotExists() {
           },
         },
       });
-    }
-  } catch (err: unknown) {
-    if (isKubernetesError(err) && err.code === 404) {
-      await client.createCustomResourceDefinition({ body: crd });
+
+      crdLogger.info('Updated App CRD');
       return;
     }
 
+    crdLogger.debug('App CRD is up to date');
+  } catch (err: unknown) {
+    if (isKubernetesError(err) && err.code === 404) {
+      crdLogger.info('Creating App CRD');
+      await client.createCustomResourceDefinition({ body: crd });
+      crdLogger.info('Created App CRD');
+      return;
+    }
+
+    crdLogger.error({ err }, 'Failed to ensure App CRD');
     throw err;
   }
 }
@@ -140,6 +157,8 @@ function watchAppResources() {
   kc.loadFromDefault();
   const watch = new k8s.Watch(kc);
 
+  appControllerLogger.info('Starting resource watches');
+
   watchResource({
     watch,
     path: `/apis/${group}/${version}/${plural}`,
@@ -148,7 +167,13 @@ function watchAppResources() {
         return;
       }
 
+      const eventLogger = appControllerLogger.child({
+        eventType: type,
+        ...getAppLogContext(apiObj),
+      });
+
       if (!shouldReconcileApp(apiObj)) {
+        eventLogger.debug('Skipping app reconcile because status is current');
         return;
       }
 
@@ -160,12 +185,14 @@ function watchAppResources() {
       }
 
       await runSerialized(`${namespace}/${name}`, async () => {
+        eventLogger.info('Reconciling app resources');
         await reconcileApp(apiObj);
         await reconcileAppStatus({
           name,
           namespace,
           observedGeneration: apiObj.metadata.generation,
         });
+        eventLogger.info('Reconciled app resources');
       });
     },
   });
@@ -189,7 +216,15 @@ function watchAppResources() {
         return;
       }
 
+      const eventLogger = appControllerLogger.child({
+        eventType: type,
+        name,
+        namespace,
+        resource: 'deployment',
+      });
+
       await runSerialized(`${namespace}/${name}`, async () => {
+        eventLogger.debug('Refreshing app status from deployment event');
         await reconcileAppStatus({
           name,
           namespace,
@@ -217,7 +252,15 @@ function watchAppResources() {
         return;
       }
 
+      const eventLogger = appControllerLogger.child({
+        eventType: type,
+        name,
+        namespace,
+        resource: 'pod',
+      });
+
       await runSerialized(`${namespace}/${name}`, async () => {
+        eventLogger.debug('Refreshing app status from pod event');
         await reconcileAppStatus({
           name,
           namespace,
@@ -228,6 +271,7 @@ function watchAppResources() {
 }
 
 async function runSerialized(key: string, operation: () => Promise<void>) {
+  appControllerLogger.debug({ key }, 'Queueing serialized reconcile operation');
   const previous = reconcileQueue.get(key) ?? Promise.resolve();
   const next = previous
     .catch(() => {})
@@ -251,6 +295,7 @@ function watchResource<T extends k8s.KubernetesObject>({
   path: string;
   onEvent: (type: string, obj: T) => Promise<void>;
 }) {
+  appControllerLogger.debug({ path }, 'Registering watch');
   watch.watch(
     path,
     watchOptions,
@@ -258,11 +303,19 @@ function watchResource<T extends k8s.KubernetesObject>({
       try {
         await onEvent(type, apiObj);
       } catch (error) {
-        console.error(error);
+        appControllerLogger.error(
+          {
+            err: error,
+            path,
+            eventType: type,
+            ...getObjectLogContext(apiObj),
+          },
+          'Watch event handler failed',
+        );
       }
     },
     (error) => {
-      console.error(error);
+      appControllerLogger.error({ err: error, path }, 'Watch stream failed');
     },
   );
 }
@@ -290,6 +343,13 @@ async function reconcileApp(apiObj: WatchedApp) {
   assert(typeof name === 'string', 'Name must be a string');
   assert(typeof namespace === 'string', 'Namespace must be a string');
   assert(typeof uid === 'string', 'UID must be a string');
+
+  const reconcileLogger = appControllerLogger.child({
+    operation: 'reconcile-app',
+    name,
+    namespace,
+    generation: apiObj.metadata?.generation,
+  });
 
   const app = appSchema.parse({
     apiVersion: apiObj.apiVersion,
@@ -336,6 +396,8 @@ async function reconcileApp(apiObj: WatchedApp) {
       ),
     ),
   ]);
+
+  reconcileLogger.info({ domain }, 'Applied app runtime resources');
 }
 
 async function reconcileAppStatus({
@@ -347,13 +409,22 @@ async function reconcileAppStatus({
   namespace: string | undefined;
   observedGeneration?: number;
 }) {
+  const statusLogger = appControllerLogger.child({
+    operation: 'reconcile-app-status',
+    name,
+    namespace,
+    observedGeneration,
+  });
+
   if (!name || !namespace || name !== namespace) {
+    statusLogger.debug('Skipping status reconcile for non-app namespace mapping');
     return;
   }
 
   const appResource = await getAppResource(name, namespace);
 
   if (!appResource) {
+    statusLogger.debug('Skipping status reconcile because app resource was not found');
     return;
   }
 
@@ -367,18 +438,21 @@ async function reconcileAppStatus({
   });
 
   if (currentStatus.success && isEqual(currentStatus.data, nextStatus)) {
+    statusLogger.debug('Skipping status update because status is unchanged');
     return;
   }
 
   const latestAppResource = await getAppResource(name, namespace);
 
   if (!latestAppResource) {
+    statusLogger.debug('Skipping status update because latest app resource was not found');
     return;
   }
 
   const latestStatus = appStatusSchema.safeParse(latestAppResource.status);
 
   if (latestStatus.success && isEqual(latestStatus.data, nextStatus)) {
+    statusLogger.debug('Skipping status update because latest status is unchanged');
     return;
   }
 
@@ -394,11 +468,14 @@ async function reconcileAppStatus({
     },
   }).catch((error) => {
     if (isKubernetesError(error) && error.code === 404) {
+      statusLogger.warn('Skipping status update because app resource disappeared');
       return;
     }
 
     throw error;
   });
+
+  statusLogger.info({ phase: nextStatus.phase }, 'Updated app status');
 }
 
 async function getAppResource(name: string, namespace: string) {
@@ -416,6 +493,10 @@ async function getAppResource(name: string, namespace: string) {
     return resource;
   } catch (error) {
     if (isKubernetesError(error) && error.code === 404) {
+      appControllerLogger.debug(
+        { name, namespace, operation: 'get-app-resource' },
+        'App resource was not found',
+      );
       return null;
     }
 
@@ -487,6 +568,8 @@ async function getClusterDomain() {
     'Domain must be configured in tesselar-system-config ConfigMap',
   );
 
+  appControllerLogger.debug({ domain }, 'Loaded cluster domain');
+
   return domain;
 }
 
@@ -524,6 +607,10 @@ async function readDeployment({
     });
   } catch (error) {
     if (isKubernetesError(error) && error.code === 404) {
+      appControllerLogger.debug(
+        { name, namespace, operation: 'read-deployment' },
+        'Deployment was not found',
+      );
       return null;
     }
 
@@ -542,6 +629,12 @@ async function applyDeployment(deployment: k8s.V1Deployment) {
 
   const name = metadata.name;
   const namespace = metadata.namespace;
+  const deploymentLogger = appControllerLogger.child({
+    operation: 'apply-deployment',
+    name,
+    namespace,
+    resource: 'deployment',
+  });
 
   const templateLabels = spec.template.metadata?.labels ?? {};
   spec.template.metadata = {
@@ -559,6 +652,7 @@ async function applyDeployment(deployment: k8s.V1Deployment) {
       namespace,
     });
 
+    deploymentLogger.info('Replacing deployment');
     await client.replaceNamespacedDeployment({
       name,
       namespace,
@@ -572,6 +666,7 @@ async function applyDeployment(deployment: k8s.V1Deployment) {
     });
   } catch (err: unknown) {
     if (isKubernetesError(err) && err.code === 404) {
+      deploymentLogger.info('Creating deployment');
       await client.createNamespacedDeployment({
         namespace,
         body: deployment,
@@ -592,6 +687,12 @@ async function applyService(service: k8s.V1Service) {
 
   const name = metadata.name;
   const namespace = metadata.namespace;
+  const serviceLogger = appControllerLogger.child({
+    operation: 'apply-service',
+    name,
+    namespace,
+    resource: 'service',
+  });
 
   try {
     const current = await client.readNamespacedService({
@@ -599,6 +700,7 @@ async function applyService(service: k8s.V1Service) {
       namespace,
     });
 
+    serviceLogger.info('Replacing service');
     await client.replaceNamespacedService({
       name,
       namespace,
@@ -612,6 +714,7 @@ async function applyService(service: k8s.V1Service) {
     });
   } catch (err: unknown) {
     if (isKubernetesError(err) && err.code === 404) {
+      serviceLogger.info('Creating service');
       await client.createNamespacedService({
         namespace,
         body: service,
@@ -632,6 +735,12 @@ async function applyIngress(ingress: k8s.V1Ingress) {
 
   const name = metadata.name;
   const namespace = metadata.namespace;
+  const ingressLogger = appControllerLogger.child({
+    operation: 'apply-ingress',
+    name,
+    namespace,
+    resource: 'ingress',
+  });
 
   try {
     const current = await client.readNamespacedIngress({
@@ -639,6 +748,7 @@ async function applyIngress(ingress: k8s.V1Ingress) {
       namespace,
     });
 
+    ingressLogger.info('Replacing ingress');
     await client.replaceNamespacedIngress({
       name,
       namespace,
@@ -652,6 +762,7 @@ async function applyIngress(ingress: k8s.V1Ingress) {
     });
   } catch (error) {
     if (isKubernetesError(error) && error.code === 404) {
+      ingressLogger.info('Creating ingress');
       await client.createNamespacedIngress({
         namespace,
         body: ingress,
@@ -661,4 +772,19 @@ async function applyIngress(ingress: k8s.V1Ingress) {
 
     throw error;
   }
+}
+
+function getAppLogContext(app: WatchedApp) {
+  return {
+    name: app.metadata?.name,
+    namespace: app.metadata?.namespace,
+    generation: app.metadata?.generation,
+  };
+}
+
+function getObjectLogContext(resource: k8s.KubernetesObject) {
+  return {
+    name: resource.metadata?.name,
+    namespace: resource.metadata?.namespace,
+  };
 }
