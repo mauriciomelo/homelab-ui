@@ -7,6 +7,7 @@ import { AppBundleSchema, appBundleSchema } from './schemas';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/node';
 import { APP_STATUS } from '@/app/constants';
+import { logger } from '@/lib/logger';
 import {
   appStatusSchema,
   appSchema,
@@ -29,6 +30,8 @@ type AdditionalResourceSchema =
   | z.infer<typeof authClientSchema>
   | z.infer<typeof persistentVolumeClaimSchema>;
 
+const applicationsLogger = logger.child({ module: 'applications-api' });
+
 export type AppRuntimeStatus = z.infer<typeof appStatusSchema>;
 
 export type App = AppBundleSchema & {
@@ -48,7 +51,7 @@ export async function getApps() {
 
   settled.forEach((result) => {
     if (result.status === 'rejected') {
-      console.error('Error fetching app:', result.reason);
+      applicationsLogger.error({ err: result.reason }, 'Error fetching app');
     }
   });
 
@@ -103,7 +106,10 @@ export async function updateApp(appBundle: AppBundleSchema) {
 
     return { success: true };
   } catch (error) {
-    console.error(`[updateApp] Failed to update app "${appName}"`, error);
+    applicationsLogger.error(
+      { appName, err: error, operation: 'update-app' },
+      'Failed to update app',
+    );
     throw new Error(
       `Failed to update app "${appName}": ${formatErrorMessage(error)}`,
       {
@@ -443,10 +449,14 @@ export async function reconcileFluxGitRepository({
       body: patch,
     });
 
-    console.log(
-      `Successfully triggered reconciliation for GitRepository '${name}' in namespace '${namespace}'.`,
+    applicationsLogger.info(
+      { name, namespace, operation: 'reconcile-flux-git-repository' },
+      'Triggered reconciliation for GitRepository',
     );
   } catch (err) {
-    console.error('Error triggering reconciliation:', err);
+    applicationsLogger.error(
+      { err, name, namespace, operation: 'reconcile-flux-git-repository' },
+      'Error triggering reconciliation',
+    );
   }
 }

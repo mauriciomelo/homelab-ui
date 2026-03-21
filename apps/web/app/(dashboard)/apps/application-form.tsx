@@ -86,12 +86,9 @@ export function useApplicationForm({
   );
 
   const onSubmit = form.handleSubmit(async (formData) => {
-    const result =
-      mode === 'create'
-        ? await createAppMutation.mutateAsync(formData)
-        : await updateAppMutation.mutateAsync(formData);
-    // TODO: remove log and handle success/failure
-    console.log(result);
+    await (mode === 'create'
+      ? createAppMutation.mutateAsync(formData)
+      : updateAppMutation.mutateAsync(formData));
   });
 
   return { form, data, mode, onSubmit };
