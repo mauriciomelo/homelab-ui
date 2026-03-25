@@ -1,5 +1,4 @@
 import { router } from '@/orpc/router';
-import { ensureServerBootstrap } from '@/lib/server-bootstrap';
 import { RPCHandler } from '@orpc/server/fetch';
 import { createFileRoute } from '@tanstack/react-router';
 
@@ -9,8 +8,6 @@ export const Route = createFileRoute('/rpc/$')({
   server: {
     handlers: {
       ANY: async ({ request }) => {
-        await ensureServerBootstrap();
-
         const { response } = await handler.handle(request, {
           prefix: '/rpc',
           context: {},

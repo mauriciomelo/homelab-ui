@@ -11,8 +11,9 @@ export async function ensureServerBootstrap() {
 
   bootstrapped = true;
 
+  const { publishService } = await import('@/mdns');
+
   if (getOptionalConfig().PUBLISH_MDNS_SERVICE) {
-    const { publishService } = await import('@/mdns');
     publishService();
   }
 
