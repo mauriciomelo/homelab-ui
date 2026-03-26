@@ -4,6 +4,7 @@ import { appSchema, defaultAppData } from './app-schema';
 
 export const appBundleSchema = z
   .object({
+    draftId: z.string().min(1).optional(),
     app: appSchema,
     additionalResources: z.array(additionalResourceSchema),
   })

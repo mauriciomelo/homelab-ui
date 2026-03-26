@@ -44,7 +44,7 @@ export async function getApps() {
     withFileTypes: true,
   });
   const appListPromises = entries
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && entry.name !== '.drafts')
     .map((entry) => getAppByName(entry.name));
 
   const settled = await Promise.allSettled(appListPromises);
@@ -91,18 +91,10 @@ async function getAppByName(name: string) {
 export async function updateApp(appBundle: AppBundleSchema) {
   const parsedAppBundle = appBundleSchema.parse(appBundle);
   const appName = parsedAppBundle.app.metadata.name;
+  const appDir = getBundleDir(parsedAppBundle);
 
   try {
-    const appManifest = createPersistedAppManifest(parsedAppBundle.app);
-    const namespace = toManifests(appManifest).namespace;
-
-    await writeResourcesToFileSystem(appName, [
-      appManifest,
-      namespace,
-      ...parsedAppBundle.additionalResources,
-    ]);
-
-    await commitAndPushChanges(appName, `Update app ${appName}`);
+    await writeAppBundleToDirectory(appDir, parsedAppBundle);
 
     return { success: true };
   } catch (error) {
@@ -141,21 +133,18 @@ function getFileName(resource: AppResourceType) {
     return 'app.yaml';
   }
 
-  if (
-    resource.kind === 'Kustomization' ||
-    resource.kind === 'Namespace'
-  ) {
+  if (resource.kind === 'Kustomization' || resource.kind === 'Namespace') {
     return `${resource.kind.toLowerCase()}.yaml`;
   }
 
   return `${resource.metadata.name}.${resource.kind.toLowerCase()}.yaml`;
 }
 
-async function writeResourcesToFileSystem(
+async function writeResourcesToDirectory(
+  appDir: string,
   appName: string,
   resources: AppResourceType[],
 ) {
-  const appDir = getAppDir(appName);
   const files = resources.map((resource) => {
     const filename = getFileName(resource);
     return { filename, textContent: YAML.stringify(resource) };
@@ -191,17 +180,19 @@ async function writeResourcesToFileSystem(
 
 async function deleteObsoleteGeneratedFiles(appDir: string) {
   await Promise.all(
-    ['deployment.yaml', 'service.yaml', 'ingress.yaml'].map(async (filename) => {
-      const filePath = `${appDir}/${filename}`;
+    ['deployment.yaml', 'service.yaml', 'ingress.yaml'].map(
+      async (filename) => {
+        const filePath = `${appDir}/${filename}`;
 
-      try {
-        await fs.promises.unlink(filePath);
-      } catch (error) {
-        if (!isKubernetesNotFoundError(error) && !isMissingFileError(error)) {
-          throw error;
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (error) {
+          if (!isKubernetesNotFoundError(error) && !isMissingFileError(error)) {
+            throw error;
+          }
         }
-      }
-    }),
+      },
+    ),
   );
 }
 
@@ -241,19 +232,31 @@ async function commitAndPushChanges(appName: string, message: string) {
 
 export async function createApp(appBundle: AppBundleSchema) {
   const parsedAppBundle = appBundleSchema.parse(appBundle);
-  const appManifest = createPersistedAppManifest(parsedAppBundle.app);
-  const { namespace } = toManifests(appManifest);
+  await writeAppBundleToDirectory(
+    getBundleDir(parsedAppBundle),
+    parsedAppBundle,
+  );
 
-  await writeResourcesToFileSystem(parsedAppBundle.app.metadata.name, [
-    appManifest,
-    namespace,
-    ...parsedAppBundle.additionalResources,
-  ]);
+  return { success: true };
+}
+
+export async function publishApp(appBundle: AppBundleSchema) {
+  const parsedAppBundle = appBundleSchema.parse(appBundle);
+  const appName = parsedAppBundle.app.metadata.name;
+
+  await writeAppBundleToDirectory(getAppDir(appName), parsedAppBundle);
 
   await commitAndPushChanges(
-    parsedAppBundle.app.metadata.name,
-    `Create app ${parsedAppBundle.app.metadata.name}`,
+    appName,
+    `${parsedAppBundle.draftId ? 'Create' : 'Update'} app ${appName}`,
   );
+
+  if (parsedAppBundle.draftId) {
+    await fs.promises.rm(getDraftDir(parsedAppBundle.draftId), {
+      recursive: true,
+      force: true,
+    });
+  }
 
   return { success: true };
 }
@@ -292,6 +295,13 @@ async function getManifestsFromAppFiles(appName: string): Promise<{
   additionalResources: AdditionalResourceSchema[];
 }> {
   const appPath = getAppDir(appName);
+  return readAppBundleFromDirectory(appPath);
+}
+
+export async function readAppBundleFromDirectory(appPath: string): Promise<{
+  app: z.infer<typeof appSchema>;
+  additionalResources: AdditionalResourceSchema[];
+}> {
   const requiredFiles = new Set(['app.yaml', 'namespace.yaml']);
 
   const kustomizationResult = await getFile({
@@ -363,13 +373,15 @@ function createPersistedAppManifest(
 
 async function getAppRuntimeStatus(name: string): Promise<AppRuntimeStatus> {
   try {
-    const appResource = await k.customObjectsApi().getNamespacedCustomObjectStatus({
-      group: 'tesselar.io',
-      version: 'v1alpha1',
-      namespace: name,
-      plural: 'apps',
-      name,
-    });
+    const appResource = await k
+      .customObjectsApi()
+      .getNamespacedCustomObjectStatus({
+        group: 'tesselar.io',
+        version: 'v1alpha1',
+        namespace: name,
+        plural: 'apps',
+        name,
+      });
 
     const parsed = appStatusSchema.safeParse(appResource.status);
 
@@ -406,8 +418,22 @@ function isMissingFileError(error: unknown): error is { code: string } {
     error.code === 'ENOENT'
   );
 }
+export async function writeAppBundleToDirectory(
+  appDir: string,
+  appBundle: AppBundleSchema,
+) {
+  const parsedAppBundle = appBundleSchema.parse(appBundle);
+  const appManifest = createPersistedAppManifest(parsedAppBundle.app);
+  const { namespace } = toManifests(appManifest);
 
-function getAppsDir() {
+  await writeResourcesToDirectory(appDir, parsedAppBundle.app.metadata.name, [
+    appManifest,
+    namespace,
+    ...parsedAppBundle.additionalResources,
+  ]);
+}
+
+export function getAppsDir() {
   const config = getAppConfig();
   return path.join(
     config.PROJECT_DIR,
@@ -417,9 +443,23 @@ function getAppsDir() {
   );
 }
 
-function getAppDir(appName: string) {
+export function getAppDir(appName: string) {
   const appsDir = getAppsDir();
   return path.join(appsDir, appName);
+}
+
+function getDraftsDir() {
+  return path.join(getAppsDir(), '.drafts');
+}
+
+function getDraftDir(draftId: string) {
+  return path.join(getDraftsDir(), draftId);
+}
+
+function getBundleDir(appBundle: AppBundleSchema) {
+  return appBundle.draftId
+    ? getDraftDir(appBundle.draftId)
+    : getAppDir(appBundle.app.metadata.name);
 }
 
 export async function reconcileFluxGitRepository({

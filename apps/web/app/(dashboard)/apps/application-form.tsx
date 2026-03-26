@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLens } from '@hookform/lenses';
-import { useMemo, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -23,16 +23,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { InsetGroup, InsetSectionTitle } from '@/components/ui/inset-group';
 import { AuthClientCard } from './auth-client-card';
 import { ResourceLimitsField } from './form-sections/resource-limits-field';
@@ -69,26 +59,26 @@ const getNextPersistentVolumeName = (
 export function useApplicationForm({
   data,
   mode,
+  onPublishSuccess,
+  defaultValues,
 }: {
   data?: AppBundleSchema;
   mode: FormMode;
+  onPublishSuccess?: () => Promise<void> | void;
+  defaultValues?: AppBundleSchema | (() => Promise<AppBundleSchema>);
 }) {
   const form = useForm<AppBundleSchema>({
     resolver: zodResolver(appBundleSchema),
-    defaultValues: data ?? defaultAppBundleData,
+    defaultValues: defaultValues ?? data ?? defaultAppBundleData,
   });
 
-  const createAppMutation = useMutation(
-    controlPlaneOrpc.apps.create.mutationOptions(),
-  );
-  const updateAppMutation = useMutation(
-    controlPlaneOrpc.apps.update.mutationOptions(),
+  const publishAppMutation = useMutation(
+    controlPlaneOrpc.apps.publish.mutationOptions(),
   );
 
   const onSubmit = form.handleSubmit(async (formData) => {
-    await (mode === 'create'
-      ? createAppMutation.mutateAsync(formData)
-      : updateAppMutation.mutateAsync(formData));
+    await publishAppMutation.mutateAsync(formData);
+    await onPublishSuccess?.();
   });
 
   return { form, data, mode, onSubmit };
@@ -100,29 +90,21 @@ export function ApplicationForm(
   } & ReturnType<typeof useApplicationForm>,
 ) {
   const { form, mode } = props;
+  const previousDataRef = useRef(props.data);
 
   const lens = useLens({ control: form.control });
   const appLens = lens.focus('app');
   const appSpecLens = appLens.focus('spec');
   const additionalResourcesLens = lens.focus('additionalResources').defined();
 
-  const [lastSeenData, setLastSeenData] = useState(props.data);
+  useEffect(() => {
+    if (isEqual(previousDataRef.current, props.data)) {
+      return;
+    }
 
-  const hasDataChanged = useMemo(
-    () => !isEqual(lastSeenData, props.data),
-    [lastSeenData, props.data],
-  );
-
-  const handleExternalUpdateConfirm = () => {
-    const newData = props.data;
-    setLastSeenData(newData);
-    form.reset(newData);
-  };
-
-  const handleExternalUpdateCancel = () => {
-    const newData = props.data;
-    setLastSeenData(newData);
-  };
+    form.reset(props.data);
+    previousDataRef.current = props.data;
+  }, [form, props.data]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -230,32 +212,6 @@ export function ApplicationForm(
 
   return (
     <div className={cn('space-y-8', props.className)}>
-      <AlertDialog
-        open={hasDataChanged}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleExternalUpdateCancel();
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>External update detected</AlertDialogTitle>
-            <AlertDialogDescription>
-              This app was updated elsewhere. Do you want to load the latest
-              values? Unsaved changes will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleExternalUpdateCancel}>
-              Keep editing
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleExternalUpdateConfirm}>
-              Load new values
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <AppBasicsSection lens={appLens} mode={mode} />
 
       <ResourceLimitsField lens={appSpecLens.focus('resources')} />

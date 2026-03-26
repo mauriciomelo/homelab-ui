@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { updateApp, getApps, createApp, getFile } from './applications';
+import {
+  updateApp,
+  getApps,
+  createApp,
+  getFile,
+  publishApp,
+} from './applications';
 import { fs, vol } from 'memfs';
 
 import YAML from 'yaml';
@@ -191,7 +197,7 @@ describe('updateApp', () => {
       ),
     ).toBe(false);
 
-    expect(gitPushMock).toHaveBeenCalled();
+    expect(gitPushMock).not.toHaveBeenCalled();
   });
 });
 
@@ -433,6 +439,44 @@ describe('createApp', () => {
         },
       ],
     });
+  });
+});
+
+describe('publishApp', () => {
+  beforeEach(async () => {
+    await setupMockGitRepo({
+      dir: '/test-project',
+      fs,
+    });
+
+    seedFluxConfig();
+  });
+
+  it('commits and pushes published app changes', async () => {
+    const app = produce(baseAppManifest, (draft) => {
+      draft.metadata.name = 'publish-app';
+    });
+
+    await publishApp(createBundle(app));
+
+    expect(gitPushMock).toHaveBeenCalled();
+  });
+
+  it('removes the draft directory after publishing a draft', async () => {
+    const draftBundle = produce(createBundle(baseAppManifest), (draft) => {
+      draft.draftId = 'draft-1';
+      draft.app.metadata.name = 'published-draft';
+    });
+
+    await createApp(draftBundle);
+    await publishApp(draftBundle);
+
+    expect(
+      fs.existsSync('/test-project/clusters/my-cluster/my-applications/.drafts/draft-1'),
+    ).toBe(false);
+    expect(
+      fs.existsSync('/test-project/clusters/my-cluster/my-applications/published-draft/app.yaml'),
+    ).toBe(true);
   });
 });
 

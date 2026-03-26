@@ -21,6 +21,14 @@ import { appBundleSchema, type AppBundleSchema } from '@/app/api/schemas';
 
 vi.mock('server-only', () => ({}));
 
+test.beforeEach(async ({ worker }) => {
+  worker.use(
+    http.post('*/api/app/rpc/apps/listDrafts', () => {
+      return orpcJsonResponse([]);
+    }),
+  );
+});
+
 async function readOrpcInput(request: Request): Promise<unknown> {
   const body = await request.json();
   if (typeof body !== 'object' || body === null || !('json' in body)) {
@@ -28,6 +36,83 @@ async function readOrpcInput(request: Request): Promise<unknown> {
   }
 
   return body.json;
+}
+function readInputValue(locator: ReturnType<typeof page.getByPlaceholder>) {
+  const element = locator.element();
+
+  if (!(element instanceof HTMLInputElement)) {
+    throw new Error('Expected an input element');
+  }
+
+  return element.value;
+}
+
+function setupDraftHandlers(
+  worker: {
+    use: (...handlers: Array<ReturnType<typeof http.post>>) => void;
+  },
+  initialBundle?: AppBundleSchema,
+) {
+  const draftId = 'draft-1234';
+  let draftBundle =
+    initialBundle ??
+    produce(baseAppBundle, (draft) => {
+      draft.draftId = draftId;
+      draft.app.metadata.name = draftId;
+      draft.app.spec.image = 'nginx:latest';
+      draft.app.spec.envVariables = [];
+      draft.app.spec.health = {
+        check: {
+          type: 'httpGet',
+          path: '/',
+          port: 'http',
+        },
+      };
+      draft.app.spec.volumeMounts = [];
+      draft.additionalResources = [];
+    });
+
+  worker.use(
+    http.post('*/api/app/rpc/apps/listDrafts', () => {
+      return orpcJsonResponse([
+        {
+          ...draftBundle,
+          draftId: draftBundle.draftId ?? draftId,
+        },
+      ]);
+    }),
+    http.post('*/api/app/rpc/apps/getDraft', () => {
+      return orpcJsonResponse({
+        draftId: draftBundle.draftId ?? draftId,
+        bundle: draftBundle,
+      });
+    }),
+    http.post('*/api/control-plane/rpc/apps/create', async ({ request }) => {
+      const input = await readOrpcInput(request);
+
+      draftBundle = appBundleSchema.parse(input);
+
+      return orpcJsonResponse({ success: true });
+    }),
+    http.post('*/api/control-plane/rpc/apps/update', async ({ request }) => {
+      const input = await readOrpcInput(request);
+
+      draftBundle = appBundleSchema.parse(input);
+
+      return orpcJsonResponse({ success: true });
+    }),
+    http.post('*/api/app/rpc/apps/discardDraft', () => {
+      return orpcJsonResponse({ success: true });
+    }),
+    http.post('*/api/app/rpc/apps/openWith', () => {
+      return orpcJsonResponse({ success: true });
+    }),
+  );
+
+  return {
+    draftId,
+    getDraftBundle: () => draftBundle,
+  };
 }
 
 describe('Apps Page', () => {
@@ -63,6 +148,38 @@ describe('Apps Page', () => {
       .toBeInTheDocument();
 
     await page.screenshot({});
+  });
+
+  test('lists drafts alongside committed apps', async ({ worker }) => {
+    worker.use(
+      http.post('*/api/control-plane/rpc/apps/list', () => {
+        return orpcJsonResponse([
+          produce(baseApp, (app) => {
+            app.app.metadata.name = 'committed-app';
+          }),
+        ]);
+      }),
+      http.post('*/api/app/rpc/apps/listDrafts', () => {
+        return orpcJsonResponse([
+          {
+            draftId: 'draft-1234',
+            ...produce(baseAppBundle, (draft) => {
+              draft.app.metadata.name = 'draft-app';
+            }),
+          },
+        ]);
+      }),
+    );
+
+    await renderWithProviders(<Apps />);
+
+    await expect
+      .poll(() => page.getByText('committed-app'))
+      .toBeInTheDocument();
+    await expect.poll(() => page.getByText('draft-app')).toBeInTheDocument();
+    await expect
+      .poll(() => page.getByRole('cell', { name: 'Draft', exact: true }))
+      .toBeInTheDocument();
   });
 
   test('displays list of applications', async ({ worker }) => {
@@ -168,6 +285,39 @@ describe('ApplicationForm', () => {
   });
 
   describe('update application', () => {
+    test('opens the committed app directory from edit mode', async ({
+      worker,
+    }) => {
+      let openRequest: unknown;
+      const user = userEvent.setup();
+
+      worker.use(
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([
+            produce(baseApp, (app) => {
+              app.app.metadata.name = 'edit-open-app';
+            }),
+          ]);
+        }),
+        http.post('*/api/app/rpc/apps/openWith', async ({ request }) => {
+          openRequest = await readOrpcInput(request);
+          return orpcJsonResponse({ success: true });
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+      await user.click(await page.getByText('edit-open-app'));
+      await user.click(page.getByRole('button', { name: 'Open in' }));
+      await user.click(page.getByRole('menuitem', { name: 'Finder' }));
+
+      await expect
+        .poll(() => openRequest)
+        .toEqual({
+          target: 'finder',
+          appName: 'edit-open-app',
+        });
+    });
+
     test('populates form fields with initial data', async ({ worker }) => {
       const user = userEvent.setup();
       const openwebuiApp = produce(baseApp, (app) => {
@@ -345,6 +495,8 @@ describe('ApplicationForm', () => {
         app.app.spec.image = 'nginx:1.27';
       });
 
+      setupDraftHandlers(worker);
+
       worker.use(
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([appOne, appTwo]);
@@ -373,12 +525,19 @@ describe('ApplicationForm', () => {
       await expect.element(nameInput).toHaveValue('app-two');
       await expect.element(imageInput).toHaveValue('nginx:1.27');
 
-      // Step 3: open create app and verify defaults are restored
+      // Step 3: open create app and verify draft defaults are restored
       await user.keyboard('{Escape}');
       await user.click(page.getByText('Create App'));
 
-      await expect.element(nameInput).toHaveValue('');
-      await expect.element(imageInput).toHaveValue('');
+      const createNameInput = page.getByPlaceholder('App Name');
+      const createImageInput = page.getByPlaceholder(
+        'nginx:latest or registry.example.com/my-app:v1.0.0',
+      );
+
+      await expect
+        .poll(() => readInputValue(createNameInput))
+        .toMatch(/^draft-/);
+      await expect.element(createImageInput).toHaveValue('nginx:latest');
     });
 
     test('renders existing auth clients', async ({ worker }) => {
@@ -554,9 +713,11 @@ describe('ApplicationForm', () => {
         'https://example.com/logout, https://example.com/logout-next',
       );
 
-      await expect.element(postLogoutInput).toHaveValue(
-        'https://example.com/logout,\nhttps://example.com/logout-next',
-      );
+      await expect
+        .element(postLogoutInput)
+        .toHaveValue(
+          'https://example.com/logout,\nhttps://example.com/logout-next',
+        );
     });
 
     test('shows validation error for invalid redirect uri', async ({
@@ -837,13 +998,15 @@ describe('ApplicationForm', () => {
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.image = 'nginx:latest';
-              app.app.spec.envVariables = [{ name: 'OLD_VAR', value: 'old_value' }];
+              app.app.spec.envVariables = [
+                { name: 'OLD_VAR', value: 'old_value' },
+              ];
               app.app.spec.ingress = { port: { name: 'http' } };
             }),
           ]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/update',
+          '*/api/control-plane/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -900,46 +1063,7 @@ describe('ApplicationForm', () => {
         });
     });
 
-    test('prompts before applying external updates while editing', async ({
-      worker,
-    }) => {
-      const user = userEvent.setup();
-      const app = produce(baseApp, (draft) => {
-        draft.app.metadata.name = 'external-update-app';
-        draft.app.spec.image = 'nginx:latest';
-      });
-      const updatedApp = produce(app, (draft) => {
-        draft.app.spec.image = 'redis:7-alpine';
-      });
-      let responseCount = 0;
-
-      worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
-          responseCount += 1;
-          return orpcJsonResponse([responseCount === 1 ? app : updatedApp]);
-        }),
-      );
-
-      await renderWithProviders(<Apps />);
-      await user.click(await page.getByText('external-update-app'));
-
-      const imageInput = page.getByPlaceholder(
-        'nginx:latest or registry.example.com/my-app:v1.0.0',
-      );
-      await user.fill(imageInput, 'custom-image:1.0');
-
-      await expect
-        .poll(() => page.getByText('External update detected'), {
-          timeout: 5000,
-        })
-        .toBeInTheDocument();
-
-      await expect.element(imageInput).toHaveValue('custom-image:1.0');
-      await user.click(page.getByRole('button', { name: 'Keep editing' }));
-      await expect.element(imageInput).toHaveValue('custom-image:1.0');
-    });
-
-    test('applies external updates when confirmed', async ({ worker }) => {
+    test('applies external updates automatically', async ({ worker }) => {
       const user = userEvent.setup();
       const app = produce(baseApp, (draft) => {
         draft.app.metadata.name = 'external-accept-app';
@@ -966,18 +1090,14 @@ describe('ApplicationForm', () => {
       await user.fill(imageInput, 'custom-image:1.0');
 
       await expect
-        .poll(() => page.getByText('External update detected'), {
-          timeout: 5000,
-        })
-        .toBeInTheDocument();
-
-      await user.click(page.getByRole('button', { name: 'Load new values' }));
-
-      await expect
-        .poll(() =>
-          page.getByPlaceholder(
-            'nginx:latest or registry.example.com/my-app:v1.0.0',
-          ),
+        .poll(
+          () =>
+            page.getByPlaceholder(
+              'nginx:latest or registry.example.com/my-app:v1.0.0',
+            ),
+          {
+            timeout: 5000,
+          },
         )
         .toHaveValue('redis:7-alpine');
     });
@@ -1010,7 +1130,7 @@ describe('ApplicationForm', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/update',
+          '*/api/control-plane/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1093,7 +1213,7 @@ describe('ApplicationForm', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/update',
+          '*/api/control-plane/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1201,7 +1321,7 @@ describe('ApplicationForm', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/update',
+          '*/api/control-plane/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1417,18 +1537,99 @@ describe('ApplicationForm', () => {
   });
 
   describe('create application', () => {
+    test('opens a draft from the list and persists updates through update', async ({
+      worker,
+    }) => {
+      let updatedDraft: AppBundleSchema | undefined;
+      let updateCallCount = 0;
+      const user = userEvent.setup();
+
+      setupDraftHandlers(
+        worker,
+        produce(baseAppBundle, (draft) => {
+          draft.draftId = 'draft-1234';
+          draft.app.metadata.name = 'persistent-draft';
+          draft.app.spec.image = 'nginx:latest';
+          draft.additionalResources = [];
+        }),
+      );
+      worker.use(
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([]);
+        }),
+        http.post(
+          '*/api/control-plane/rpc/apps/update',
+          async ({ request }) => {
+            updateCallCount += 1;
+            updatedDraft = appBundleSchema.parse(await readOrpcInput(request));
+            return orpcJsonResponse({ success: true });
+          },
+        ),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('persistent-draft'));
+      await expect
+        .element(page.getByPlaceholder('App Name'))
+        .toHaveValue('persistent-draft');
+
+      expect(updateCallCount).toBe(0);
+
+      await user.fill(page.getByPlaceholder('App Name'), 'persistent-draft-2');
+
+      await expect.poll(() => updatedDraft).toMatchObject({
+        draftId: 'draft-1234',
+        app: {
+          metadata: {
+            name: 'persistent-draft-2',
+          },
+        },
+      });
+    });
+
+    test('opens the draft workspace in VSCode', async ({ worker }) => {
+      let openRequest: unknown;
+      const user = userEvent.setup();
+
+      setupDraftHandlers(worker);
+      worker.use(
+        http.post('*/api/control-plane/rpc/apps/list', () => {
+          return orpcJsonResponse([]);
+        }),
+        http.post('*/api/app/rpc/apps/openWith', async ({ request }) => {
+          openRequest = await readOrpcInput(request);
+          return orpcJsonResponse({ success: true });
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('Create App'));
+      await user.click(page.getByRole('button', { name: 'Open in' }));
+      await user.click(page.getByRole('menuitem', { name: 'VSCode' }));
+
+      await expect
+        .poll(() => openRequest)
+        .toEqual({
+          target: 'vscode',
+          draftId: expect.any(String),
+        });
+    });
+
     test('captures default health check inputs on create', async ({
       worker,
     }) => {
       let submittedApp: AppBundleSchema | undefined;
       const user = userEvent.setup();
+      setupDraftHandlers(worker);
 
       worker.use(
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/create',
+          '*/api/control-plane/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1463,6 +1664,7 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
+          draftId: expect.any(String),
           app: {
             apiVersion: 'tesselar.io/v1alpha1',
             kind: 'App',
@@ -1489,10 +1691,14 @@ describe('ApplicationForm', () => {
           },
           additionalResources: [],
         });
+      await expect
+        .poll(() => document.body.textContent?.includes('Create New App'))
+        .toBe(false);
     });
 
     test('fills form from dropped yaml file', async ({ worker }) => {
       const user = userEvent.setup();
+      setupDraftHandlers(worker);
       worker.use(
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([]);
@@ -1504,13 +1710,15 @@ describe('ApplicationForm', () => {
       await user.click(page.getByText('Create App'));
 
       const nameInput = page.getByPlaceholder('App Name');
-      await expect.element(nameInput).toHaveValue('');
+      await expect.poll(() => readInputValue(nameInput)).toMatch(/^draft-/);
 
       const appSpec = produce(baseAppBundle, (app) => {
         app.app.metadata.name = 'yaml-app';
         app.app.spec.image = 'redis:7-alpine';
         app.app.spec.ports = [{ name: 'http', containerPort: 8080 }];
-        app.app.spec.envVariables = [{ name: 'REDIS_HOST', value: 'localhost' }];
+        app.app.spec.envVariables = [
+          { name: 'REDIS_HOST', value: 'localhost' },
+        ];
         app.app.spec.resources = { limits: { cpu: '750m', memory: '768Mi' } };
         app.app.spec.ingress = { port: { name: 'http' } };
         app.app.spec.health = {
@@ -1569,6 +1777,7 @@ describe('ApplicationForm', () => {
 
     test('fills form from dropped bare app manifest', async ({ worker }) => {
       const user = userEvent.setup();
+      setupDraftHandlers(worker);
       worker.use(
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([]);
@@ -1618,19 +1827,22 @@ describe('ApplicationForm', () => {
 
       await expect.element(nameInput).toHaveValue('yaml-app');
       await expect.element(imageInput).toHaveValue('redis:7-alpine');
-      await expect.element(page.getByText('No additional resources.')).toBeInTheDocument();
+      await expect
+        .element(page.getByText('No additional resources.'))
+        .toBeInTheDocument();
     });
 
     test('handles successful app creation', async ({ worker }) => {
       let submittedApp: AppBundleSchema | undefined;
       const user = userEvent.setup();
+      setupDraftHandlers(worker);
 
       worker.use(
         http.post('*/api/control-plane/rpc/apps/list', () => {
           return orpcJsonResponse([]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/create',
+          '*/api/control-plane/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1668,6 +1880,7 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
+          draftId: expect.any(String),
           app: {
             apiVersion: 'tesselar.io/v1alpha1',
             kind: 'App',
@@ -1694,6 +1907,9 @@ describe('ApplicationForm', () => {
           },
           additionalResources: [],
         });
+      await expect
+        .poll(() => document.body.textContent?.includes('Create New App'))
+        .toBe(false);
     });
   });
 });

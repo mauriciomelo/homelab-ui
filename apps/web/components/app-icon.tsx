@@ -7,12 +7,13 @@ import {
 import { ComponentProps, useState } from 'react';
 import { Status } from './ui/status';
 import type { App } from '@/app/api/applications';
+import type { DraftApp } from '@/app/api/app-workspaces';
 
 export function AppIcon({
   app,
   showStatus = true,
 }: {
-  app: App;
+  app: App | DraftApp;
   showStatus?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
@@ -33,11 +34,11 @@ export function AppIcon({
               onError={() => setImageError(true)}
             />
           </div>
-          {showStatus && (
+          {showStatus && 'status' in app ? (
             <div className="absolute -right-1 -bottom-1 scale-80 rounded-full border-2 border-white">
               <Status {...appStatusProps(app.status.phase)} />
             </div>
-          )}
+          ) : null}
         </div>
       </TooltipTrigger>
       <TooltipContent>{appName}</TooltipContent>

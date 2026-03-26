@@ -10,10 +10,12 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { controlPlaneOrpc } from '@/control-plane-orpc/client';
+import { appOrpc } from '@/app-orpc/client';
 import { useQuery } from '@tanstack/react-query';
 import { APP_STATUS } from '@/app/constants';
 import { useState } from 'react';
 import type { App } from '@/app/api/applications';
+import type { DraftApp } from '@/app/api/app-workspaces';
 import { Status } from '@/components/ui/status';
 import { PageContent } from '@/components/page-content';
 import { AppIcon, appStatusProps } from '@/components/app-icon';
@@ -22,33 +24,72 @@ import { Plus } from 'lucide-react';
 import { AppFormSheet } from './app-form-sheet';
 
 type FormMode = 'edit' | 'create' | null;
+type AppListItem = App | DraftApp;
+
+function isDraftApp(item: AppListItem): item is DraftApp {
+  return 'draftId' in item;
+}
+
+function isPublishedApp(item: AppListItem): item is App {
+  return !isDraftApp(item);
+}
+
+function getListItemStatus(item: AppListItem) {
+  return isDraftApp(item) ? APP_STATUS.UNKNOWN : item.status.phase;
+}
 
 export function Apps() {
   const apps = useQuery({
     ...controlPlaneOrpc.apps.list.queryOptions(),
     refetchInterval: 2000,
   });
+  const drafts = useQuery({
+    ...appOrpc.apps.listDrafts.queryOptions(),
+    refetchInterval: 2000,
+  });
   const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode>(null);
+  const appItems: AppListItem[] = [
+    ...(drafts.data ?? []),
+    ...(apps.data ?? []).flatMap((app) => {
+      return app.app?.metadata?.name ? [app] : [];
+    }),
+  ];
 
   const selectedApp = selectedAppName
-    ? (apps.data?.find((app) => app.app.metadata.name === selectedAppName) ?? null)
+    ? (appItems
+        .filter(isPublishedApp)
+        .find((app) => app.app.metadata.name === selectedAppName) ?? null)
     : null;
+  const hasPersistedDraft = selectedDraftId
+    ? (drafts.data?.some((draft) => draft.draftId === selectedDraftId) ?? false)
+    : false;
 
   const handleCreateApp = () => {
     setSelectedAppName(null);
+    setSelectedDraftId(crypto.randomUUID());
     setFormMode('create');
   };
 
   const handleEditApp = (app: App) => {
     setSelectedAppName(app.app.metadata.name);
+    setSelectedDraftId(null);
     setFormMode('edit');
+  };
+
+  const handleEditDraft = (draft: DraftApp) => {
+    setSelectedAppName(null);
+    setSelectedDraftId(draft.draftId);
+    setFormMode('create');
   };
 
   const handleCloseForm = () => {
     setSelectedAppName(null);
+    setSelectedDraftId(null);
     setFormMode(null);
     apps.refetch();
+    drafts.refetch();
   };
 
   return (
@@ -77,15 +118,19 @@ export function Apps() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {apps.data?.map((app) => (
-                <TableRow
-                key={app.app.metadata.name}
+            {appItems.map((app) => (
+              <TableRow
+                key={
+                  isDraftApp(app)
+                    ? `draft-${app.draftId}`
+                    : `app-${app.app.metadata.name}`
+                }
                 className={cn({
-                  'animate-pulse': app.status.phase === APP_STATUS.PENDING,
+                  'animate-pulse': getListItemStatus(app) === APP_STATUS.PENDING,
                 })}
               >
                 <TableCell className="w-2">
-                  <Status {...appStatusProps(app.status.phase)} />
+                  <Status {...appStatusProps(getListItemStatus(app))} />
                 </TableCell>
                 <TableCell>
                   <div className="size-4">
@@ -94,14 +139,23 @@ export function Apps() {
                 </TableCell>
                 <TableCell
                   className="cursor-pointer font-medium"
-                    onClick={() => handleEditApp(app)}
+                  onClick={() => {
+                    if (isDraftApp(app)) {
+                      handleEditDraft(app);
+                      return;
+                    }
+
+                    handleEditApp(app);
+                  }}
                 >
                   <div className="flex min-h-9 items-center">
                     {app.app.metadata.name}
                   </div>
                 </TableCell>
 
-                <TableCell className="font-medium">{app.status.phase}</TableCell>
+                <TableCell className="font-medium">
+                  {isDraftApp(app) ? 'Draft' : app.status.phase}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -111,6 +165,9 @@ export function Apps() {
           mode={formMode ?? 'edit'}
           selectedApp={selectedApp}
           selectedAppName={selectedAppName}
+          selectedDraftId={selectedDraftId}
+          hasPersistedDraft={hasPersistedDraft}
+          onSelectedDraftIdChange={setSelectedDraftId}
           onOpenChange={(open) => {
             if (!open) {
               handleCloseForm();

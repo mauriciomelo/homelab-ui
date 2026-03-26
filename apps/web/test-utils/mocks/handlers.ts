@@ -2,6 +2,11 @@ import { http, HttpResponse } from 'msw';
 import { APP_STATUS } from '@/app/constants';
 
 export const handlers = [
+  http.post('*/api/app/rpc/apps/listDrafts', () => {
+    return HttpResponse.json({
+      json: [],
+    });
+  }),
   http.post('*/api/control-plane/rpc/apps/list', () => {
     return HttpResponse.json({
       json: [
@@ -38,6 +43,11 @@ export const handlers = [
           },
         },
       ],
+    });
+  }),
+  http.post('*/api/control-plane/rpc/apps/publish', () => {
+    return HttpResponse.json({
+      json: { success: true },
     });
   }),
 ];

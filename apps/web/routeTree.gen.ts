@@ -16,6 +16,7 @@ import { Route as RpcSplatRouteImport } from './routes/rpc/$'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiJoinRouteImport } from './routes/api/join'
 import { Route as ApiControlPlaneRpcSplatRouteImport } from './routes/api/control-plane/rpc/$'
+import { Route as ApiAppRpcSplatRouteImport } from './routes/api/app/rpc/$'
 
 const DevicesRoute = DevicesRouteImport.update({
   id: '/devices',
@@ -52,6 +53,11 @@ const ApiControlPlaneRpcSplatRoute = ApiControlPlaneRpcSplatRouteImport.update({
   path: '/api/control-plane/rpc/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAppRpcSplatRoute = ApiAppRpcSplatRouteImport.update({
+  id: '/api/app/rpc/$',
+  path: '/api/app/rpc/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/api/join': typeof ApiJoinRoute
   '/api/reset': typeof ApiResetRoute
   '/rpc/$': typeof RpcSplatRoute
+  '/api/app/rpc/$': typeof ApiAppRpcSplatRoute
   '/api/control-plane/rpc/$': typeof ApiControlPlaneRpcSplatRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/api/join': typeof ApiJoinRoute
   '/api/reset': typeof ApiResetRoute
   '/rpc/$': typeof RpcSplatRoute
+  '/api/app/rpc/$': typeof ApiAppRpcSplatRoute
   '/api/control-plane/rpc/$': typeof ApiControlPlaneRpcSplatRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/api/join': typeof ApiJoinRoute
   '/api/reset': typeof ApiResetRoute
   '/rpc/$': typeof RpcSplatRoute
+  '/api/app/rpc/$': typeof ApiAppRpcSplatRoute
   '/api/control-plane/rpc/$': typeof ApiControlPlaneRpcSplatRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/api/join'
     | '/api/reset'
     | '/rpc/$'
+    | '/api/app/rpc/$'
     | '/api/control-plane/rpc/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/api/join'
     | '/api/reset'
     | '/rpc/$'
+    | '/api/app/rpc/$'
     | '/api/control-plane/rpc/$'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/api/join'
     | '/api/reset'
     | '/rpc/$'
+    | '/api/app/rpc/$'
     | '/api/control-plane/rpc/$'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   ApiJoinRoute: typeof ApiJoinRoute
   ApiResetRoute: typeof ApiResetRoute
   RpcSplatRoute: typeof RpcSplatRoute
+  ApiAppRpcSplatRoute: typeof ApiAppRpcSplatRoute
   ApiControlPlaneRpcSplatRoute: typeof ApiControlPlaneRpcSplatRoute
 }
 
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiControlPlaneRpcSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/app/rpc/$': {
+      id: '/api/app/rpc/$'
+      path: '/api/app/rpc/$'
+      fullPath: '/api/app/rpc/$'
+      preLoaderRoute: typeof ApiAppRpcSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJoinRoute: ApiJoinRoute,
   ApiResetRoute: ApiResetRoute,
   RpcSplatRoute: RpcSplatRoute,
+  ApiAppRpcSplatRoute: ApiAppRpcSplatRoute,
   ApiControlPlaneRpcSplatRoute: ApiControlPlaneRpcSplatRoute,
 }
 export const routeTree = rootRouteImport

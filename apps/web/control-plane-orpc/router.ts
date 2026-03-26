@@ -1,6 +1,11 @@
 import { getApps } from '@/app/api/applications';
 import { appBundleSchema } from '@/app/api/schemas';
-import { createApp, restartApp, updateApp } from '@/app/api/applications';
+import {
+  createApp,
+  publishApp,
+  restartApp,
+  updateApp,
+} from '@/app/api/applications';
 import {
   createBootstrapToken,
   deleteNode,
@@ -26,6 +31,9 @@ export const controlPlaneRouter = {
     }),
     update: os.input(appBundleSchema).handler(async ({ input }) => {
       return updateApp(input);
+    }),
+    publish: os.input(appBundleSchema).handler(async ({ input }) => {
+      return publishApp(input);
     }),
   },
   devices: {
