@@ -9,13 +9,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import { appOrpc } from '@/app-orpc/client';
 import { useQuery } from '@tanstack/react-query';
 import { APP_STATUS } from '@/app/constants';
 import { useState } from 'react';
 import type { App } from '@/app/api/applications';
-import type { DraftApp } from '@/app/api/app-workspaces';
+import type { AppListItem, DraftApp } from '@/app/api/app-workspaces';
 import {
   getAppBundleIdentifier,
   isDraftAppBundleIdentifier,
@@ -29,7 +28,6 @@ import { Plus } from 'lucide-react';
 import { AppFormSheet } from './app-form-sheet';
 
 type FormMode = 'edit' | 'create' | null;
-type AppListItem = App | DraftApp;
 
 function isDraftApp(item: AppListItem): item is DraftApp {
   return 'draftId' in item;
@@ -45,18 +43,17 @@ function getListItemStatus(item: AppListItem) {
 
 export function Apps() {
   const apps = useQuery({
-    ...controlPlaneOrpc.apps.list.queryOptions(),
-    refetchInterval: 2000,
-  });
-  const drafts = useQuery({
-    ...appOrpc.apps.listDrafts.queryOptions(),
+    ...appOrpc.apps.list.queryOptions({
+      input: {
+        includeDrafts: true,
+      },
+    }),
     refetchInterval: 2000,
   });
   const [selectedIdentifier, setSelectedIdentifier] =
     useState<AppBundleIdentifier | null>(null);
   const [formMode, setFormMode] = useState<FormMode>(null);
   const appItems: AppListItem[] = [
-    ...(drafts.data ?? []),
     ...(apps.data ?? []).flatMap((app) => {
       return app.app?.metadata?.name ? [app] : [];
     }),
@@ -71,7 +68,7 @@ export function Apps() {
     : null;
   const hasPersistedDraft =
     selectedIdentifier && isDraftAppBundleIdentifier(selectedIdentifier)
-      ? (drafts.data?.some(
+      ? (appItems.filter(isDraftApp).some(
           (draft) => draft.draftId === selectedIdentifier.draftId,
         ) ?? false)
     : false;
@@ -101,7 +98,6 @@ export function Apps() {
     setSelectedIdentifier(null);
     setFormMode(null);
     apps.refetch();
-    drafts.refetch();
   };
 
   return (

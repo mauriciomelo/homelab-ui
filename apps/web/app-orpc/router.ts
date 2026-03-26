@@ -1,7 +1,8 @@
 import {
   discardDraft,
   getApp,
-  listDrafts,
+  listApps,
+  listAppsInputSchema,
   openWith,
   openWithTargetSchema,
   watchApp,
@@ -13,8 +14,8 @@ import z from 'zod/v4';
 
 export const appRouter = {
   apps: {
-    listDrafts: os.handler(async () => {
-      return listDrafts();
+    list: os.input(listAppsInputSchema).handler(async ({ input }) => {
+      return listApps(input);
     }),
     getApp: os
       .input(appBundleIdentifierSchema)

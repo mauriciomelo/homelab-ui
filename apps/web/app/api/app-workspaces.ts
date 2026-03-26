@@ -11,9 +11,11 @@ import {
   type AppBundleIdentifier,
 } from './app-bundle-identifier';
 import {
+  getApps,
   getAppDir,
   getAppsDir,
   readAppBundleFromDirectory,
+  type App,
 } from './applications';
 import type { AppBundleSchema } from './schemas';
 
@@ -56,6 +58,25 @@ export async function* watchApp(
 export type DraftApp = AppBundleSchema & {
   draftId: string;
 };
+
+export type AppListItem = App | DraftApp;
+
+export const listAppsInputSchema = z.object({
+  includeDrafts: z.boolean().default(false),
+});
+
+export async function listApps(input: unknown = {}): Promise<AppListItem[]> {
+  const parsedInput = listAppsInputSchema.parse(input);
+  const apps = await getApps();
+
+  if (!parsedInput.includeDrafts) {
+    return apps;
+  }
+
+  const drafts = await listDrafts();
+
+  return [...drafts, ...apps];
+}
 
 export async function listDrafts(): Promise<DraftApp[]> {
   try {

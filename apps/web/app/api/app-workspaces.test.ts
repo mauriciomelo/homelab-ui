@@ -6,6 +6,7 @@ import {
   discardDraft,
   getDraftDir,
   getApp,
+  listApps,
   listDrafts,
   openWith,
   watchApp,
@@ -160,6 +161,47 @@ describe('draft workspaces', () => {
     expect(drafts.map((draft) => draft.app.metadata.name)).toContain(
       'second-draft',
     );
+  });
+
+  it('lists published apps by default', async () => {
+    await createApp(
+      produce(baseAppBundle, (draft) => {
+        delete draft.draftId;
+        draft.app.metadata.name = 'published-app';
+      }),
+    );
+    await createApp(
+      produce(baseAppBundle, (draft) => {
+        draft.draftId = 'draft-1';
+        draft.app.metadata.name = 'draft-app';
+      }),
+    );
+
+    const apps = await listApps();
+
+    expect(apps.map((app) => app.app.metadata.name)).toEqual(['published-app']);
+  });
+
+  it('includes drafts when requested', async () => {
+    await createApp(
+      produce(baseAppBundle, (draft) => {
+        delete draft.draftId;
+        draft.app.metadata.name = 'published-app';
+      }),
+    );
+    await createApp(
+      produce(baseAppBundle, (draft) => {
+        draft.draftId = 'draft-1';
+        draft.app.metadata.name = 'draft-app';
+      }),
+    );
+
+    const apps = await listApps({ includeDrafts: true });
+
+    expect(apps.map((app) => app.app.metadata.name)).toEqual([
+      'draft-app',
+      'published-app',
+    ]);
   });
 
   it('reads a committed app bundle for watchApp', async () => {

@@ -23,7 +23,7 @@ vi.mock('server-only', () => ({}));
 
 test.beforeEach(async ({ worker }) => {
   worker.use(
-    http.post('*/api/app/rpc/apps/listDrafts', () => {
+    http.post('*/api/app/rpc/apps/list', () => {
       return orpcJsonResponse([]);
     }),
   );
@@ -73,7 +73,7 @@ function setupDraftHandlers(
     });
 
   worker.use(
-    http.post('*/api/app/rpc/apps/listDrafts', () => {
+    http.post('*/api/app/rpc/apps/list', () => {
       return orpcJsonResponse([
         {
           ...draftBundle,
@@ -118,7 +118,7 @@ describe('Apps Page', () => {
     const scale = 1;
     page.viewport(1440 * scale, 920 * scale);
     worker.use(
-      http.post('*/api/control-plane/rpc/apps/list', () => {
+      http.post('*/api/app/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.app.metadata.name = 'myapp';
@@ -149,15 +149,11 @@ describe('Apps Page', () => {
 
   test('lists drafts alongside committed apps', async ({ worker }) => {
     worker.use(
-      http.post('*/api/control-plane/rpc/apps/list', () => {
+      http.post('*/api/app/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.app.metadata.name = 'committed-app';
           }),
-        ]);
-      }),
-      http.post('*/api/app/rpc/apps/listDrafts', () => {
-        return orpcJsonResponse([
           {
             draftId: 'draft-1234',
             ...produce(baseAppBundle, (draft) => {
@@ -181,7 +177,7 @@ describe('Apps Page', () => {
 
   test('displays list of applications', async ({ worker }) => {
     worker.use(
-      http.post('*/api/control-plane/rpc/apps/list', () => {
+      http.post('*/api/app/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.app.metadata.name = 'myapp';
@@ -203,7 +199,7 @@ describe('Apps Page', () => {
   test('opens form sheet when clicking on an app row', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.post('*/api/control-plane/rpc/apps/list', () => {
+      http.post('*/api/app/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.app.metadata.name = 'myapp';
@@ -224,7 +220,7 @@ describe('ApplicationForm', () => {
   test('displays validation error when CPU is 0', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.post('*/api/control-plane/rpc/apps/list', () => {
+      http.post('*/api/app/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.app.metadata.name = 'test-app';
@@ -254,7 +250,7 @@ describe('ApplicationForm', () => {
   test('displays validation error when Memory is 0', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.post('*/api/control-plane/rpc/apps/list', () => {
+      http.post('*/api/app/rpc/apps/list', () => {
         return orpcJsonResponse([
           produce(baseApp, (app) => {
             app.app.metadata.name = 'test-app';
@@ -289,7 +285,7 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'edit-open-app';
@@ -402,7 +398,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([openwebuiApp]);
         }),
       );
@@ -495,7 +491,7 @@ describe('ApplicationForm', () => {
       setupDraftHandlers(worker);
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([appOne, appTwo]);
         }),
       );
@@ -540,7 +536,7 @@ describe('ApplicationForm', () => {
     test('renders existing auth clients', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'auth-app';
@@ -590,7 +586,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
       );
@@ -624,7 +620,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
       );
@@ -663,7 +659,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
       );
@@ -692,7 +688,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
       );
@@ -727,7 +723,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
       );
@@ -761,7 +757,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
       );
@@ -817,7 +813,7 @@ describe('ApplicationForm', () => {
     test('renders multiple ports correctly', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -849,7 +845,7 @@ describe('ApplicationForm', () => {
     test('adds new port', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -874,7 +870,7 @@ describe('ApplicationForm', () => {
     test('removes port', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -919,7 +915,7 @@ describe('ApplicationForm', () => {
     test('updates web port when toggle is clicked', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -962,7 +958,7 @@ describe('ApplicationForm', () => {
     test('adds new environment variable', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -990,7 +986,7 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -1072,7 +1068,7 @@ describe('ApplicationForm', () => {
       let responseCount = 0;
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           responseCount += 1;
           return orpcJsonResponse([responseCount === 1 ? app : updatedApp]);
         }),
@@ -1123,7 +1119,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
@@ -1206,7 +1202,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
@@ -1280,7 +1276,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
       );
@@ -1314,7 +1310,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
@@ -1385,7 +1381,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([app]);
         }),
       );
@@ -1413,7 +1409,7 @@ describe('ApplicationForm', () => {
     test('app name field is readonly', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'locked-app';
@@ -1438,7 +1434,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -1477,7 +1473,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -1506,7 +1502,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
@@ -1551,9 +1547,6 @@ describe('ApplicationForm', () => {
         }),
       );
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
-          return orpcJsonResponse([]);
-        }),
         http.post(
           '*/api/control-plane/rpc/apps/update',
           async ({ request }) => {
@@ -1591,9 +1584,6 @@ describe('ApplicationForm', () => {
 
       setupDraftHandlers(worker);
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
-          return orpcJsonResponse([]);
-        }),
         http.post('*/api/app/rpc/apps/openWith', async ({ request }) => {
           openRequest = await readOrpcInput(request);
           return orpcJsonResponse({ success: true });
@@ -1622,7 +1612,7 @@ describe('ApplicationForm', () => {
       setupDraftHandlers(worker);
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([]);
         }),
         http.post(
@@ -1697,7 +1687,7 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
       setupDraftHandlers(worker);
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([]);
         }),
       );
@@ -1776,7 +1766,7 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
       setupDraftHandlers(worker);
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([]);
         }),
       );
@@ -1835,7 +1825,7 @@ describe('ApplicationForm', () => {
       setupDraftHandlers(worker);
 
       worker.use(
-        http.post('*/api/control-plane/rpc/apps/list', () => {
+        http.post('*/api/app/rpc/apps/list', () => {
           return orpcJsonResponse([]);
         }),
         http.post(

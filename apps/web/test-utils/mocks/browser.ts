@@ -38,12 +38,7 @@ const appsData = [
 ];
 
 const handlers = [
-  http.post('*/api/app/rpc/apps/listDrafts', () => {
-    return HttpResponse.json({
-      json: [],
-    });
-  }),
-  http.post('*/api/control-plane/rpc/apps/list', () => {
+  http.post('*/api/app/rpc/apps/list', () => {
     return HttpResponse.json({
       json: appsData,
     });
