@@ -16,6 +16,11 @@ import { APP_STATUS } from '@/app/constants';
 import { useState } from 'react';
 import type { App } from '@/app/api/applications';
 import type { DraftApp } from '@/app/api/app-workspaces';
+import {
+  getAppBundleIdentifier,
+  isDraftAppBundleIdentifier,
+  type AppBundleIdentifier,
+} from '@/app/api/app-bundle-identifier';
 import { Status } from '@/components/ui/status';
 import { PageContent } from '@/components/page-content';
 import { AppIcon, appStatusProps } from '@/components/app-icon';
@@ -47,8 +52,8 @@ export function Apps() {
     ...appOrpc.apps.listDrafts.queryOptions(),
     refetchInterval: 2000,
   });
-  const [selectedAppName, setSelectedAppName] = useState<string | null>(null);
-  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [selectedIdentifier, setSelectedIdentifier] =
+    useState<AppBundleIdentifier | null>(null);
   const [formMode, setFormMode] = useState<FormMode>(null);
   const appItems: AppListItem[] = [
     ...(drafts.data ?? []),
@@ -57,36 +62,43 @@ export function Apps() {
     }),
   ];
 
-  const selectedApp = selectedAppName
+  const selectedApp =
+    selectedIdentifier && !isDraftAppBundleIdentifier(selectedIdentifier)
     ? (appItems
         .filter(isPublishedApp)
-        .find((app) => app.app.metadata.name === selectedAppName) ?? null)
+        .find((app) => app.app.metadata.name === selectedIdentifier.appName) ??
+      null)
     : null;
-  const hasPersistedDraft = selectedDraftId
-    ? (drafts.data?.some((draft) => draft.draftId === selectedDraftId) ?? false)
+  const hasPersistedDraft =
+    selectedIdentifier && isDraftAppBundleIdentifier(selectedIdentifier)
+      ? (drafts.data?.some(
+          (draft) => draft.draftId === selectedIdentifier.draftId,
+        ) ?? false)
     : false;
 
   const handleCreateApp = () => {
-    setSelectedAppName(null);
-    setSelectedDraftId(crypto.randomUUID());
+    const nextIdentifier = getAppBundleIdentifier({
+      draftId: crypto.randomUUID(),
+    });
+
+    setSelectedIdentifier(nextIdentifier);
     setFormMode('create');
   };
 
   const handleEditApp = (app: App) => {
-    setSelectedAppName(app.app.metadata.name);
-    setSelectedDraftId(null);
+    setSelectedIdentifier(
+      getAppBundleIdentifier({ appName: app.app.metadata.name }),
+    );
     setFormMode('edit');
   };
 
   const handleEditDraft = (draft: DraftApp) => {
-    setSelectedAppName(null);
-    setSelectedDraftId(draft.draftId);
+    setSelectedIdentifier(getAppBundleIdentifier({ draftId: draft.draftId }));
     setFormMode('create');
   };
 
   const handleCloseForm = () => {
-    setSelectedAppName(null);
-    setSelectedDraftId(null);
+    setSelectedIdentifier(null);
     setFormMode(null);
     apps.refetch();
     drafts.refetch();
@@ -164,10 +176,9 @@ export function Apps() {
           open={formMode !== null}
           mode={formMode ?? 'edit'}
           selectedApp={selectedApp}
-          selectedAppName={selectedAppName}
-          selectedDraftId={selectedDraftId}
+          selectedIdentifier={selectedIdentifier}
           hasPersistedDraft={hasPersistedDraft}
-          onSelectedDraftIdChange={setSelectedDraftId}
+          onSelectedIdentifierChange={setSelectedIdentifier}
           onOpenChange={(open) => {
             if (!open) {
               handleCloseForm();

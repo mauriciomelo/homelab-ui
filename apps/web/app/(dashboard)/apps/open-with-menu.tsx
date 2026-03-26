@@ -1,5 +1,6 @@
 'use client';
 
+import type { AppBundleIdentifier } from '@/app/api/app-bundle-identifier';
 import { appOrpc } from '@/app-orpc/client';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,20 +11,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useMutation } from '@tanstack/react-query';
 
-type AppIdentifier =
-  | {
-      draftId: string;
-    }
-  | {
-      appName: string;
-    };
-
 export function OpenWithMenu({
   targetIdentifier: appIdentifier,
   disabled,
   beforeOpen,
 }: {
-  targetIdentifier: AppIdentifier | null;
+  targetIdentifier: AppBundleIdentifier | null;
   disabled?: boolean;
   beforeOpen?: () => Promise<void>;
 }) {

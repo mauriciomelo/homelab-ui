@@ -81,11 +81,8 @@ function setupDraftHandlers(
         },
       ]);
     }),
-    http.post('*/api/app/rpc/apps/getDraft', () => {
-      return orpcJsonResponse({
-        draftId: draftBundle.draftId ?? draftId,
-        bundle: draftBundle,
-      });
+    http.post('*/api/app/rpc/apps/getApp', () => {
+      return orpcJsonResponse(draftBundle);
     }),
     http.post('*/api/control-plane/rpc/apps/create', async ({ request }) => {
       const input = await readOrpcInput(request);

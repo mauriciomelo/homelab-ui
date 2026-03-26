@@ -1,7 +1,15 @@
 import { execFile } from 'child_process';
+import { logger } from '@/lib/logger';
 import fs from 'fs';
+import { watch } from 'node:fs/promises';
 import path from 'path';
 import z from 'zod/v4';
+import {
+  appBundleIdentifierSchema,
+  isDraftAppBundleIdentifier,
+  parseAppBundleIdentifier,
+  type AppBundleIdentifier,
+} from './app-bundle-identifier';
 import {
   getAppDir,
   getAppsDir,
@@ -9,39 +17,40 @@ import {
 } from './applications';
 import type { AppBundleSchema } from './schemas';
 
+const appWorkspacesLogger = logger.child({ module: 'app-workspaces-api' });
+
 export const openWithTargetSchema = z.enum(['finder', 'terminal', 'vscode']);
 
 const openWithInputSchema = z
   .object({
     target: openWithTargetSchema,
-    appName: z.string().min(1).optional(),
-    draftId: z.string().min(1).optional(),
   })
-  .superRefine((input, ctx) => {
-    const targetCount =
-      Number(input.appName !== undefined) + Number(input.draftId !== undefined);
+  .and(appBundleIdentifierSchema);
 
-    if (targetCount !== 1) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Provide exactly one of appName or draftId',
-        path: ['appName'],
-      });
-    }
-  });
+export async function getApp(input: unknown): Promise<AppBundleSchema> {
+  const parsedInput = parseAppBundleIdentifier(input);
+  const targetDir = getAppBundlePath(parsedInput);
+  const bundle = await readAppBundleFromDirectory(targetDir);
 
-export async function getDraft(draftId: string) {
-  const parsedDraftId = z.string().min(1).parse(draftId);
-  const draftDir = getDraftDir(parsedDraftId);
-  const bundle = await readAppBundleFromDirectory(draftDir);
+  return isDraftAppBundleIdentifier(parsedInput)
+    ? {
+        ...bundle,
+        draftId: parsedInput.draftId,
+      }
+    : bundle;
+}
 
-  return {
-    draftId: parsedDraftId,
-    bundle: {
-      ...bundle,
-      draftId: parsedDraftId,
-    },
-  };
+export async function* watchApp(
+  input: unknown,
+): AsyncGenerator<AppBundleSchema> {
+  const parsedInput = parseAppBundleIdentifier(input);
+
+  yield await getApp(parsedInput);
+
+  for await (const event of watch(getAppsDir(), { recursive: true })) {
+    appWorkspacesLogger.debug({ event, target: parsedInput }, 'watchApp event');
+    yield await getApp(parsedInput);
+  }
 }
 
 export type DraftApp = AppBundleSchema & {
@@ -92,9 +101,8 @@ export async function discardDraft(draftId: string) {
 
 export async function openWith(input: unknown) {
   const parsedInput = openWithInputSchema.parse(input);
-  const targetPath = parsedInput.draftId
-    ? getDraftDir(parsedInput.draftId)
-    : getAppDir(parsedInput.appName ?? '');
+  const targetIdentifier = parseAppBundleIdentifier(parsedInput);
+  const targetPath = getAppBundlePath(targetIdentifier);
 
   await fs.promises.access(targetPath, fs.constants.F_OK);
 
@@ -110,6 +118,12 @@ export function getDraftsDir() {
 
 export function getDraftDir(draftId: string) {
   return path.join(getDraftsDir(), draftId);
+}
+
+function getAppBundlePath(identifier: AppBundleIdentifier) {
+  return isDraftAppBundleIdentifier(identifier)
+    ? getDraftDir(identifier.draftId)
+    : getAppDir(identifier.appName);
 }
 
 function getOpenCommand(

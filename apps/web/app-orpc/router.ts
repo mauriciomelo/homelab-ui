@@ -1,11 +1,14 @@
 import {
   discardDraft,
-  getDraft,
+  getApp,
   listDrafts,
   openWith,
   openWithTargetSchema,
+  watchApp,
 } from '@/app/api/app-workspaces';
-import { os } from '@orpc/server';
+import { appBundleIdentifierSchema } from '@/app/api/app-bundle-identifier';
+import { appBundleSchema } from '@/app/api/schemas';
+import { eventIterator, os } from '@orpc/server';
 import z from 'zod/v4';
 
 export const appRouter = {
@@ -13,14 +16,17 @@ export const appRouter = {
     listDrafts: os.handler(async () => {
       return listDrafts();
     }),
-    getDraft: os
-      .input(
-        z.object({
-          draftId: z.string().min(1),
-        }),
-      )
+    getApp: os
+      .input(appBundleIdentifierSchema)
+      .output(appBundleSchema)
       .handler(async ({ input }) => {
-        return getDraft(input.draftId);
+        return getApp(input);
+      }),
+    watchApp: os
+      .input(appBundleIdentifierSchema)
+      .output(eventIterator(appBundleSchema))
+      .handler(async function* ({ input }) {
+        yield* watchApp(input);
       }),
     discardDraft: os
       .input(
@@ -36,20 +42,8 @@ export const appRouter = {
         z
           .object({
             target: openWithTargetSchema,
-            appName: z.string().min(1).optional(),
-            draftId: z.string().min(1).optional(),
           })
-          .superRefine((input, ctx) => {
-            const targetCount = Number(input.appName !== undefined) + Number(input.draftId !== undefined);
-
-            if (targetCount !== 1) {
-              ctx.addIssue({
-                code: 'custom',
-                message: 'Provide exactly one of appName or draftId',
-                path: ['appName'],
-              });
-            }
-          }),
+          .and(appBundleIdentifierSchema),
       )
       .handler(async ({ input }) => {
         return openWith(input);

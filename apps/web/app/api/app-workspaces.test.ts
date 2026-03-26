@@ -4,13 +4,19 @@ import { produce } from 'immer';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import {
   discardDraft,
-  getDraft,
   getDraftDir,
+  getApp,
   listDrafts,
   openWith,
+  watchApp,
 } from './app-workspaces';
 import { createApp } from './applications';
 import { baseAppBundle } from '../../test-utils/fixtures';
+
+type WatchEvent = { eventType: string; filename: string | null };
+type WatchEventResolver = (
+  value: IteratorResult<WatchEvent, undefined>,
+) => void;
 
 const { execFileMock } = vi.hoisted(() => ({
   execFileMock: vi.fn(
@@ -24,6 +30,15 @@ const { execFileMock } = vi.hoisted(() => ({
   ),
 }));
 
+const { watchMock } = vi.hoisted(() => ({
+  watchMock: vi.fn<
+    (
+      path: string,
+      options: { recursive?: boolean },
+    ) => AsyncIterableIterator<{ eventType: string; filename: string | null }>
+  >(),
+}));
+
 vi.mock('server-only', () => ({}));
 
 vi.mock('../(dashboard)/apps/config', () => ({
@@ -32,12 +47,19 @@ vi.mock('../(dashboard)/apps/config', () => ({
 
 vi.mock('fs', async () => {
   const memfs = await vi.importActual<typeof import('memfs')>('memfs');
-  return { default: memfs.fs, ...memfs.fs };
+  return {
+    default: memfs.fs,
+    ...memfs.fs,
+  };
 });
 
 vi.mock('node:fs/promises', async () => {
   const memfs = await vi.importActual<typeof import('memfs')>('memfs');
-  return memfs.fs.promises;
+  return {
+    default: memfs.fs.promises,
+    ...memfs.fs.promises,
+    watch: watchMock,
+  };
 });
 
 vi.mock('child_process', () => ({
@@ -61,6 +83,7 @@ beforeEach(() => {
   });
 
   execFileMock.mockClear();
+  watchMock.mockClear();
   vol.reset();
 });
 
@@ -76,11 +99,11 @@ describe('draft workspaces', () => {
 
     expect(vol.existsSync(getDraftDir('draft-1'))).toBe(true);
 
-    const loadedDraft = await getDraft('draft-1');
+    const loadedDraft = await getApp({ draftId: 'draft-1' });
 
-    expect(loadedDraft.bundle.draftId).toBe('draft-1');
-    expect(loadedDraft.bundle.app.metadata.name).toBe('draft-app');
-    expect(loadedDraft.bundle.app.spec.image).toBe('nginx:latest');
+    expect(loadedDraft.draftId).toBe('draft-1');
+    expect(loadedDraft.app.metadata.name).toBe('draft-app');
+    expect(loadedDraft.app.spec.image).toBe('nginx:latest');
   });
 
   it('updates a draft bundle on disk', async () => {
@@ -98,9 +121,9 @@ describe('draft workspaces', () => {
 
     await createApp(nextBundle);
 
-    const loadedDraft = await getDraft('draft-1');
+    const loadedDraft = await getApp({ draftId: 'draft-1' });
 
-    expect(loadedDraft.bundle).toEqual(nextBundle);
+    expect(loadedDraft).toEqual(nextBundle);
   });
 
   it('discards a draft workspace', async () => {
@@ -137,6 +160,96 @@ describe('draft workspaces', () => {
     expect(drafts.map((draft) => draft.app.metadata.name)).toContain(
       'second-draft',
     );
+  });
+
+  it('reads a committed app bundle for watchApp', async () => {
+    const appBundle = produce(baseAppBundle, (draft) => {
+      delete draft.draftId;
+      draft.app.metadata.name = 'demo-app';
+      draft.app.spec.image = 'nginx:stable';
+    });
+
+    await createApp(appBundle);
+
+    await expect(
+      getApp({
+        appName: 'demo-app',
+      }),
+    ).resolves.toEqual({
+      app: appBundle.app,
+      additionalResources: appBundle.additionalResources,
+    });
+  });
+
+  it('streams updated bundle snapshots for watched drafts', async () => {
+    const queuedEvents: Array<IteratorResult<WatchEvent, undefined>> = [];
+    let resolveNextEvent: WatchEventResolver | undefined;
+
+    const iterator = {
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+      next: vi.fn(() => {
+        const queuedEvent = queuedEvents.shift();
+
+        if (queuedEvent) {
+          return Promise.resolve(queuedEvent);
+        }
+
+        return new Promise<
+          IteratorResult<WatchEvent, undefined>
+        >((resolve) => {
+          resolveNextEvent = resolve;
+        });
+      }),
+      return: vi.fn(async () => ({ done: true as const, value: undefined })),
+    };
+
+    watchMock.mockImplementation((path, options) => {
+      expect(path).toBe('/test-project/clusters/my-cluster/my-applications');
+      expect(options).toEqual({ recursive: true });
+      return iterator;
+    });
+
+    const initialBundle = produce(baseAppBundle, (draft) => {
+      draft.draftId = 'draft-1';
+      draft.app.metadata.name = 'draft-app';
+      draft.app.spec.image = 'nginx:latest';
+    });
+    const updatedBundle = produce(initialBundle, (draft) => {
+      draft.app.spec.image = 'ghcr.io/example/app:2.0.0';
+    });
+
+    await createApp(initialBundle);
+
+    const appWatcher = watchApp({ draftId: 'draft-1' });
+
+    await expect(appWatcher.next()).resolves.toEqual({
+      done: false,
+      value: initialBundle,
+    });
+
+    const nextPromise = appWatcher.next();
+
+    await createApp(updatedBundle);
+
+    const nextEvent = {
+      done: false as const,
+      value: { eventType: 'change', filename: 'app.yaml' },
+    };
+
+    if (resolveNextEvent) {
+      resolveNextEvent(nextEvent);
+    } else {
+      queuedEvents.push(nextEvent);
+    }
+
+    await expect(nextPromise).resolves.toEqual({
+      done: false,
+      value: updatedBundle,
+    });
+
+    await appWatcher.return(undefined);
   });
 });
 

@@ -89,10 +89,9 @@ describe('app-form-sheet visual', () => {
         open
         mode="edit"
         selectedApp={fullFeaturedApp}
-        selectedAppName={fullFeaturedApp.app.metadata.name}
-        selectedDraftId={null}
+        selectedIdentifier={{ appName: fullFeaturedApp.app.metadata.name }}
         hasPersistedDraft={false}
-        onSelectedDraftIdChange={() => {}}
+        onSelectedIdentifierChange={() => {}}
         onOpenChange={() => {}}
       />,
     );

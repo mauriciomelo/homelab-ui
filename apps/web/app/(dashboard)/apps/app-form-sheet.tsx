@@ -12,6 +12,10 @@ import {
 import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import {
+  isDraftAppBundleIdentifier,
+  type AppBundleIdentifier,
+} from '@/app/api/app-bundle-identifier';
+import {
   appBundleSchema,
   defaultAppBundleData,
   type AppBundleSchema,
@@ -19,12 +23,13 @@ import {
 import type { App } from '@/app/api/applications';
 import { ApplicationForm, useApplicationForm } from './application-form';
 import { AppDropArea, useAppDropArea } from './app-drop-area';
-import { appOrpc } from '@/app-orpc/client';
+import { appOrpc, appOrpcClient } from '@/app-orpc/client';
 import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { OpenWithMenu } from './open-with-menu';
 import { produce } from 'immer';
+import isEqual from 'lodash/isEqual';
 
 export type AppFormMode = 'edit' | 'create';
 
@@ -32,15 +37,14 @@ type AppFormSheetProps = {
   open: boolean;
   mode: AppFormMode;
   selectedApp: App | null;
-  selectedAppName: string | null;
-  selectedDraftId: string | null;
+  selectedIdentifier: AppBundleIdentifier | null;
   hasPersistedDraft: boolean;
-  onSelectedDraftIdChange: (draftId: string | null) => void;
+  onSelectedIdentifierChange: (identifier: AppBundleIdentifier | null) => void;
   onOpenChange: (open: boolean) => void;
 };
 
 export function AppFormSheet(props: AppFormSheetProps) {
-  const formIdentity = `${props.mode}-${props.selectedAppName ?? props.selectedDraftId ?? 'new'}`;
+  const formIdentity = `${props.mode}-${props.selectedIdentifier?.draftId ?? props.selectedIdentifier?.appName ?? 'new'}`;
 
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
@@ -55,24 +59,30 @@ function AppFormSheetBody({
   open,
   mode,
   selectedApp,
-  selectedAppName,
-  selectedDraftId,
+  selectedIdentifier,
   hasPersistedDraft,
-  onSelectedDraftIdChange,
+  onSelectedIdentifierChange,
   onOpenChange,
 }: AppFormSheetProps) {
   const [draftExists, setDraftExists] = useState(hasPersistedDraft);
+  const [watchedBundle, setWatchedBundle] = useState<AppBundleSchema>();
+  const [watchError, setWatchError] = useState<Error | null>(null);
+  const [isWatchingInitialBundle, setIsWatchingInitialBundle] = useState(false);
   const hasAvailableDraft = hasPersistedDraft || draftExists;
+  const draftIdentifier =
+    selectedIdentifier && isDraftAppBundleIdentifier(selectedIdentifier)
+      ? selectedIdentifier
+      : null;
+  const appIdentifier =
+    selectedIdentifier && !isDraftAppBundleIdentifier(selectedIdentifier)
+      ? selectedIdentifier
+      : null;
 
-  const draftQuery = useQuery({
-    ...appOrpc.apps.getDraft.queryOptions({
-      input: {
-        draftId: selectedDraftId ?? '',
-      },
+  const persistedDraftQuery = useQuery({
+    ...appOrpc.apps.getApp.queryOptions({
+      input: draftIdentifier ?? { draftId: '' },
     }),
-    enabled:
-      open && mode === 'create' && selectedDraftId !== null && hasAvailableDraft,
-    refetchInterval: 2000,
+    enabled: open && mode === 'create' && draftIdentifier !== null && hasPersistedDraft,
   });
 
   const createDraftMutation = useMutation(
@@ -83,14 +93,17 @@ function AppFormSheetBody({
   );
 
   const currentData =
-    mode === 'create'
-      ? draftQuery.data?.bundle
+    watchedBundle ??
+    (mode === 'create'
+      ? hasPersistedDraft
+        ? persistedDraftQuery.data
+        : undefined
       : selectedApp
         ? {
             app: selectedApp.app,
             additionalResources: selectedApp.additionalResources,
           }
-        : defaultAppBundleData;
+        : defaultAppBundleData);
 
   const defaultValues = async () => {
     if (mode === 'edit') {
@@ -104,25 +117,26 @@ function AppFormSheetBody({
       return defaultAppBundleData;
     }
 
-    if (selectedDraftId === null) {
+    if (draftIdentifier === null) {
       return defaultAppBundleData;
     }
 
-    if (!hasAvailableDraft) {
-      return createDefaultDraftBundle(selectedDraftId);
+    if (!hasPersistedDraft) {
+      return createDefaultDraftBundle(draftIdentifier.draftId);
     }
 
-    if (draftQuery.data?.bundle) {
-      return draftQuery.data.bundle;
+    if (persistedDraftQuery.data) {
+      return persistedDraftQuery.data;
     }
 
-    const draftResult = draftQuery.data ?? (await draftQuery.refetch()).data;
+    const draftResult =
+      persistedDraftQuery.data ?? (await persistedDraftQuery.refetch()).data;
 
-    if (draftResult?.bundle) {
-      return draftResult.bundle;
+    if (draftResult) {
+      return draftResult;
     }
 
-    return createDefaultDraftBundle(selectedDraftId);
+    return createDefaultDraftBundle(draftIdentifier.draftId);
   };
 
   const form = useApplicationForm({
@@ -130,12 +144,12 @@ function AppFormSheetBody({
     mode,
     defaultValues,
     onPublishSuccess: async () => {
-      if (!selectedDraftId) {
+      if (!draftIdentifier) {
         onOpenChange(false);
         return;
       }
 
-      onSelectedDraftIdChange(null);
+      onSelectedIdentifierChange(null);
       onOpenChange(false);
     },
   });
@@ -143,12 +157,18 @@ function AppFormSheetBody({
 
   useEffect(() => {
     setDraftExists(hasPersistedDraft);
-  }, [hasPersistedDraft, selectedDraftId]);
+  }, [draftIdentifier, hasPersistedDraft]);
+
+  useEffect(() => {
+    setWatchedBundle(undefined);
+    setWatchError(null);
+    setIsWatchingInitialBundle(false);
+  }, [mode, selectedIdentifier]);
 
   const ensureDraftExists = async () => {
     if (
       mode !== 'create' ||
-      selectedDraftId === null ||
+      draftIdentifier === null ||
       hasAvailableDraft ||
       createDraftMutation.isPending
     ) {
@@ -156,13 +176,13 @@ function AppFormSheetBody({
     }
 
     await createDraftMutation.mutateAsync(
-      createDefaultDraftBundle(selectedDraftId),
+      createDefaultDraftBundle(draftIdentifier.draftId),
     );
     setDraftExists(true);
   };
 
   useEffect(() => {
-    if (!open || mode !== 'create' || !selectedDraftId) {
+    if (!open || mode !== 'create' || !draftIdentifier) {
       return;
     }
 
@@ -198,21 +218,86 @@ function AppFormSheetBody({
     hasAvailableDraft,
     mode,
     open,
-    selectedDraftId,
+    draftIdentifier,
     updateDraftMutation,
+  ]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
+    const watchTarget =
+      mode === 'create'
+        ? open && draftIdentifier !== null && hasAvailableDraft
+          ? draftIdentifier
+          : null
+        : open && appIdentifier !== null
+          ? appIdentifier
+          : null;
+
+    if (!watchTarget) {
+      return;
+    }
+
+    const controller = new AbortController();
+    let isActive = true;
+
+    setWatchError(null);
+    setIsWatchingInitialBundle(mode === 'create');
+
+    void (async () => {
+      try {
+        const iterator = await appOrpcClient.apps.watchApp(watchTarget, {
+          signal: controller.signal,
+        });
+
+        for await (const bundle of iterator) {
+          if (!isActive) {
+            return;
+          }
+
+          setIsWatchingInitialBundle(false);
+
+          if (isEqual(bundle, form.form.getValues())) {
+            continue;
+          }
+
+          setWatchedBundle(bundle);
+        }
+      } catch (error) {
+        if (!isActive || controller.signal.aborted) {
+          return;
+        }
+
+        setIsWatchingInitialBundle(false);
+        setWatchError(
+          error instanceof Error
+            ? error
+            : new Error('Unable to watch the app on disk.'),
+        );
+      }
+    })();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [
+    form.form,
+    hasAvailableDraft,
+    mode,
+    open,
+    appIdentifier,
+    draftIdentifier,
   ]);
 
   const isFormLoading =
     form.form.formState.isLoading ||
-    (mode === 'create' && selectedDraftId === null);
+    (mode === 'create' && draftIdentifier === null) ||
+    isWatchingInitialBundle;
   const openTargetIdentifier =
-    mode === 'create'
-      ? selectedDraftId
-        ? { draftId: selectedDraftId }
-        : null
-      : selectedAppName
-        ? { appName: selectedAppName }
-        : null;
+    mode === 'create' ? draftIdentifier : appIdentifier;
 
   const isOpenDisabled =
     openTargetIdentifier === null ||
@@ -221,12 +306,12 @@ function AppFormSheetBody({
 
   return (
     <>
-      {mode === 'create' && draftQuery.error ? (
+      {mode === 'create' && (persistedDraftQuery.error || watchError) ? (
         <Alert variant="destructive" className="mb-4">
           <AlertTitle>Draft sync failed</AlertTitle>
           <AlertDescription>
-            {draftQuery.error instanceof Error
-              ? draftQuery.error.message
+            {(persistedDraftQuery.error ?? watchError) instanceof Error
+              ? (persistedDraftQuery.error ?? watchError)?.message
               : 'Unable to read the draft from disk.'}
           </AlertDescription>
         </Alert>
@@ -237,7 +322,7 @@ function AppFormSheetBody({
             <SheetTitle>
               {mode === 'create'
                 ? 'Create New App'
-                : (selectedApp?.app.metadata.name ?? selectedAppName)}
+                : (selectedApp?.app.metadata.name ?? appIdentifier?.appName)}
             </SheetTitle>
             <SheetDescription>
               {mode === 'create'
