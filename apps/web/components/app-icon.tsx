@@ -6,14 +6,14 @@ import {
 } from '@/components/ui/tooltip';
 import { ComponentProps, useState } from 'react';
 import { Status } from './ui/status';
-import type { App } from '@/app/api/applications';
-import type { DraftApp } from '@/app/api/app-workspaces';
+import type { PublishedAppBundle } from '@/app/api/applications';
+import type { DraftAppBundle } from '@/app/api/app-workspaces';
 
 export function AppIcon({
   app,
   showStatus = true,
 }: {
-  app: App | DraftApp;
+  app: PublishedAppBundle | DraftAppBundle;
   showStatus?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);

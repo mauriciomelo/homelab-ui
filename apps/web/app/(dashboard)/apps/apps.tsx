@@ -13,8 +13,11 @@ import { appOrpc } from '@/app-orpc/client';
 import { useQuery } from '@tanstack/react-query';
 import { APP_STATUS } from '@/app/constants';
 import { useState } from 'react';
-import type { App } from '@/app/api/applications';
-import type { AppListItem, DraftApp } from '@/app/api/app-workspaces';
+import type { PublishedAppBundle } from '@/app/api/applications';
+import type {
+  AppBundleListItem,
+  DraftAppBundle,
+} from '@/app/api/app-workspaces';
 import {
   getAppBundleIdentifier,
   isDraftAppBundleIdentifier,
@@ -29,15 +32,15 @@ import { AppFormSheet } from './app-form-sheet';
 
 type FormMode = 'edit' | 'create' | null;
 
-function isDraftApp(item: AppListItem): item is DraftApp {
+function isDraftApp(item: AppBundleListItem): item is DraftAppBundle {
   return 'draftId' in item;
 }
 
-function isPublishedApp(item: AppListItem): item is App {
+function isPublishedApp(item: AppBundleListItem): item is PublishedAppBundle {
   return !isDraftApp(item);
 }
 
-function getListItemStatus(item: AppListItem) {
+function getListItemStatus(item: AppBundleListItem) {
   return isDraftApp(item) ? APP_STATUS.UNKNOWN : item.status.phase;
 }
 
@@ -53,7 +56,7 @@ export function Apps() {
   const [selectedIdentifier, setSelectedIdentifier] =
     useState<AppBundleIdentifier | null>(null);
   const [formMode, setFormMode] = useState<FormMode>(null);
-  const appItems: AppListItem[] = [
+  const appItems: AppBundleListItem[] = [
     ...(apps.data ?? []).flatMap((app) => {
       return app.app?.metadata?.name ? [app] : [];
     }),
@@ -82,14 +85,14 @@ export function Apps() {
     setFormMode('create');
   };
 
-  const handleEditApp = (app: App) => {
+  const handleEditApp = (app: PublishedAppBundle) => {
     setSelectedIdentifier(
       getAppBundleIdentifier({ appName: app.app.metadata.name }),
     );
     setFormMode('edit');
   };
 
-  const handleEditDraft = (draft: DraftApp) => {
+  const handleEditDraft = (draft: DraftAppBundle) => {
     setSelectedIdentifier(getAppBundleIdentifier({ draftId: draft.draftId }));
     setFormMode('create');
   };

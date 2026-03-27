@@ -6,6 +6,7 @@ import {
   openWith,
   openWithTargetSchema,
   watchApp,
+  type ListAppsInput,
 } from '@/app/api/app-workspaces';
 import { appBundleIdentifierSchema } from '@/app/api/app-bundle-identifier';
 import { appBundleSchema } from '@/app/api/schemas';
@@ -14,9 +15,11 @@ import z from 'zod/v4';
 
 export const appRouter = {
   apps: {
-    list: os.input(listAppsInputSchema).handler(async ({ input }) => {
-      return listApps(input);
-    }),
+    list: os
+      .input(listAppsInputSchema)
+      .handler(async <TInput extends ListAppsInput>({ input }: { input: TInput }) => {
+        return listApps(input);
+      }),
     getApp: os
       .input(appBundleIdentifierSchema)
       .output(appBundleSchema)

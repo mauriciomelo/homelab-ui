@@ -34,7 +34,7 @@ const applicationsLogger = logger.child({ module: 'applications-api' });
 
 export type AppRuntimeStatus = z.infer<typeof appStatusSchema>;
 
-export type App = AppBundleSchema & {
+export type PublishedAppBundle = AppBundleSchema & {
   status: AppRuntimeStatus;
 };
 
@@ -85,7 +85,7 @@ async function getAppByName(name: string) {
     app,
     additionalResources,
     status,
-  } satisfies App;
+  } satisfies PublishedAppBundle;
 }
 
 export async function updateApp(appBundle: AppBundleSchema) {

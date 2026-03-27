@@ -1,4 +1,4 @@
-import type { App } from '@/app/api/applications';
+import type { PublishedAppBundle } from '@/app/api/applications';
 import { APP_STATUS } from '@/app/constants';
 import {
   appBundleSchema,
@@ -36,7 +36,7 @@ export const basePersistedAppManifest: z.infer<typeof appSchema> = Object.freeze
   ...baseAppManifest,
 });
 
-export const baseApp: App = Object.freeze({
+export const baseApp: PublishedAppBundle = Object.freeze({
   ...baseAppBundle,
   status: {
     phase: APP_STATUS.RUNNING,

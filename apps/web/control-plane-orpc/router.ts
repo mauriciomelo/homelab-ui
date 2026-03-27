@@ -1,4 +1,3 @@
-import { getApps } from '@/app/api/applications';
 import { appBundleSchema } from '@/app/api/schemas';
 import {
   createApp,
@@ -23,9 +22,6 @@ import z from 'zod/v4';
 
 export const controlPlaneRouter = {
   apps: {
-    list: os.handler(async () => {
-      return getApps();
-    }),
     create: os.input(appBundleSchema).handler(async ({ input }) => {
       return createApp(input);
     }),
@@ -42,9 +38,6 @@ export const controlPlaneRouter = {
     }),
     discoveredNodes: os.handler(async () => {
       return Array.from(getDiscoveredNodes().entries());
-    }),
-    apps: os.handler(async () => {
-      return getApps();
     }),
     restartApp: os
       .input(

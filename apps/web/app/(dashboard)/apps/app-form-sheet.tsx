@@ -20,7 +20,7 @@ import {
   defaultAppBundleData,
   type AppBundleSchema,
 } from '@/app/api/schemas';
-import type { App } from '@/app/api/applications';
+import type { PublishedAppBundle } from '@/app/api/applications';
 import { ApplicationForm, useApplicationForm } from './application-form';
 import { AppDropArea, useAppDropArea } from './app-drop-area';
 import { appOrpc, appOrpcClient } from '@/app-orpc/client';
@@ -36,7 +36,7 @@ export type AppFormMode = 'edit' | 'create';
 type AppFormSheetProps = {
   open: boolean;
   mode: AppFormMode;
-  selectedApp: App | null;
+  selectedApp: PublishedAppBundle | null;
   selectedIdentifier: AppBundleIdentifier | null;
   hasPersistedDraft: boolean;
   onSelectedIdentifierChange: (identifier: AppBundleIdentifier | null) => void;

@@ -81,7 +81,7 @@ function mockDevicesQueries({
     http.post('*/api/control-plane/rpc/devices/discoveredNodes', () => {
       return orpcJsonResponse(discoveredNodes.map((node) => [node.ip, node]));
     }),
-    http.post('*/api/control-plane/rpc/devices/apps', () => {
+    http.post('*/api/app/rpc/apps/list', () => {
       return orpcJsonResponse(apps);
     }),
   ];
@@ -202,7 +202,7 @@ describe('Devices Page', () => {
             : [],
         );
       }),
-      http.post('*/api/control-plane/rpc/devices/apps', () => {
+      http.post('*/api/app/rpc/apps/list', () => {
         return orpcJsonResponse([]);
       }),
       http.post(
@@ -521,7 +521,7 @@ describe('Devices Page', () => {
       http.post('*/api/control-plane/rpc/devices/discoveredNodes', () => {
         return orpcJsonResponse([[discoveredPortNode.ip, discoveredPortNode]]);
       }),
-      http.post('*/api/control-plane/rpc/devices/apps', () => {
+      http.post('*/api/app/rpc/apps/list', () => {
         return orpcJsonResponse([]);
       }),
       http.post('*/api/control-plane/rpc/devices/reset', async () => {

@@ -15,7 +15,7 @@ import {
   getAppDir,
   getAppsDir,
   readAppBundleFromDirectory,
-  type App,
+  type PublishedAppBundle,
 } from './applications';
 import type { AppBundleSchema } from './schemas';
 
@@ -55,17 +55,34 @@ export async function* watchApp(
   }
 }
 
-export type DraftApp = AppBundleSchema & {
+export type DraftAppBundle = AppBundleSchema & {
   draftId: string;
 };
 
-export type AppListItem = App | DraftApp;
+export type AppBundleListItem = PublishedAppBundle | DraftAppBundle;
 
-export const listAppsInputSchema = z.object({
-  includeDrafts: z.boolean().default(false),
-});
+export const listAppsInputSchema = z.union([
+  z.object({
+    includeDrafts: z.literal(true),
+  }),
+  z.object({
+    includeDrafts: z.literal(false).default(false),
+  }),
+]);
 
-export async function listApps(input: unknown = {}): Promise<AppListItem[]> {
+export type ListAppsInput = z.infer<typeof listAppsInputSchema>;
+
+export function listApps<TInput extends ListAppsInput>(
+  input: TInput,
+): Promise<
+  TInput['includeDrafts'] extends true
+    ? AppBundleListItem[]
+    : PublishedAppBundle[]
+>;
+export function listApps(): Promise<PublishedAppBundle[]>;
+export async function listApps(
+  input: unknown = {},
+): Promise<AppBundleListItem[] | PublishedAppBundle[]> {
   const parsedInput = listAppsInputSchema.parse(input);
   const apps = await getApps();
 
@@ -78,7 +95,7 @@ export async function listApps(input: unknown = {}): Promise<AppListItem[]> {
   return [...drafts, ...apps];
 }
 
-export async function listDrafts(): Promise<DraftApp[]> {
+export async function listDrafts(): Promise<DraftAppBundle[]> {
   try {
     const entries = await fs.promises.readdir(getDraftsDir(), {
       withFileTypes: true,
@@ -95,7 +112,7 @@ export async function listDrafts(): Promise<DraftApp[]> {
           return {
             ...bundle,
             draftId: entry.name,
-          } satisfies DraftApp;
+          } satisfies DraftAppBundle;
         }),
     );
 

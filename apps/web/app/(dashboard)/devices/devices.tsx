@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { appOrpc } from '@/app-orpc/client';
 import { cn } from '@/lib/utils';
 import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import {
@@ -58,7 +59,7 @@ import type { DiscoveredNode } from '@/mdns';
 import type { ClusterNode } from '@/app/api/devices';
 import capitalize from 'lodash/capitalize';
 import get from 'lodash/get';
-import type { App } from '@/app/api/applications';
+import type { PublishedAppBundle } from '@/app/api/applications';
 import { AppIcon } from '@/components/app-icon';
 import { useTransition, animated } from '@react-spring/web';
 import { useGLTF } from '@react-three/drei';
@@ -81,13 +82,17 @@ type DevicesProps = {
   appsPollIntervalMs?: number;
 };
 
-function nodeApps(apps: App[], nodeName: string) {
+function nodeApps(apps: PublishedAppBundle[], nodeName: string) {
   return apps.filter((app) =>
     app.status.placements.some((placement) => placement.nodeName === nodeName),
   );
 }
 
-function NodeApps(props: { apps: App[]; node: string; className?: string }) {
+function NodeApps(props: {
+  apps: PublishedAppBundle[];
+  node: string;
+  className?: string;
+}) {
   const items = nodeApps(props.apps, props.node);
   const AnimatedDiv = animated('div');
   const restartAppMutation = useMutation(
@@ -156,7 +161,11 @@ export function Devices({
     enabled: !isResetting,
   });
   const apps = useQuery({
-    ...controlPlaneOrpc.devices.apps.queryOptions(),
+    ...appOrpc.apps.list.queryOptions({
+      input: {
+        includeDrafts: false,
+      },
+    }),
     refetchInterval: appsPollIntervalMs,
     enabled: !isResetting,
   });
@@ -169,7 +178,11 @@ export function Devices({
       queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
     });
     queryClient.invalidateQueries({
-      queryKey: controlPlaneOrpc.devices.apps.queryKey(),
+      queryKey: appOrpc.apps.list.queryKey({
+        input: {
+          includeDrafts: false,
+        },
+      }),
     });
   };
 
@@ -221,7 +234,7 @@ export function Devices({
 
   const isNew = selected?.status === DEVICE_STATUS.NEW;
 
-  const runningApps = selected ? nodeApps(apps.data || [], selected.name) : [];
+  const runningApps = selected ? nodeApps(apps.data ?? [], selected.name) : [];
 
   const handleOpenNodeDetails = (node: Device) => {
     setSelectedId(node.ip);
@@ -336,7 +349,7 @@ export function Devices({
                 <TableCell className="font-medium">{device.ip}</TableCell>
                 <TableCell className="font-medium">
                   <NodeApps
-                    apps={apps.data || []}
+                    apps={apps.data ?? []}
                     node={device.name}
                   ></NodeApps>
                 </TableCell>
@@ -431,7 +444,7 @@ export function Devices({
                     {runningApps.length > 0 ? (
                       <NodeApps
                         className="size-6"
-                        apps={apps.data || []}
+                        apps={apps.data ?? []}
                         node={selected.name}
                       />
                     ) : (
@@ -491,7 +504,11 @@ function ResetDeviceDialog({
       queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
     });
     queryClient.invalidateQueries({
-      queryKey: controlPlaneOrpc.devices.apps.queryKey(),
+      queryKey: appOrpc.apps.list.queryKey({
+        input: {
+          includeDrafts: false,
+        },
+      }),
     });
   };
 
