@@ -84,14 +84,14 @@ function setupDraftHandlers(
     http.post('*/api/app/rpc/apps/getApp', () => {
       return orpcJsonResponse(draftBundle);
     }),
-    http.post('*/api/control-plane/rpc/apps/create', async ({ request }) => {
+    http.post('*/api/app/rpc/apps/create', async ({ request }) => {
       const input = await readOrpcInput(request);
 
       draftBundle = appBundleSchema.parse(input);
 
       return orpcJsonResponse({ success: true });
     }),
-    http.post('*/api/control-plane/rpc/apps/update', async ({ request }) => {
+    http.post('*/api/app/rpc/apps/update', async ({ request }) => {
       const input = await readOrpcInput(request);
 
       draftBundle = appBundleSchema.parse(input);
@@ -999,7 +999,7 @@ describe('ApplicationForm', () => {
           ]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/publish',
+          '*/api/app/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1123,7 +1123,7 @@ describe('ApplicationForm', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/publish',
+          '*/api/app/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1206,7 +1206,7 @@ describe('ApplicationForm', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/publish',
+          '*/api/app/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1314,7 +1314,7 @@ describe('ApplicationForm', () => {
           return orpcJsonResponse([app]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/publish',
+          '*/api/app/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1548,7 +1548,7 @@ describe('ApplicationForm', () => {
       );
       worker.use(
         http.post(
-          '*/api/control-plane/rpc/apps/update',
+          '*/api/app/rpc/apps/update',
           async ({ request }) => {
             updateCallCount += 1;
             updatedDraft = appBundleSchema.parse(await readOrpcInput(request));
@@ -1616,7 +1616,7 @@ describe('ApplicationForm', () => {
           return orpcJsonResponse([]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/publish',
+          '*/api/app/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1829,7 +1829,7 @@ describe('ApplicationForm', () => {
           return orpcJsonResponse([]);
         }),
         http.post(
-          '*/api/control-plane/rpc/apps/publish',
+          '*/api/app/rpc/apps/publish',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });

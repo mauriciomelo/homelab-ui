@@ -1,9 +1,7 @@
-import { appBundleSchema } from '@/app/api/schemas';
 import {
-  createApp,
-  publishApp,
+  getLiveApps,
+  reconcileFluxGitRepository,
   restartApp,
-  updateApp,
 } from '@/app/api/applications';
 import {
   createBootstrapToken,
@@ -18,19 +16,23 @@ import { os } from '@orpc/server';
 import axios from 'axios';
 import { exec } from 'child_process';
 import util from 'util';
-import z from 'zod/v4';
+import { z } from 'zod/v4';
 
 export const controlPlaneRouter = {
   apps: {
-    create: os.input(appBundleSchema).handler(async ({ input }) => {
-      return createApp(input);
+    getLiveApps: os.handler(async () => {
+      return getLiveApps();
     }),
-    update: os.input(appBundleSchema).handler(async ({ input }) => {
-      return updateApp(input);
-    }),
-    publish: os.input(appBundleSchema).handler(async ({ input }) => {
-      return publishApp(input);
-    }),
+    reconcileFluxGitRepository: os
+      .input(
+        z.object({
+          name: z.string().min(1),
+          namespace: z.string().min(1),
+        }),
+      )
+      .handler(async ({ input }) => {
+        return reconcileFluxGitRepository(input);
+      }),
   },
   devices: {
     list: os.handler(async () => {

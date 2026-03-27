@@ -20,11 +20,10 @@ import {
   defaultAppBundleData,
   type AppBundleSchema,
 } from '@/app/api/schemas';
-import type { PublishedAppBundle } from '@/app/api/applications';
+import type { PublishedAppBundle } from '@/app/api/app-workspaces';
 import { ApplicationForm, useApplicationForm } from './application-form';
 import { AppDropArea, useAppDropArea } from './app-drop-area';
 import { appOrpc, appOrpcClient } from '@/app-orpc/client';
-import { controlPlaneOrpc } from '@/control-plane-orpc/client';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { OpenWithMenu } from './open-with-menu';
@@ -86,10 +85,10 @@ function AppFormSheetBody({
   });
 
   const createDraftMutation = useMutation(
-    controlPlaneOrpc.apps.create.mutationOptions(),
+    appOrpc.apps.create.mutationOptions(),
   );
   const updateDraftMutation = useMutation(
-    controlPlaneOrpc.apps.update.mutationOptions(),
+    appOrpc.apps.update.mutationOptions(),
   );
 
   const currentData =

@@ -6,8 +6,10 @@ import {
 } from '@/components/ui/tooltip';
 import { ComponentProps, useState } from 'react';
 import { Status } from './ui/status';
-import type { PublishedAppBundle } from '@/app/api/applications';
-import type { DraftAppBundle } from '@/app/api/app-workspaces';
+import type {
+  DraftAppBundle,
+  PublishedAppBundle,
+} from '@/app/api/app-workspaces';
 
 export function AppIcon({
   app,

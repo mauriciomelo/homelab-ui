@@ -240,7 +240,6 @@ describe('Devices Page', () => {
   test('resets a non-master device via confirmation dialog', async ({
     worker,
   }) => {
-    const user = userEvent.setup();
     let resetPayload: unknown;
 
     const nonMasterNode = produce(baseClusterNode, (draft) => {
@@ -273,14 +272,16 @@ describe('Devices Page', () => {
 
     await renderWithProviders(<Devices />);
 
-    await user.click(page.getByRole('button', { name: nonMasterNode.name }));
-    await user.click(page.getByRole('button', { name: 'Factory Reset' }));
+    const nodeButton = page.getByRole('button', { name: nonMasterNode.name });
+
+    await nodeButton.click({ button: 'right' });
+    await page.getByText('Factory Reset').click();
 
     await expect
       .poll(() => page.getByRole('button', { name: 'Reset Device' }).elements())
       .toHaveLength(1);
 
-    await user.click(page.getByRole('button', { name: 'Reset Device' }));
+    await page.getByRole('button', { name: 'Reset Device' }).click();
 
     await expect
       .poll(() => resetPayload)

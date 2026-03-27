@@ -59,7 +59,7 @@ import type { DiscoveredNode } from '@/mdns';
 import type { ClusterNode } from '@/app/api/devices';
 import capitalize from 'lodash/capitalize';
 import get from 'lodash/get';
-import type { PublishedAppBundle } from '@/app/api/applications';
+import type { PublishedAppBundle } from '@/app/api/app-workspaces';
 import { AppIcon } from '@/components/app-icon';
 import { useTransition, animated } from '@react-spring/web';
 import { useGLTF } from '@react-three/drei';

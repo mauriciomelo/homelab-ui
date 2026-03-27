@@ -43,17 +43,17 @@ const handlers = [
       json: appsData,
     });
   }),
-  http.post('*/api/control-plane/rpc/apps/create', () => {
+  http.post('*/api/app/rpc/apps/create', () => {
     return HttpResponse.json({
       json: { success: true },
     });
   }),
-  http.post('*/api/control-plane/rpc/apps/update', () => {
+  http.post('*/api/app/rpc/apps/update', () => {
     return HttpResponse.json({
       json: { success: true },
     });
   }),
-  http.post('*/api/control-plane/rpc/apps/publish', () => {
+  http.post('*/api/app/rpc/apps/publish', () => {
     return HttpResponse.json({
       json: { success: true },
     });

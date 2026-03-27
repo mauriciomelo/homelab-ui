@@ -1,10 +1,13 @@
 import {
+  createApp,
   discardDraft,
   getApp,
   listApps,
   listAppsInputSchema,
   openWith,
   openWithTargetSchema,
+  publishApp,
+  updateApp,
   watchApp,
   type ListAppsInput,
 } from '@/app/api/app-workspaces';
@@ -26,6 +29,15 @@ export const appRouter = {
       .handler(async ({ input }) => {
         return getApp(input);
       }),
+    create: os.input(appBundleSchema).handler(async ({ input }) => {
+      return createApp(input);
+    }),
+    update: os.input(appBundleSchema).handler(async ({ input }) => {
+      return updateApp(input);
+    }),
+    publish: os.input(appBundleSchema).handler(async ({ input }) => {
+      return publishApp(input);
+    }),
     watchApp: os
       .input(appBundleIdentifierSchema)
       .output(eventIterator(appBundleSchema))

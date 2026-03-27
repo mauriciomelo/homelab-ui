@@ -13,10 +13,10 @@ import { appOrpc } from '@/app-orpc/client';
 import { useQuery } from '@tanstack/react-query';
 import { APP_STATUS } from '@/app/constants';
 import { useState } from 'react';
-import type { PublishedAppBundle } from '@/app/api/applications';
 import type {
   AppBundleListItem,
   DraftAppBundle,
+  PublishedAppBundle,
 } from '@/app/api/app-workspaces';
 import {
   getAppBundleIdentifier,

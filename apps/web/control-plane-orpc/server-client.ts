@@ -1,15 +1,10 @@
 import { createORPCClient, onError } from '@orpc/client';
 import { RPCLink } from '@orpc/client/fetch';
-import { createTanstackQueryUtils } from '@orpc/tanstack-query';
 import type { RouterClient } from '@orpc/server';
 import type { controlPlaneRouter } from './router';
 import { getOptionalConfig } from '@/app/(dashboard)/apps/config';
 
 function getUrl() {
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}/api/control-plane/rpc`;
-  }
-
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}/api/control-plane/rpc`;
   }
@@ -19,6 +14,7 @@ function getUrl() {
 
 const link = new RPCLink({
   url: getUrl,
+  fetch: (input, init) => globalThis.fetch(input, init),
   interceptors: [
     onError((error) => {
       console.error(error);
@@ -26,7 +22,6 @@ const link = new RPCLink({
   ],
 });
 
-const client: RouterClient<typeof controlPlaneRouter> = createORPCClient(link);
-
-export const controlPlaneOrpcClient = client;
-export const controlPlaneOrpc = createTanstackQueryUtils(client);
+export const controlPlaneOrpcServerClient: RouterClient<
+  typeof controlPlaneRouter
+> = createORPCClient(link);

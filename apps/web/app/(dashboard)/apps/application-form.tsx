@@ -14,7 +14,7 @@ import {
   defaultAppBundleData,
   type PersistentVolumeClaimSchema,
 } from '@/app/api/schemas';
-import { controlPlaneOrpc } from '@/control-plane-orpc/client';
+import { appOrpc } from '@/app-orpc/client';
 import { Separator } from '@radix-ui/react-separator';
 import { cn } from '@/lib/utils';
 import {
@@ -73,7 +73,7 @@ export function useApplicationForm({
   });
 
   const publishAppMutation = useMutation(
-    controlPlaneOrpc.apps.publish.mutationOptions(),
+    appOrpc.apps.publish.mutationOptions(),
   );
 
   const onSubmit = form.handleSubmit(async (formData) => {

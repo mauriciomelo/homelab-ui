@@ -1,4 +1,4 @@
-import type { PublishedAppBundle } from '@/app/api/applications';
+import type { PublishedAppBundle } from '@/app/api/app-workspaces';
 import { APP_STATUS } from '@/app/constants';
 import {
   appBundleSchema,
