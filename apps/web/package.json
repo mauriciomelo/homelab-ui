@@ -17,7 +17,7 @@
     "test:visual": "vitest --project=visual",
     "tsc": "tsc --noEmit",
     "lint": "eslint . --fix",
-    "dance": "concurrently --kill-others-on-fail -n \"lint,test,tsc\" \"pnpm run lint\" \"pnpm run test:ci --silent passed-only\" \"pnpm run tsc\"",
+    "dance": "concurrently --kill-others-on-fail -n \"lint,test,tsc\" \"pnpm run lint\" \"pnpm run test:ci --silent passed-only --bail=1\" \"pnpm run tsc\"",
     "build:cli": "tsup cli/index.ts --format esm --out-dir dist-cli --clean --target node20",
     "cli": "pnpm run build:cli && node dist-cli/index.mjs",
     "postinstall": "pnpm run build:cli"

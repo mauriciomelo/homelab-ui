@@ -1,14 +1,20 @@
 import { describe, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { produce } from 'immer';
+import { http } from 'msw';
 import { AppFormSheet } from './app-form-sheet';
-import { renderWithProviders, test } from '@/test-utils/browser';
+import {
+  orpcEventStreamResponse,
+  orpcJsonResponse,
+  renderWithProviders,
+  test,
+} from '@/test-utils/browser';
 import { baseApp } from '@/test-utils/fixtures';
 
 vi.mock('server-only', () => ({}));
 
 describe('app-form-sheet visual', () => {
-  test('renders a full-featured app edit sheet', async () => {
+  test('renders a full-featured app edit sheet', async ({ worker }) => {
     const fullFeaturedApp = produce(baseApp, (app) => {
       app.app.metadata.name = 'openwebui';
       app.app.spec.image = 'ghcr.io/open-webui/open-webui:main';
@@ -83,15 +89,33 @@ describe('app-form-sheet visual', () => {
       ];
     });
 
+    worker.use(
+      http.post('*/api/app/rpc/apps/getApp', () =>
+        orpcJsonResponse({
+          app: fullFeaturedApp.app,
+          additionalResources: fullFeaturedApp.additionalResources,
+        }),
+      ),
+      http.post('*/api/app/rpc/apps/watchApp', () =>
+        orpcEventStreamResponse([
+          {
+            app: fullFeaturedApp.app,
+            additionalResources: fullFeaturedApp.additionalResources,
+          },
+        ]),
+      ),
+    );
+
     page.viewport(800, 2000);
     await renderWithProviders(
       <AppFormSheet
         open
-        mode="edit"
-        selectedApp={fullFeaturedApp}
-        selectedIdentifier={{ appName: fullFeaturedApp.app.metadata.name }}
-        hasPersistedDraft={false}
-        onSelectedIdentifierChange={() => {}}
+        session={{
+          mode: 'edit',
+          identifier: { appName: fullFeaturedApp.app.metadata.name },
+          initialData: fullFeaturedApp,
+        }}
+        onSessionChange={() => {}}
         onOpenChange={() => {}}
       />,
     );
@@ -104,10 +128,10 @@ describe('app-form-sheet visual', () => {
       .poll(() => page.getByText('Resource Limits'))
       .toBeInTheDocument();
     await expect
-      .poll(() => page.getByText('Environment Variables'))
+      .poll(() => page.getByText('Environment Variables', { exact: true }))
       .toBeInTheDocument();
     await expect
-      .poll(() => page.getByText('Additional Resources'))
+      .poll(() => page.getByText('Additional Resources', { exact: true }))
       .toBeInTheDocument();
 
     await expect(page.getByRole('dialog')).toMatchScreenshot();

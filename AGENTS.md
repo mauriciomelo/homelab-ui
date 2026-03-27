@@ -44,6 +44,5 @@
 
 ## Coding conventions
 
-- **Comments:** Avoid redundant comments. Prioritize descriptive naming over code comments, but include comments when the code's intent or context isn't immediately obvious.
 - **React Stack:** Use **Tailwind CSS** for styling and **shadcn/ui** for UI components.
 - **Type Safety:** Do not use explicit `any` or type casting (e.g., `as` in TypeScript). Use proper type definitions instead.

@@ -21,60 +21,24 @@ import type {
   DraftAppBundle,
   PublishedAppBundle,
 } from '@/app/api/app-workspaces';
-import {
-  getAppBundleIdentifier,
-  isDraftAppBundleIdentifier as isDraft,
-  type AppBundleIdentifier,
-} from '@/app/api/app-bundle-identifier';
 import { Status } from '@/components/ui/status';
 import { PageContent } from '@/components/page-content';
 import { AppIcon, appStatusProps } from '@/components/app-icon';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { AppFormSheet } from './app-form-sheet';
+import {
+  AppFormSheet,
+  type AppFormSheetSession,
+} from './app-form-sheet';
 
-type FormMode = 'edit' | 'create' | null;
 const initialAppItems: AppBundleListItem[] = [];
 
 function isDraftApp(item: AppBundleListItem): item is DraftAppBundle {
   return 'draftId' in item;
 }
 
-function isPublishedApp(item: AppBundleListItem): item is PublishedAppBundle {
-  return !isDraftApp(item);
-}
-
 function getListItemStatus(item: AppBundleListItem) {
   return isDraftApp(item) ? APP_STATUS.UNKNOWN : item.status.phase;
-}
-
-function getSelectedApp(
-  appItems: AppBundleListItem[],
-  selectedIdentifier: AppBundleIdentifier | null,
-) {
-  if (!selectedIdentifier || isDraft(selectedIdentifier)) {
-    return null;
-  }
-
-  return (
-    appItems
-      .filter(isPublishedApp)
-      .find((app) => app.app.metadata.name === selectedIdentifier.appName) ??
-    null
-  );
-}
-
-function hasPersistedDraftApp(
-  appItems: AppBundleListItem[],
-  selectedIdentifier: AppBundleIdentifier | null,
-) {
-  if (!selectedIdentifier || !isDraft(selectedIdentifier)) {
-    return false;
-  }
-
-  return appItems
-    .filter(isDraftApp)
-    .some((draft) => draft.draftId === selectedIdentifier.draftId);
 }
 
 export function Apps() {
@@ -91,39 +55,43 @@ export function Apps() {
     }),
   });
 
-  const [selectedIdentifier, setSelectedIdentifier] =
-    useState<AppBundleIdentifier | null>(null);
-  const [formMode, setFormMode] = useState<FormMode>(null);
+  const [sheetSession, setSheetSession] = useState<AppFormSheetSession | null>(
+    null,
+  );
   const appItems = watchedApps.data ?? [];
-  const selectedApp = getSelectedApp(appItems, selectedIdentifier);
-  const hasPersistedDraft = hasPersistedDraftApp(appItems, selectedIdentifier);
 
   const handleCreateApp = () => {
-    const nextIdentifier = getAppBundleIdentifier({
+    const nextIdentifier = {
       draftId: crypto.randomUUID(),
-    });
+      persisted: false,
+    };
 
-    setSelectedIdentifier(nextIdentifier);
-    setFormMode('create');
+    setSheetSession({
+      mode: 'create',
+      identifier: nextIdentifier,
+      initialData: undefined,
+    });
   };
 
   const handleEditApp = (app: PublishedAppBundle) => {
-    setSelectedIdentifier(
-      getAppBundleIdentifier({ appName: app.app.metadata.name }),
-    );
-    setFormMode('edit');
+    const identifier = { appName: app.app.metadata.name };
+
+    setSheetSession({ mode: 'edit', identifier, initialData: app });
   };
 
   const handleEditDraft = (draft: DraftAppBundle) => {
-    setSelectedIdentifier(getAppBundleIdentifier({ draftId: draft.draftId }));
-    setFormMode('create');
+    const identifier = { draftId: draft.draftId, persisted: true };
+
+    setSheetSession({
+      mode: 'create',
+      identifier,
+      initialData: draft,
+    });
   };
 
   const handleCloseForm = () => {
-    setSelectedIdentifier(null);
-    setFormMode(null);
+    setSheetSession(null);
   };
-
   return (
     <>
       <PageContent>
@@ -194,12 +162,9 @@ export function Apps() {
           </TableBody>
         </Table>
         <AppFormSheet
-          open={formMode !== null}
-          mode={formMode ?? 'edit'}
-          selectedApp={selectedApp}
-          selectedIdentifier={selectedIdentifier}
-          hasPersistedDraft={hasPersistedDraft}
-          onSelectedIdentifierChange={setSelectedIdentifier}
+          open={sheetSession !== null}
+          session={sheetSession}
+          onSessionChange={setSheetSession}
           onOpenChange={(open) => {
             if (!open) {
               handleCloseForm();

@@ -5,15 +5,19 @@ import { orpcEventStreamResponse } from '../orpc';
 
 const appsData = [
   {
-    apiVersion: 'tesselar.io/v1alpha1',
-    kind: 'App',
-    metadata: {
-      name: 'my-app',
+    app: {
+      apiVersion: 'tesselar.io/v1alpha1',
+      kind: 'App',
+      metadata: {
+        name: 'my-app',
+      },
+      spec: {
+        image: 'postgres:16',
+        envVariables: [{ name: 'DB_NAME', value: 'production' }],
+        ports: [],
+      },
     },
-    spec: {
-      image: 'postgres:16',
-      envVariables: [{ name: 'DB_NAME', value: 'production' }],
-    },
+    additionalResources: [],
     status: {
       phase: APP_STATUS.RUNNING,
       placements: [],
@@ -21,15 +25,19 @@ const appsData = [
     },
   },
   {
-    apiVersion: 'tesselar.io/v1alpha1',
-    kind: 'App',
-    metadata: {
-      name: 'web-app',
+    app: {
+      apiVersion: 'tesselar.io/v1alpha1',
+      kind: 'App',
+      metadata: {
+        name: 'web-app',
+      },
+      spec: {
+        image: 'nginx:latest',
+        envVariables: [],
+        ports: [],
+      },
     },
-    spec: {
-      image: 'nginx:latest',
-      envVariables: [],
-    },
+    additionalResources: [],
     status: {
       phase: APP_STATUS.RUNNING,
       placements: [],

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -11,44 +11,201 @@ import {
 } from '@/components/ui/sheet';
 import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
-import {
-  isDraftAppBundleIdentifier,
-  type AppBundleIdentifier,
-} from '@/app/api/app-bundle-identifier';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   appBundleSchema,
   defaultAppBundleData,
   type AppBundleSchema,
 } from '@/app/api/schemas';
-import type { PublishedAppBundle } from '@/app/api/app-workspaces';
 import { ApplicationForm, useApplicationForm } from './application-form';
 import { AppDropArea, useAppDropArea } from './app-drop-area';
 import { appOrpc, appOrpcClient } from '@/app-orpc/client';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  experimental_streamedQuery as streamedQuery,
+  useMutation,
+  useQuery,
+} from '@tanstack/react-query';
 import { OpenWithMenu } from './open-with-menu';
 import { produce } from 'immer';
-import isEqual from 'lodash/isEqual';
 
 export type AppFormMode = 'edit' | 'create';
 
+export type AppFormSheetSession =
+  | {
+      mode: 'create';
+      identifier: { draftId: string; persisted: boolean };
+      initialData?: AppBundleSchema;
+    }
+  | {
+      mode: 'edit';
+      identifier: { appName: string };
+      initialData: AppBundleSchema;
+    };
+
 type AppFormSheetProps = {
   open: boolean;
-  mode: AppFormMode;
-  selectedApp: PublishedAppBundle | null;
-  selectedIdentifier: AppBundleIdentifier | null;
-  hasPersistedDraft: boolean;
-  onSelectedIdentifierChange: (identifier: AppBundleIdentifier | null) => void;
+  session: AppFormSheetSession | null;
+  onSessionChange: (session: AppFormSheetSession | null) => void;
   onOpenChange: (open: boolean) => void;
 };
 
+function getFormIdentity(session: AppFormSheetSession | null) {
+  if (!session) {
+    return 'closed-new';
+  }
+
+  if (session.mode === 'create') {
+    return `create-${session.identifier.draftId}`;
+  }
+
+  return `edit-${session.identifier.appName}`;
+}
+
+function getSheetTitle({
+  mode,
+  currentData,
+  appIdentifier,
+}: {
+  mode: AppFormMode;
+  currentData?: AppBundleSchema;
+  appIdentifier: { appName: string } | null;
+}) {
+  if (mode === 'create') {
+    return 'Create New App';
+  }
+
+  return currentData?.app.metadata.name ?? appIdentifier?.appName;
+}
+
+function getSheetDescription(mode: AppFormMode) {
+  return mode === 'create'
+    ? 'Configure your new application.'
+    : "Edit the App's configuration.";
+}
+
+function getLoadingMessage(mode: AppFormMode) {
+  return mode === 'create'
+    ? 'Preparing draft workspace...'
+    : 'Loading application...';
+}
+
+function getEmptyStateMessage(mode: AppFormMode) {
+  return mode === 'create'
+    ? 'Unable to prepare the draft form.'
+    : 'Unable to load the application form.';
+}
+
+function getErrorTitle(mode: AppFormMode) {
+  return mode === 'create' ? 'Draft sync failed' : 'App load failed';
+}
+
+function getErrorDescription({
+  mode,
+  isEditModeMissingApp,
+  appIdentifier,
+  error,
+}: {
+  mode: AppFormMode;
+  isEditModeMissingApp: boolean;
+  appIdentifier: { appName: string } | null;
+  error: Error | null;
+}) {
+  if (isEditModeMissingApp) {
+    return `Unable to find app "${appIdentifier?.appName}".`;
+  }
+
+  if (error) {
+    return error.message;
+  }
+
+  return mode === 'create'
+    ? 'Unable to read the draft from disk.'
+    : 'Unable to read the app from disk.';
+}
+
+function getWatchQueryKey({
+  mode,
+  draftIdentifier,
+  appIdentifier,
+}: {
+  mode: AppFormMode;
+  draftIdentifier: { draftId: string } | null;
+  appIdentifier: { appName: string } | null;
+}) {
+  if (mode === 'create') {
+    return ['watch-app', 'draft', draftIdentifier?.draftId] as const;
+  }
+
+  return ['watch-app', 'app', appIdentifier?.appName] as const;
+}
+
+function getCurrentData({
+  watchedBundle,
+  initialData,
+  mode,
+  draftIdentifier,
+}: {
+  watchedBundle?: AppBundleSchema;
+  initialData?: AppBundleSchema;
+  mode: AppFormMode;
+  draftIdentifier: { draftId: string } | null;
+}) {
+  if (watchedBundle) {
+    return watchedBundle;
+  }
+
+  if (initialData) {
+    return initialData;
+  }
+
+  if (mode === 'create') {
+    return createDefaultDraftBundle(draftIdentifier?.draftId ?? null);
+  }
+
+  return undefined;
+}
+
+function getInitialWatchedBundle({
+  initialData,
+  mode,
+  draftIdentifier,
+}: {
+  initialData?: AppBundleSchema;
+  mode: AppFormMode;
+  draftIdentifier: { draftId: string } | null;
+}) {
+  if (initialData) {
+    return initialData;
+  }
+
+  if (mode === 'create') {
+    return createDefaultDraftBundle(draftIdentifier?.draftId ?? null);
+  }
+
+  return undefined;
+}
+
+function getQueryError(error: unknown) {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  if (error) {
+    return new Error('Unable to watch the app on disk.');
+  }
+
+  return null;
+}
+
 export function AppFormSheet(props: AppFormSheetProps) {
-  const formIdentity = `${props.mode}-${props.selectedIdentifier?.draftId ?? props.selectedIdentifier?.appName ?? 'new'}`;
+  const formIdentity = getFormIdentity(props.session);
 
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
       <SheetContent className="bg-muted w-[600px] sm:max-w-[600px]">
-        {props.open ? <AppFormSheetBody key={formIdentity} {...props} /> : null}
+        {props.open && props.session ? (
+          <AppFormSheetBody key={formIdentity} {...props} session={props.session} />
+        ) : null}
       </SheetContent>
     </Sheet>
   );
@@ -56,87 +213,58 @@ export function AppFormSheet(props: AppFormSheetProps) {
 
 function AppFormSheetBody({
   open,
-  mode,
-  selectedApp,
-  selectedIdentifier,
-  hasPersistedDraft,
-  onSelectedIdentifierChange,
+  session,
+  onSessionChange,
   onOpenChange,
-}: AppFormSheetProps) {
-  const [draftExists, setDraftExists] = useState(hasPersistedDraft);
-  const [watchedBundle, setWatchedBundle] = useState<AppBundleSchema>();
-  const [watchError, setWatchError] = useState<Error | null>(null);
-  const [isWatchingInitialBundle, setIsWatchingInitialBundle] = useState(false);
-  const hasAvailableDraft = hasPersistedDraft || draftExists;
+}: AppFormSheetProps & { session: AppFormSheetSession }) {
+  const { mode } = session;
+  const draftSession = session.mode === 'create' ? session.identifier : null;
   const draftIdentifier =
-    selectedIdentifier && isDraftAppBundleIdentifier(selectedIdentifier)
-      ? selectedIdentifier
-      : null;
-  const appIdentifier =
-    selectedIdentifier && !isDraftAppBundleIdentifier(selectedIdentifier)
-      ? selectedIdentifier
-      : null;
-
-  const persistedDraftQuery = useQuery({
-    ...appOrpc.apps.getApp.queryOptions({
-      input: draftIdentifier ?? { draftId: '' },
-    }),
-    enabled: open && mode === 'create' && draftIdentifier !== null && hasPersistedDraft,
-  });
-
+    draftSession === null ? null : { draftId: draftSession.draftId };
+  const appIdentifier = session.mode === 'edit' ? session.identifier : null;
+  const initialData = session.initialData;
   const createDraftMutation = useMutation(
     appOrpc.apps.create.mutationOptions(),
   );
   const updateDraftMutation = useMutation(
     appOrpc.apps.update.mutationOptions(),
   );
+  const hasPersistedDraft =
+    mode === 'create' &&
+    draftSession !== null &&
+    (draftSession.persisted || createDraftMutation.isSuccess);
+  const watchEnabled = open && (mode === 'edit' || hasPersistedDraft);
+  const watchIdentifier = mode === 'create' ? draftIdentifier : appIdentifier;
+  const initialWatchedBundle = getInitialWatchedBundle({
+    initialData,
+    mode,
+    draftIdentifier,
+  });
+  const watchedBundlesQuery = useQuery({
+    queryKey: getWatchQueryKey({ mode, draftIdentifier, appIdentifier }),
+    enabled: watchEnabled,
+    retry: false,
+    queryFn: streamedQuery<AppBundleSchema, AppBundleSchema | undefined>({
+      streamFn: async () => {
+        if (!watchIdentifier) {
+          throw new Error('Unable to determine which app to watch.');
+        }
 
-  const currentData =
-    watchedBundle ??
-    (mode === 'create'
-      ? hasPersistedDraft
-        ? persistedDraftQuery.data
-        : undefined
-      : selectedApp
-        ? {
-            app: selectedApp.app,
-            additionalResources: selectedApp.additionalResources,
-          }
-        : defaultAppBundleData);
-
-  const defaultValues = async () => {
-    if (mode === 'edit') {
-      if (selectedApp) {
-        return {
-          app: selectedApp.app,
-          additionalResources: selectedApp.additionalResources,
-        };
-      }
-
-      return defaultAppBundleData;
-    }
-
-    if (draftIdentifier === null) {
-      return defaultAppBundleData;
-    }
-
-    if (!hasPersistedDraft) {
-      return createDefaultDraftBundle(draftIdentifier.draftId);
-    }
-
-    if (persistedDraftQuery.data) {
-      return persistedDraftQuery.data;
-    }
-
-    const draftResult =
-      persistedDraftQuery.data ?? (await persistedDraftQuery.refetch()).data;
-
-    if (draftResult) {
-      return draftResult;
-    }
-
-    return createDefaultDraftBundle(draftIdentifier.draftId);
-  };
+        return appOrpcClient.apps.watchApp(watchIdentifier);
+      },
+      initialValue: initialWatchedBundle,
+      reducer: (_previous, nextBundle) => nextBundle,
+      refetchMode: 'reset',
+    }),
+  });
+  const watchedBundle = watchedBundlesQuery.data;
+  const currentData = getCurrentData({
+    watchedBundle,
+    initialData,
+    mode,
+    draftIdentifier,
+  });
+  const defaultValues = currentData ?? defaultAppBundleData;
 
   const form = useApplicationForm({
     data: currentData,
@@ -148,27 +276,17 @@ function AppFormSheetBody({
         return;
       }
 
-      onSelectedIdentifierChange(null);
+      onSessionChange(null);
       onOpenChange(false);
     },
   });
   const appDropArea = useAppDropArea({ form: form.form });
 
-  useEffect(() => {
-    setDraftExists(hasPersistedDraft);
-  }, [draftIdentifier, hasPersistedDraft]);
-
-  useEffect(() => {
-    setWatchedBundle(undefined);
-    setWatchError(null);
-    setIsWatchingInitialBundle(false);
-  }, [mode, selectedIdentifier]);
-
   const ensureDraftExists = async () => {
     if (
       mode !== 'create' ||
       draftIdentifier === null ||
-      hasAvailableDraft ||
+      hasPersistedDraft ||
       createDraftMutation.isPending
     ) {
       return;
@@ -177,7 +295,6 @@ function AppFormSheetBody({
     await createDraftMutation.mutateAsync(
       createDefaultDraftBundle(draftIdentifier.draftId),
     );
-    setDraftExists(true);
   };
 
   useEffect(() => {
@@ -196,16 +313,12 @@ function AppFormSheetBody({
         return;
       }
 
-      if (hasAvailableDraft) {
+      if (hasPersistedDraft) {
         updateDraftMutation.mutate(parsedBundle.data);
         return;
       }
 
-      createDraftMutation.mutate(parsedBundle.data, {
-        onSuccess: () => {
-          setDraftExists(true);
-        },
-      });
+      createDraftMutation.mutate(parsedBundle.data);
     });
 
     return () => {
@@ -214,128 +327,67 @@ function AppFormSheetBody({
   }, [
     createDraftMutation,
     form.form,
-    hasAvailableDraft,
+    hasPersistedDraft,
     mode,
     open,
     draftIdentifier,
     updateDraftMutation,
   ]);
 
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-
-    const watchTarget =
-      mode === 'create'
-        ? open && draftIdentifier !== null && hasAvailableDraft
-          ? draftIdentifier
-          : null
-        : open && appIdentifier !== null
-          ? appIdentifier
-          : null;
-
-    if (!watchTarget) {
-      return;
-    }
-
-    const controller = new AbortController();
-    let isActive = true;
-
-    setWatchError(null);
-    setIsWatchingInitialBundle(mode === 'create');
-
-    void (async () => {
-      try {
-        const iterator = await appOrpcClient.apps.watchApp(watchTarget, {
-          signal: controller.signal,
-        });
-
-        for await (const bundle of iterator) {
-          if (!isActive) {
-            return;
-          }
-
-          setIsWatchingInitialBundle(false);
-
-          if (isEqual(bundle, form.form.getValues())) {
-            continue;
-          }
-
-          setWatchedBundle(bundle);
-        }
-      } catch (error) {
-        if (!isActive || controller.signal.aborted) {
-          return;
-        }
-
-        setIsWatchingInitialBundle(false);
-        setWatchError(
-          error instanceof Error
-            ? error
-            : new Error('Unable to watch the app on disk.'),
-        );
-      }
-    })();
-
-    return () => {
-      isActive = false;
-      controller.abort();
-    };
-  }, [
-    form.form,
-    hasAvailableDraft,
-    mode,
-    open,
-    appIdentifier,
-    draftIdentifier,
-  ]);
-
+  const isEditModeMissingApp =
+    mode === 'edit' &&
+    !watchedBundlesQuery.error &&
+    !watchedBundlesQuery.isPending &&
+    !form.form.formState.isLoading &&
+    !currentData;
   const isFormLoading =
     form.form.formState.isLoading ||
     (mode === 'create' && draftIdentifier === null) ||
-    isWatchingInitialBundle;
-  const openTargetIdentifier =
-    mode === 'create' ? draftIdentifier : appIdentifier;
+    (mode === 'edit' && watchedBundlesQuery.isPending && !currentData) ||
+    (mode === 'create' && hasPersistedDraft && watchedBundlesQuery.isPending);
+  const openTargetIdentifier = mode === 'create' ? draftIdentifier : appIdentifier;
 
   const isOpenDisabled =
     openTargetIdentifier === null ||
     createDraftMutation.isPending ||
     updateDraftMutation.isPending;
+  const displayedError = getQueryError(watchedBundlesQuery.error);
+  const showError = displayedError !== null || isEditModeMissingApp;
+  const title = getSheetTitle({ mode, currentData, appIdentifier });
+  const description = getSheetDescription(mode);
+  const loadingMessage = getLoadingMessage(mode);
+  const emptyStateMessage = getEmptyStateMessage(mode);
+  const errorTitle = getErrorTitle(mode);
+  const errorDescription = getErrorDescription({
+    mode,
+    isEditModeMissingApp,
+    appIdentifier,
+    error: displayedError,
+  });
 
   return (
     <>
-      {mode === 'create' && (persistedDraftQuery.error || watchError) ? (
+      {showError ? (
         <Alert variant="destructive" className="mb-4">
-          <AlertTitle>Draft sync failed</AlertTitle>
-          <AlertDescription>
-            {(persistedDraftQuery.error ?? watchError) instanceof Error
-              ? (persistedDraftQuery.error ?? watchError)?.message
-              : 'Unable to read the draft from disk.'}
-          </AlertDescription>
+          <AlertTitle>{errorTitle}</AlertTitle>
+          <AlertDescription>{errorDescription}</AlertDescription>
         </Alert>
       ) : null}
       <Form {...form.form}>
         <form onSubmit={form.onSubmit} className="flex min-h-0 flex-1 flex-col">
           <SheetHeader>
-            <SheetTitle>
-              {mode === 'create'
-                ? 'Create New App'
-                : (selectedApp?.app.metadata.name ?? appIdentifier?.appName)}
-            </SheetTitle>
-            <SheetDescription>
-              {mode === 'create'
-                ? 'Configure your new application.'
-                : "Edit the App's configuration."}
-            </SheetDescription>
+            <SheetTitle>{title}</SheetTitle>
+            <SheetDescription>{description}</SheetDescription>
           </SheetHeader>
           <AppDropArea className="min-h-0 flex-1" {...appDropArea.dropAreaProps}>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {isFormLoading ? (
                 <div className="text-muted-foreground flex h-full min-h-40 items-center justify-center p-4 text-sm">
-                  {mode === 'create'
-                    ? 'Preparing draft workspace...'
-                    : 'Loading application...'}
+                  {loadingMessage}
+                </div>
+              ) : !currentData ? (
+                <div className="text-muted-foreground flex h-full min-h-40 items-center justify-center p-4 text-sm">
+                  {emptyStateMessage}
                 </div>
               ) : (
                 <ApplicationForm className="p-4" {...form} />
