@@ -25,7 +25,9 @@ export function OpenWithMenu({
   const isDisabled =
     disabled || appIdentifier === null || openWithMutation.isPending;
 
-  const handleOpenWith = async (target: 'finder' | 'terminal' | 'vscode') => {
+  const handleOpenWith = async (
+    target: 'finder' | 'terminal' | 'vscode' | 'cursor' | 'ghostty',
+  ) => {
     if (!appIdentifier) {
       return;
     }
@@ -47,13 +49,49 @@ export function OpenWithMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         <DropdownMenuItem onSelect={() => handleOpenWith('finder')}>
+          <img
+            src="/app-icons/finder.png"
+            alt=""
+            aria-hidden="true"
+            className="size-4 rounded-[4px]"
+          />
           Finder
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => handleOpenWith('vscode')}>
+          <img
+            src="/app-icons/vscode.png"
+            alt=""
+            aria-hidden="true"
+            className="size-4 rounded-[4px]"
+          />
           VSCode
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => handleOpenWith('cursor')}>
+          <img
+            src="/app-icons/cursor.png"
+            alt=""
+            aria-hidden="true"
+            className="size-4 rounded-[4px]"
+          />
+          Cursor
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => handleOpenWith('terminal')}>
+          <img
+            src="/app-icons/terminal.png"
+            alt=""
+            aria-hidden="true"
+            className="size-4 rounded-[4px]"
+          />
           Terminal
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => handleOpenWith('ghostty')}>
+          <img
+            src="/app-icons/ghostty.png"
+            alt=""
+            aria-hidden="true"
+            className="size-4 rounded-[4px]"
+          />
+          Ghostty
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -34,7 +34,13 @@ import type { AppBundleSchema } from './schemas';
 
 const appWorkspacesLogger = logger.child({ module: 'app-workspaces-api' });
 
-export const openWithTargetSchema = z.enum(['finder', 'terminal', 'vscode']);
+export const openWithTargetSchema = z.enum([
+  'finder',
+  'terminal',
+  'vscode',
+  'cursor',
+  'ghostty',
+]);
 
 export type AppResourceType =
   | z.infer<typeof appSchema>
@@ -583,6 +589,20 @@ function getOpenCommand(
     return {
       command: 'open',
       args: ['-a', 'Terminal', targetPath],
+    };
+  }
+
+  if (target === 'ghostty') {
+    return {
+      command: 'open',
+      args: ['-a', 'Ghostty', targetPath],
+    };
+  }
+
+  if (target === 'cursor') {
+    return {
+      command: 'open',
+      args: ['-a', 'Cursor', targetPath],
     };
   }
 

@@ -759,6 +759,25 @@ describe('openWith', () => {
     );
   });
 
+  it('opens a draft workspace in Cursor', async () => {
+    await createApp(
+      produce(baseAppBundle, (draft) => {
+        draft.draftId = 'draft-1';
+      }),
+    );
+
+    await openWith({
+      target: 'cursor',
+      draftId: 'draft-1',
+    });
+
+    expect(execFileMock).toHaveBeenCalledWith(
+      'open',
+      ['-a', 'Cursor', getDraftDir('draft-1')],
+      expect.any(Function),
+    );
+  });
+
   it('opens a committed app directory in Finder', async () => {
     vol.fromJSON({
       '/test-project/clusters/my-cluster/my-applications/demo-app/.keep': '',
@@ -772,6 +791,23 @@ describe('openWith', () => {
     expect(execFileMock).toHaveBeenCalledWith(
       'open',
       ['/test-project/clusters/my-cluster/my-applications/demo-app'],
+      expect.any(Function),
+    );
+  });
+
+  it('opens a committed app directory in Ghostty', async () => {
+    vol.fromJSON({
+      '/test-project/clusters/my-cluster/my-applications/demo-app/.keep': '',
+    });
+
+    await openWith({
+      target: 'ghostty',
+      appName: 'demo-app',
+    });
+
+    expect(execFileMock).toHaveBeenCalledWith(
+      'open',
+      ['-a', 'Ghostty', '/test-project/clusters/my-cluster/my-applications/demo-app'],
       expect.any(Function),
     );
   });
