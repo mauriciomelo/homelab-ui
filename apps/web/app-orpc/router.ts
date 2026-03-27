@@ -1,4 +1,5 @@
 import {
+  appBundleListSchema,
   createApp,
   discardDraft,
   getApp,
@@ -9,6 +10,7 @@ import {
   publishApp,
   updateApp,
   watchApp,
+  watchApps,
   type ListAppsInput,
 } from '@/app/api/app-workspaces';
 import { appBundleIdentifierSchema } from '@/app/api/app-bundle-identifier';
@@ -43,6 +45,12 @@ export const appRouter = {
       .output(eventIterator(appBundleSchema))
       .handler(async function* ({ input }) {
         yield* watchApp(input);
+      }),
+    watchApps: os
+      .input(listAppsInputSchema)
+      .output(eventIterator(appBundleListSchema))
+      .handler(async function* ({ input }) {
+        yield* watchApps(input);
       }),
     discardDraft: os
       .input(

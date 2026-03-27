@@ -37,7 +37,7 @@ importers:
         version: 1.9.1(ws@8.18.3)
       '@orpc/tanstack-query':
         specifier: ^1.9.1
-        version: 1.9.1(@orpc/client@1.9.1)(@tanstack/query-core@5.81.2)
+        version: 1.9.1(@orpc/client@1.9.1)(@tanstack/query-core@5.95.2)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.14
         version: 1.1.14(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -93,8 +93,8 @@ importers:
         specifier: ^9.1.4
         version: 9.1.4(@types/react@19.2.7)(immer@11.0.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(three@0.178.0)
       '@tanstack/react-query':
-        specifier: ^5.81.2
-        version: 5.81.2(react@19.2.3)
+        specifier: ^5.95.2
+        version: 5.95.2(react@19.2.3)
       '@tanstack/react-router':
         specifier: ^1.132.14
         version: 1.161.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -2013,11 +2013,11 @@ packages:
     resolution: {integrity: sha512-xyIfof8eHBuub1CkBnbKNKQXeRZC4dClhmzePHVOEel4G7lk/dW+TQ16da7CFdeNLv6u6Owf5VoBQxoo6DFTSA==}
     engines: {node: '>=12'}
 
-  '@tanstack/query-core@5.81.2':
-    resolution: {integrity: sha512-QLYkPdrudoMATDFa3MiLEwRhNnAlzHWDf0LKaXUqJd0/+QxN8uTPi7bahRlxoAyH0UbLMBdeDbYzWALj7THOtw==}
+  '@tanstack/query-core@5.95.2':
+    resolution: {integrity: sha512-o4T8vZHZET4Bib3jZ/tCW9/7080urD4c+0/AUaYVpIqOsr7y0reBc1oX3ttNaSW5mYyvZHctiQ/UOP2PfdmFEQ==}
 
-  '@tanstack/react-query@5.81.2':
-    resolution: {integrity: sha512-pe8kFlTrL2zFLlcAj2kZk9UaYYHDk9/1hg9EBaoO3cxDhOZf1FRGJeziSXKrVZyxIfs7b3aoOj/bw7Lie0mDUg==}
+  '@tanstack/react-query@5.95.2':
+    resolution: {integrity: sha512-/wGkvLj/st5Ud1Q76KF1uFxScV7WeqN1slQx5280ycwAyYkIPGaRZAEgHxe3bjirSd5Zpwkj6zNcR4cqYni/ZA==}
     peerDependencies:
       react: ^18 || ^19
 
@@ -6085,11 +6085,11 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@orpc/tanstack-query@1.9.1(@orpc/client@1.9.1)(@tanstack/query-core@5.81.2)':
+  '@orpc/tanstack-query@1.9.1(@orpc/client@1.9.1)(@tanstack/query-core@5.95.2)':
     dependencies:
       '@orpc/client': 1.9.1
       '@orpc/shared': 1.9.1
-      '@tanstack/query-core': 5.81.2
+      '@tanstack/query-core': 5.95.2
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
@@ -7103,11 +7103,11 @@ snapshots:
 
   '@tanstack/history@1.154.14': {}
 
-  '@tanstack/query-core@5.81.2': {}
+  '@tanstack/query-core@5.95.2': {}
 
-  '@tanstack/react-query@5.81.2(react@19.2.3)':
+  '@tanstack/react-query@5.95.2(react@19.2.3)':
     dependencies:
-      '@tanstack/query-core': 5.81.2
+      '@tanstack/query-core': 5.95.2
       react: 19.2.3
 
   '@tanstack/react-router@1.161.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':

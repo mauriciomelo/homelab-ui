@@ -4,6 +4,7 @@ import {
   userEvent,
   renderWithProviders,
   test,
+  orpcEventStreamResponse,
   orpcJsonResponse,
 } from '@/test-utils/browser';
 import {
@@ -23,8 +24,8 @@ vi.mock('server-only', () => ({}));
 
 test.beforeEach(async ({ worker }) => {
   worker.use(
-    http.post('*/api/app/rpc/apps/list', () => {
-      return orpcJsonResponse([]);
+    http.post('*/api/app/rpc/apps/watchApps', () => {
+      return orpcEventStreamResponse([[]]);
     }),
   );
 });
@@ -45,6 +46,12 @@ function readInputValue(locator: ReturnType<typeof page.getByPlaceholder>) {
   }
 
   return element.value;
+}
+
+function watchAppsHandler(events: Array<unknown | { data: unknown; delayMs?: number }>) {
+  return http.post('*/api/app/rpc/apps/watchApps', () => {
+    return orpcEventStreamResponse(events);
+  });
 }
 
 function setupDraftHandlers(
@@ -73,13 +80,13 @@ function setupDraftHandlers(
     });
 
   worker.use(
-    http.post('*/api/app/rpc/apps/list', () => {
-      return orpcJsonResponse([
+    http.post('*/api/app/rpc/apps/watchApps', () => {
+      return orpcEventStreamResponse([[
         {
           ...draftBundle,
           draftId: draftBundle.draftId ?? draftId,
         },
-      ]);
+      ]]);
     }),
     http.post('*/api/app/rpc/apps/getApp', () => {
       return orpcJsonResponse(draftBundle);
@@ -118,15 +125,15 @@ describe('Apps Page', () => {
     const scale = 1;
     page.viewport(1440 * scale, 920 * scale);
     worker.use(
-      http.post('*/api/app/rpc/apps/list', () => {
-        return orpcJsonResponse([
+      http.post('*/api/app/rpc/apps/watchApps', () => {
+        return orpcEventStreamResponse([[
           produce(baseApp, (app) => {
             app.app.metadata.name = 'myapp';
           }),
           produce(baseApp, (app) => {
             app.app.metadata.name = 'homeassistant';
           }),
-        ]);
+        ]]);
       }),
     );
     await renderWithProviders(<Apps />);
@@ -149,8 +156,8 @@ describe('Apps Page', () => {
 
   test('lists drafts alongside committed apps', async ({ worker }) => {
     worker.use(
-      http.post('*/api/app/rpc/apps/list', () => {
-        return orpcJsonResponse([
+      http.post('*/api/app/rpc/apps/watchApps', () => {
+        return orpcEventStreamResponse([[
           produce(baseApp, (app) => {
             app.app.metadata.name = 'committed-app';
           }),
@@ -160,7 +167,7 @@ describe('Apps Page', () => {
               draft.app.metadata.name = 'draft-app';
             }),
           },
-        ]);
+        ]]);
       }),
     );
 
@@ -177,15 +184,15 @@ describe('Apps Page', () => {
 
   test('displays list of applications', async ({ worker }) => {
     worker.use(
-      http.post('*/api/app/rpc/apps/list', () => {
-        return orpcJsonResponse([
+      http.post('*/api/app/rpc/apps/watchApps', () => {
+        return orpcEventStreamResponse([[
           produce(baseApp, (app) => {
             app.app.metadata.name = 'myapp';
           }),
           produce(baseApp, (app) => {
             app.app.metadata.name = 'homeassistant';
           }),
-        ]);
+        ]]);
       }),
     );
     await renderWithProviders(<Apps />);
@@ -199,12 +206,12 @@ describe('Apps Page', () => {
   test('opens form sheet when clicking on an app row', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.post('*/api/app/rpc/apps/list', () => {
-        return orpcJsonResponse([
+      http.post('*/api/app/rpc/apps/watchApps', () => {
+        return orpcEventStreamResponse([[
           produce(baseApp, (app) => {
             app.app.metadata.name = 'myapp';
           }),
-        ]);
+        ]]);
       }),
     );
 
@@ -220,14 +227,12 @@ describe('ApplicationForm', () => {
   test('displays validation error when CPU is 0', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.post('*/api/app/rpc/apps/list', () => {
-        return orpcJsonResponse([
+      watchAppsHandler([{ data: [
           produce(baseApp, (app) => {
             app.app.metadata.name = 'test-app';
             app.app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
           }),
-        ]);
-      }),
+        ] }]),
     );
 
     await renderWithProviders(<Apps />);
@@ -250,14 +255,12 @@ describe('ApplicationForm', () => {
   test('displays validation error when Memory is 0', async ({ worker }) => {
     const user = userEvent.setup();
     worker.use(
-      http.post('*/api/app/rpc/apps/list', () => {
-        return orpcJsonResponse([
+      watchAppsHandler([{ data: [
           produce(baseApp, (app) => {
             app.app.metadata.name = 'test-app';
             app.app.spec.resources.limits = { cpu: '500m', memory: '512Mi' };
           }),
-        ]);
-      }),
+        ] }]),
     );
 
     await renderWithProviders(<Apps />);
@@ -285,13 +288,11 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'edit-open-app';
             }),
-          ]);
-        }),
+          ] }]),
         http.post('*/api/app/rpc/apps/openWith', async ({ request }) => {
           openRequest = await readOrpcInput(request);
           return orpcJsonResponse({ success: true });
@@ -398,9 +399,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([openwebuiApp]);
-        }),
+        watchAppsHandler([{ data: [openwebuiApp] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -491,9 +490,7 @@ describe('ApplicationForm', () => {
       setupDraftHandlers(worker);
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([appOne, appTwo]);
-        }),
+        watchAppsHandler([{ data: [appOne, appTwo] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -536,8 +533,7 @@ describe('ApplicationForm', () => {
     test('renders existing auth clients', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'auth-app';
               app.additionalResources = [
@@ -552,8 +548,7 @@ describe('ApplicationForm', () => {
                 },
               ];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -586,9 +581,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -620,9 +613,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -659,9 +650,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -688,9 +677,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -723,9 +710,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -757,9 +742,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -813,8 +796,7 @@ describe('ApplicationForm', () => {
     test('renders multiple ports correctly', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.ports = [
@@ -822,8 +804,7 @@ describe('ApplicationForm', () => {
                 { name: 'metrics', containerPort: 9090 },
               ];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -845,14 +826,12 @@ describe('ApplicationForm', () => {
     test('adds new port', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.ports = [{ name: 'http', containerPort: 80 }];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -870,8 +849,7 @@ describe('ApplicationForm', () => {
     test('removes port', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.ports = [
@@ -879,8 +857,7 @@ describe('ApplicationForm', () => {
                 { name: 'metrics', containerPort: 9090 },
               ];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -915,15 +892,13 @@ describe('ApplicationForm', () => {
     test('updates web port when toggle is clicked', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.ports = [{ name: 'http', containerPort: 80 }];
               app.app.spec.ingress = { port: { name: 'http' } };
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -958,15 +933,13 @@ describe('ApplicationForm', () => {
     test('adds new environment variable', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.image = 'nginx:latest';
               app.app.spec.envVariables = [{ name: 'VAR1', value: 'value1' }];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -986,8 +959,7 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.image = 'nginx:latest';
@@ -996,8 +968,7 @@ describe('ApplicationForm', () => {
               ];
               app.app.spec.ingress = { port: { name: 'http' } };
             }),
-          ]);
-        }),
+          ] }]),
         http.post(
           '*/api/app/rpc/apps/publish',
           async ({ request }) => {
@@ -1065,13 +1036,12 @@ describe('ApplicationForm', () => {
       const updatedApp = produce(app, (draft) => {
         draft.app.spec.image = 'redis:7-alpine';
       });
-      let responseCount = 0;
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          responseCount += 1;
-          return orpcJsonResponse([responseCount === 1 ? app : updatedApp]);
-        }),
+        watchAppsHandler([
+          { data: [app] },
+          { data: [updatedApp], delayMs: 300 },
+        ]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1119,9 +1089,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
         http.post(
           '*/api/app/rpc/apps/publish',
           async ({ request }) => {
@@ -1202,9 +1170,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
         http.post(
           '*/api/app/rpc/apps/publish',
           async ({ request }) => {
@@ -1276,9 +1242,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1310,9 +1274,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
         http.post(
           '*/api/app/rpc/apps/publish',
           async ({ request }) => {
@@ -1381,9 +1343,7 @@ describe('ApplicationForm', () => {
       });
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([app]);
-        }),
+        watchAppsHandler([{ data: [app] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1409,15 +1369,13 @@ describe('ApplicationForm', () => {
     test('app name field is readonly', async ({ worker }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'locked-app';
               app.app.spec.image = 'nginx:latest';
               app.app.spec.envVariables = [{ name: 'VAR', value: 'val' }];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1434,8 +1392,7 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.image = 'nginx:latest';
@@ -1445,8 +1402,7 @@ describe('ApplicationForm', () => {
                 { name: 'VAR3', value: 'value3' },
               ];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1473,14 +1429,12 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.ports = [{ name: 'http', containerPort: 80 }];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1502,14 +1456,12 @@ describe('ApplicationForm', () => {
     }) => {
       const user = userEvent.setup();
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([
+        watchAppsHandler([{ data: [
             produce(baseApp, (app) => {
               app.app.metadata.name = 'test-app';
               app.app.spec.ports = [{ name: 'http', containerPort: 80 }];
             }),
-          ]);
-        }),
+          ] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1612,9 +1564,7 @@ describe('ApplicationForm', () => {
       setupDraftHandlers(worker);
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([]);
-        }),
+        watchAppsHandler([{ data: [] }]),
         http.post(
           '*/api/app/rpc/apps/publish',
           async ({ request }) => {
@@ -1687,9 +1637,7 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
       setupDraftHandlers(worker);
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([]);
-        }),
+        watchAppsHandler([{ data: [] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1766,9 +1714,7 @@ describe('ApplicationForm', () => {
       const user = userEvent.setup();
       setupDraftHandlers(worker);
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([]);
-        }),
+        watchAppsHandler([{ data: [] }]),
       );
 
       await renderWithProviders(<Apps />);
@@ -1825,9 +1771,7 @@ describe('ApplicationForm', () => {
       setupDraftHandlers(worker);
 
       worker.use(
-        http.post('*/api/app/rpc/apps/list', () => {
-          return orpcJsonResponse([]);
-        }),
+        watchAppsHandler([{ data: [] }]),
         http.post(
           '*/api/app/rpc/apps/publish',
           async ({ request }) => {

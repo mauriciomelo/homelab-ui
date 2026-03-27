@@ -2,9 +2,9 @@ import { QueryProvider } from '@/lib/query-provider';
 import { render } from 'vitest-browser-react';
 import { test as testBase } from 'vitest';
 import { worker } from './mocks/browser';
-import { HttpResponse } from 'msw';
 import Cursor from '@/app/(dashboard)/apps/Cursor';
 import '../app/globals.css';
+export { orpcEventStreamResponse, orpcJsonResponse } from './orpc';
 
 export function renderWithProviders(ui: React.ReactElement) {
   return render(ui, {
@@ -54,9 +54,3 @@ export const test = testBase.extend<CustomFixtures>({
     },
   ],
 });
-
-export function orpcJsonResponse(data: unknown) {
-  return HttpResponse.json({
-    json: data,
-  });
-}

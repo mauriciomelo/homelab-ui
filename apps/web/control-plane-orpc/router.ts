@@ -2,6 +2,8 @@ import {
   getLiveApps,
   reconcileFluxGitRepository,
   restartApp,
+  liveAppSchema,
+  watchLiveApps,
 } from '@/app/api/applications';
 import {
   createBootstrapToken,
@@ -12,7 +14,7 @@ import {
   uncordonNode,
 } from '@/app/api/devices';
 import { getDiscoveredNodes } from '@/mdns';
-import { os } from '@orpc/server';
+import { eventIterator, os } from '@orpc/server';
 import axios from 'axios';
 import { exec } from 'child_process';
 import util from 'util';
@@ -23,6 +25,11 @@ export const controlPlaneRouter = {
     getLiveApps: os.handler(async () => {
       return getLiveApps();
     }),
+    watchLiveApps: os
+      .output(eventIterator(z.array(liveAppSchema)))
+      .handler(async function* () {
+        yield* watchLiveApps();
+      }),
     reconcileFluxGitRepository: os
       .input(
         z.object({

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { setupWorker } from 'msw/browser';
 import { APP_STATUS } from '@/app/constants';
+import { orpcEventStreamResponse } from '../orpc';
 
 const appsData = [
   {
@@ -42,6 +43,9 @@ const handlers = [
     return HttpResponse.json({
       json: appsData,
     });
+  }),
+  http.post('*/api/app/rpc/apps/watchApps', () => {
+    return orpcEventStreamResponse([appsData]);
   }),
   http.post('*/api/app/rpc/apps/create', () => {
     return HttpResponse.json({

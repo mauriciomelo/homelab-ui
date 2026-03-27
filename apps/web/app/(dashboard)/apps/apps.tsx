@@ -9,9 +9,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { appOrpc } from '@/app-orpc/client';
-import { useQuery } from '@tanstack/react-query';
+import { appOrpcClient } from '@/app-orpc/client';
 import { APP_STATUS } from '@/app/constants';
+import {
+  experimental_streamedQuery as streamedQuery,
+  useQuery,
+} from '@tanstack/react-query';
 import { useState } from 'react';
 import type {
   AppBundleListItem,
@@ -20,7 +23,7 @@ import type {
 } from '@/app/api/app-workspaces';
 import {
   getAppBundleIdentifier,
-  isDraftAppBundleIdentifier,
+  isDraftAppBundleIdentifier as isDraft,
   type AppBundleIdentifier,
 } from '@/app/api/app-bundle-identifier';
 import { Status } from '@/components/ui/status';
@@ -31,6 +34,7 @@ import { Plus } from 'lucide-react';
 import { AppFormSheet } from './app-form-sheet';
 
 type FormMode = 'edit' | 'create' | null;
+const initialAppItems: AppBundleListItem[] = [];
 
 function isDraftApp(item: AppBundleListItem): item is DraftAppBundle {
   return 'draftId' in item;
@@ -44,37 +48,55 @@ function getListItemStatus(item: AppBundleListItem) {
   return isDraftApp(item) ? APP_STATUS.UNKNOWN : item.status.phase;
 }
 
+function getSelectedApp(
+  appItems: AppBundleListItem[],
+  selectedIdentifier: AppBundleIdentifier | null,
+) {
+  if (!selectedIdentifier || isDraft(selectedIdentifier)) {
+    return null;
+  }
+
+  return (
+    appItems
+      .filter(isPublishedApp)
+      .find((app) => app.app.metadata.name === selectedIdentifier.appName) ??
+    null
+  );
+}
+
+function hasPersistedDraftApp(
+  appItems: AppBundleListItem[],
+  selectedIdentifier: AppBundleIdentifier | null,
+) {
+  if (!selectedIdentifier || !isDraft(selectedIdentifier)) {
+    return false;
+  }
+
+  return appItems
+    .filter(isDraftApp)
+    .some((draft) => draft.draftId === selectedIdentifier.draftId);
+}
+
 export function Apps() {
-  const apps = useQuery({
-    ...appOrpc.apps.list.queryOptions({
-      input: {
-        includeDrafts: true,
-      },
+  const watchedApps = useQuery({
+    queryKey: ['watch-apps'],
+    queryFn: streamedQuery({
+      streamFn: async () =>
+        appOrpcClient.apps.watchApps({
+          includeDrafts: true,
+        }),
+      initialValue: initialAppItems,
+      reducer: (_previous, nextItems) => nextItems,
+      refetchMode: 'reset',
     }),
-    refetchInterval: 2000,
   });
+
   const [selectedIdentifier, setSelectedIdentifier] =
     useState<AppBundleIdentifier | null>(null);
   const [formMode, setFormMode] = useState<FormMode>(null);
-  const appItems: AppBundleListItem[] = [
-    ...(apps.data ?? []).flatMap((app) => {
-      return app.app?.metadata?.name ? [app] : [];
-    }),
-  ];
-
-  const selectedApp =
-    selectedIdentifier && !isDraftAppBundleIdentifier(selectedIdentifier)
-    ? (appItems
-        .filter(isPublishedApp)
-        .find((app) => app.app.metadata.name === selectedIdentifier.appName) ??
-      null)
-    : null;
-  const hasPersistedDraft =
-    selectedIdentifier && isDraftAppBundleIdentifier(selectedIdentifier)
-      ? (appItems.filter(isDraftApp).some(
-          (draft) => draft.draftId === selectedIdentifier.draftId,
-        ) ?? false)
-    : false;
+  const appItems = watchedApps.data ?? [];
+  const selectedApp = getSelectedApp(appItems, selectedIdentifier);
+  const hasPersistedDraft = hasPersistedDraftApp(appItems, selectedIdentifier);
 
   const handleCreateApp = () => {
     const nextIdentifier = getAppBundleIdentifier({
@@ -100,7 +122,6 @@ export function Apps() {
   const handleCloseForm = () => {
     setSelectedIdentifier(null);
     setFormMode(null);
-    apps.refetch();
   };
 
   return (
@@ -137,7 +158,8 @@ export function Apps() {
                     : `app-${app.app.metadata.name}`
                 }
                 className={cn({
-                  'animate-pulse': getListItemStatus(app) === APP_STATUS.PENDING,
+                  'animate-pulse':
+                    getListItemStatus(app) === APP_STATUS.PENDING,
                 })}
               >
                 <TableCell className="w-2">

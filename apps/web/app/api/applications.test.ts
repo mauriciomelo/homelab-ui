@@ -3,12 +3,13 @@ import {
   getLiveApps,
   reconcileFluxGitRepository,
   restartApp,
+  watchLiveApps,
 } from './applications';
 import { APP_STATUS } from '@/app/constants';
 import { produce } from 'immer';
 import { baseAppManifest } from '../../test-utils/fixtures';
 
-const { listClusterCustomObjectMock, patchNamespacedDeploymentMock, patchNamespacedCustomObjectMock } = vi.hoisted(() => ({
+const { listClusterCustomObjectMock, patchNamespacedDeploymentMock, patchNamespacedCustomObjectMock, watchMock, watchAbortMock } = vi.hoisted(() => ({
   listClusterCustomObjectMock: vi.fn<() => Promise<unknown>>(async () => ({ items: [] })),
   patchNamespacedDeploymentMock: vi.fn<
     (input: { name: string; namespace: string; body: unknown }) => Promise<void>
@@ -23,9 +24,24 @@ const { listClusterCustomObjectMock, patchNamespacedDeploymentMock, patchNamespa
       body: unknown;
     }) => Promise<void>
   >(async () => undefined),
+  watchMock: vi.fn(),
+  watchAbortMock: vi.fn(),
 }));
 
+function getWatchCallback(): ((type: string, obj: unknown) => Promise<void>) {
+  const callback = watchMock.mock.calls[0]?.[2];
+
+  if (typeof callback !== 'function') {
+    throw new Error('Expected watch callback to be registered');
+  }
+
+  return callback;
+}
+
 vi.mock('./k8s', () => ({
+  createWatch: vi.fn().mockReturnValue({
+    watch: watchMock,
+  }),
   customObjectsApi: vi.fn().mockReturnValue({
     listClusterCustomObject: listClusterCustomObjectMock,
     patchNamespacedCustomObject: patchNamespacedCustomObjectMock,
@@ -39,6 +55,9 @@ vi.mock('./k8s', () => ({
 describe('applications cluster operations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    watchMock.mockResolvedValue({
+      abort: watchAbortMock,
+    });
   });
 
   describe('getLiveApps', () => {
@@ -103,6 +122,82 @@ describe('applications cluster operations', () => {
           },
         ],
       });
+    });
+  });
+
+  describe('watchLiveApps', () => {
+    it('yields the initial snapshot and updated snapshots on watch events', async () => {
+      listClusterCustomObjectMock
+        .mockResolvedValueOnce({
+          items: [],
+        })
+        .mockResolvedValueOnce({
+          items: [
+            {
+              ...produce(baseAppManifest, (draft) => {
+                draft.metadata.name = 'demo-app';
+              }),
+              status: {
+                phase: APP_STATUS.RUNNING,
+                placements: [],
+                conditions: [],
+              },
+            },
+          ],
+        });
+
+      const iterator = watchLiveApps();
+
+      await expect(iterator.next()).resolves.toEqual({
+        done: false,
+        value: [],
+      });
+
+      const nextPromise = iterator.next();
+      const onEvent = getWatchCallback();
+
+      await onEvent('MODIFIED', {});
+
+      await expect(nextPromise).resolves.toEqual({
+        done: false,
+        value: [
+          {
+            ...produce(baseAppManifest, (draft) => {
+              draft.metadata.name = 'demo-app';
+            }),
+            status: {
+              phase: APP_STATUS.RUNNING,
+              placements: [],
+              conditions: [],
+            },
+          },
+        ],
+      });
+
+      await iterator.return(undefined);
+
+      expect(watchAbortMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores bookmark events', async () => {
+      listClusterCustomObjectMock.mockResolvedValue({
+        items: [],
+      });
+
+      const iterator = watchLiveApps();
+
+      await expect(iterator.next()).resolves.toEqual({
+        done: false,
+        value: [],
+      });
+
+      const onEvent = getWatchCallback();
+
+      await onEvent('BOOKMARK', {});
+
+      expect(listClusterCustomObjectMock).toHaveBeenCalledTimes(1);
+
+      await iterator.return(undefined);
     });
   });
 

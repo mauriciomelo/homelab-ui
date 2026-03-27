@@ -49,7 +49,7 @@
     "@react-spring/web": "^9.7.5",
     "@react-three/drei": "^10.3.0",
     "@react-three/fiber": "^9.1.4",
-    "@tanstack/react-query": "^5.81.2",
+    "@tanstack/react-query": "^5.95.2",
     "@tanstack/react-router": "^1.132.14",
     "@tanstack/react-start": "^1.132.14",
     "@types/lodash": "^4.17.18",

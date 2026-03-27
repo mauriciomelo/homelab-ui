@@ -1,3 +1,4 @@
+import { EventEmitter, on } from 'node:events';
 import * as z from 'zod';
 import { logger } from '@/lib/logger';
 import {
@@ -10,7 +11,7 @@ const applicationsLogger = logger.child({ module: 'applications-api' });
 
 export type AppRuntimeStatus = z.infer<typeof appStatusSchema>;
 
-const liveAppSchema = appSchema.safeExtend({
+export const liveAppSchema = appSchema.safeExtend({
   status: appStatusSchema,
 });
 
@@ -40,6 +41,45 @@ export async function getLiveApps(): Promise<LiveApp[]> {
   }
 
   return [];
+}
+
+export async function* watchLiveApps(): AsyncGenerator<LiveApp[]> {
+  const changeSignal = new EventEmitter();
+  let pendingError: unknown = null;
+
+  const abortController = await k.createWatch().watch(
+    '/apis/tesselar.io/v1alpha1/apps',
+    { allowWatchBookmarks: true },
+    (type) => {
+      if (type === 'BOOKMARK') {
+        return;
+      }
+
+      changeSignal.emit('change');
+    },
+    (error) => {
+      if (error) {
+        pendingError = error;
+        changeSignal.emit('change');
+      }
+    },
+  );
+
+  try {
+    yield await getLiveApps();
+
+    for await (const change of on(changeSignal, 'change')) {
+      void change;
+
+      if (pendingError) {
+        throw pendingError;
+      }
+
+      yield await getLiveApps();
+    }
+  } finally {
+    abortController.abort();
+  }
 }
 
 export async function restartApp(name: string) {

@@ -51,6 +51,21 @@ export type PublishedAppBundle = AppBundleSchema & {
   status: AppRuntimeStatus;
 };
 
+export const publishedAppBundleSchema = appBundleSchema.safeExtend({
+  status: appStatusSchema,
+});
+
+export const draftAppBundleSchema = appBundleSchema.safeExtend({
+  draftId: z.string().min(1),
+});
+
+export const appBundleListItemSchema = z.union([
+  publishedAppBundleSchema,
+  draftAppBundleSchema,
+]);
+
+export const appBundleListSchema = z.array(appBundleListItemSchema);
+
 const openWithInputSchema = z
   .object({
     target: openWithTargetSchema,
@@ -138,6 +153,45 @@ export async function* watchApp(
   }
 }
 
+export function watchApps<TInput extends ListAppsInput>(
+  input: TInput,
+): AsyncGenerator<
+  TInput['includeDrafts'] extends true
+    ? AppBundleListItem[]
+    : PublishedAppBundle[]
+>;
+export function watchApps(): AsyncGenerator<PublishedAppBundle[]>;
+export async function* watchApps(
+  input: unknown = {},
+): AsyncGenerator<AppBundleListItem[] | PublishedAppBundle[]> {
+  const parsedInput = listAppsInputSchema.parse(input);
+  const fsWatcherIterator = watch(getAppsDir(), {
+    recursive: true,
+  })[Symbol.asyncIterator]();
+  const liveAppsIterator =
+    await controlPlaneOrpcServerClient.apps.watchLiveApps();
+
+  try {
+    yield await listApps(parsedInput);
+
+    while (true) {
+      const nextEvent = await Promise.race([
+        fsWatcherIterator.next().then((result) => ({ source: 'fs', result })),
+        liveAppsIterator.next().then((result) => ({ source: 'live', result })),
+      ]);
+
+      if (nextEvent.result.done) {
+        return;
+      }
+
+      yield await listApps(parsedInput);
+    }
+  } finally {
+    await fsWatcherIterator.return?.();
+    await liveAppsIterator.return?.();
+  }
+}
+
 export type DraftAppBundle = AppBundleSchema & {
   draftId: string;
 };
@@ -193,9 +247,18 @@ export async function listApps(
     getPersistedPublishedAppBundles(),
     getLiveAppsFromControlPlane(),
   ]);
+
+  return buildAppListSnapshot(parsedInput, persistedApps, liveApps);
+}
+
+async function buildAppListSnapshot(
+  input: ListAppsInput,
+  persistedApps: PublishedAppBundle[],
+  liveApps: LiveApp[],
+): Promise<AppBundleListItem[] | PublishedAppBundle[]> {
   const apps = mergeLiveApps(persistedApps, liveApps);
 
-  if (!parsedInput.includeDrafts) {
+  if (!input.includeDrafts) {
     return apps;
   }
 

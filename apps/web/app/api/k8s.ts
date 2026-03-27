@@ -29,3 +29,9 @@ export function networkingApi() {
   kc.loadFromDefault();
   return kc.makeApiClient(k8s.NetworkingV1Api);
 }
+
+export function createWatch() {
+  const kc = new k8s.KubeConfig();
+  kc.loadFromDefault();
+  return new k8s.Watch(kc);
+}
