@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetFooter,
@@ -202,7 +203,10 @@ export function AppFormSheet(props: AppFormSheetProps) {
 
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
-      <SheetContent className="bg-muted w-[600px] sm:max-w-[600px]">
+      <SheetContent
+        showCloseButton={false}
+        className="bg-muted w-[680px] sm:max-w-[680px]"
+      >
         {props.open && props.session ? (
           <AppFormSheetBody key={formIdentity} {...props} session={props.session} />
         ) : null}
@@ -376,7 +380,7 @@ function AppFormSheetBody({
       <Form {...form.form}>
         <form onSubmit={form.onSubmit} className="flex min-h-0 flex-1 flex-col">
           <SheetHeader>
-            <div className="flex flex-col gap-3 pr-10 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <SheetTitle>{title}</SheetTitle>
               <OpenWithMenu
                 targetIdentifier={openTargetIdentifier}
@@ -402,13 +406,18 @@ function AppFormSheetBody({
             </div>
           </AppDropArea>
 
-          <SheetFooter>
+          <SheetFooter className="flex-row justify-end">
+            <SheetClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </SheetClose>
             {form.form.formState.isSubmitting ? (
-              <Button type="submit" className="flex-1" disabled>
+              <Button type="submit" disabled>
                 {form.mode === 'create' ? 'Creating...' : 'Updating...'}
               </Button>
             ) : (
-              <Button type="submit" className="flex-1">
+              <Button type="submit">
                 {form.mode === 'create' ? 'Create' : 'Update'}
               </Button>
             )}
