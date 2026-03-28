@@ -376,7 +376,14 @@ function AppFormSheetBody({
       <Form {...form.form}>
         <form onSubmit={form.onSubmit} className="flex min-h-0 flex-1 flex-col">
           <SheetHeader>
-            <SheetTitle>{title}</SheetTitle>
+            <div className="flex flex-col gap-3 pr-10 sm:flex-row sm:items-start sm:justify-between">
+              <SheetTitle>{title}</SheetTitle>
+              <OpenWithMenu
+                targetIdentifier={openTargetIdentifier}
+                disabled={isOpenDisabled}
+                beforeOpen={mode === 'create' ? ensureDraftExists : undefined}
+              />
+            </div>
             <SheetDescription>{description}</SheetDescription>
           </SheetHeader>
           <AppDropArea className="min-h-0 flex-1" {...appDropArea.dropAreaProps}>
@@ -396,24 +403,15 @@ function AppFormSheetBody({
           </AppDropArea>
 
           <SheetFooter>
-            <div className="flex w-full gap-3">
-              <OpenWithMenu
-                targetIdentifier={openTargetIdentifier}
-                disabled={isOpenDisabled}
-                beforeOpen={
-                  mode === 'create' ? ensureDraftExists : undefined
-                }
-              />
-              {form.form.formState.isSubmitting ? (
-                <Button type="submit" className="flex-1" disabled>
-                  {form.mode === 'create' ? 'Creating...' : 'Updating...'}
-                </Button>
-              ) : (
-                <Button type="submit" className="flex-1">
-                  {form.mode === 'create' ? 'Create' : 'Update'}
-                </Button>
-              )}
-            </div>
+            {form.form.formState.isSubmitting ? (
+              <Button type="submit" className="flex-1" disabled>
+                {form.mode === 'create' ? 'Creating...' : 'Updating...'}
+              </Button>
+            ) : (
+              <Button type="submit" className="flex-1">
+                {form.mode === 'create' ? 'Create' : 'Update'}
+              </Button>
+            )}
           </SheetFooter>
         </form>
       </Form>

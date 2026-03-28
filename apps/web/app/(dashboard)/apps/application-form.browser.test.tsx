@@ -51,6 +51,15 @@ function readInputValue(locator: ReturnType<typeof page.getByPlaceholder>) {
   return element.value;
 }
 
+function isAppIdentifier(value: unknown): value is { appName: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'appName' in value &&
+    typeof value.appName === 'string'
+  );
+}
+
 function setupDraftHandlers(
   worker: {
     use: (...handlers: Array<ReturnType<typeof http.post>>) => void;
@@ -318,8 +327,10 @@ describe('ApplicationForm', () => {
 
       await renderWithProviders(<Apps />);
       await user.click(await page.getByText('edit-open-app'));
-      await user.click(page.getByRole('button', { name: 'Open in' }));
-      await user.click(page.getByRole('menuitem', { name: 'Finder' }));
+      await user.click(
+        page.getByRole('button', { name: 'Choose app to open with' }),
+      );
+      await user.click(page.getByRole('menuitemradio', { name: 'Finder' }));
 
       await expect
         .poll(() => openRequest)
@@ -506,11 +517,26 @@ describe('ApplicationForm', () => {
         app.app.spec.image = 'nginx:1.27';
       });
 
-      setupDraftHandlers(worker);
+      const draftHandlers = setupDraftHandlers(worker);
 
       worker.use(
         http.post('*/api/app/rpc/apps/watchApps', () => {
           return orpcEventStreamResponse([{ data: [appOne, appTwo] }]);
+        }),
+        http.post('*/api/app/rpc/apps/watchApp', async ({ request }) => {
+          const input = await readOrpcInput(request);
+
+          if (isAppIdentifier(input)) {
+            const matchingApp = [appOne, appTwo].find(
+              (app) => app.app.metadata.name === input.appName,
+            );
+
+            if (matchingApp) {
+              return orpcEventStreamResponse([{ data: matchingApp }]);
+            }
+          }
+
+          return orpcEventStreamResponse([{ data: draftHandlers.getDraftBundle() }]);
         }),
       );
 
@@ -1625,7 +1651,6 @@ describe('ApplicationForm', () => {
 
       await user.click(page.getByText('Create App'));
       await user.click(page.getByRole('button', { name: 'Open in' }));
-      await user.click(page.getByRole('menuitem', { name: 'VSCode' }));
 
       await expect
         .poll(() => openRequest)
