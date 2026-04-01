@@ -17,10 +17,5 @@
     "build:cli": "pnpm --filter web run build:cli",
     "cli": "pnpm --filter web run cli"
   },
-  "pnpm": {
-    "overrides": {
-      "@types/react": "19.2.7",
-      "@types/react-dom": "19.2.3"
-    }
-  }
+  "pnpm": {}
 }
