@@ -396,13 +396,15 @@ function AppFormSheetBody({
                 <div className="text-muted-foreground flex h-full min-h-40 items-center justify-center p-4 text-sm">
                   {loadingMessage}
                 </div>
-              ) : !currentData ? (
+              ) : null}
+              {!isFormLoading && !currentData ? (
                 <div className="text-muted-foreground flex h-full min-h-40 items-center justify-center p-4 text-sm">
                   {emptyStateMessage}
                 </div>
-              ) : (
+              ) : null}
+              {!isFormLoading && currentData ? (
                 <ApplicationForm className="p-4" {...form} />
-              )}
+              ) : null}
             </div>
           </AppDropArea>
 

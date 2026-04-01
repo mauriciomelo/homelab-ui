@@ -21,6 +21,7 @@ export default tseslint.config(
   prettier,
   {
     rules: {
+      'no-nested-ternary': 'error',
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/consistent-type-assertions': [
