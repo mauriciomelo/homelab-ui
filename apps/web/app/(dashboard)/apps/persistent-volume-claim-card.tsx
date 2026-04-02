@@ -77,7 +77,7 @@ export function PersistentVolumeClaimCard({
     .interop();
   const storageError = useController(storageInterop).fieldState.error?.message;
 
-  const storageValue = resource?.spec?.resources?.requests?.storage;
+  const storageValue = resource.spec.resources.requests.storage;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -103,7 +103,7 @@ export function PersistentVolumeClaimCard({
                 className="text-sm font-medium"
               >
                 Persistent Volume
-                {resource?.metadata?.name && (
+                {resource.metadata.name && (
                   <span className="text-muted-foreground ml-1 font-normal truncate">
                     — {resource.metadata.name}
                     {storageValue && (
@@ -182,7 +182,7 @@ export function PersistentVolumeClaimCard({
                       items={accessModeOptions}
                       value={
                         accessModeOptions.find(
-                          (option) => option.value === field.value?.[0],
+                           (option) => option.value === field.value[0],
                         ) ?? null
                       }
                       onValueChange={(value) =>

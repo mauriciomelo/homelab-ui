@@ -135,12 +135,14 @@ async function createCrdIfNotExists() {
   }
 }
 
-function needsCrdUpdate(existing: k8s.V1CustomResourceDefinition) {
-  const existingVersions = existing.spec?.versions;
+function needsCrdUpdate(existing: Partial<k8s.V1CustomResourceDefinition>) {
+  const existingSpec = existing.spec;
 
-  if (!existingVersions) {
+  if (existingSpec === undefined) {
     return true;
   }
+
+  const existingVersions = existingSpec.versions;
 
   const existingVersion = existingVersions.find(
     (item) => item.name === version,
@@ -163,7 +165,7 @@ function watchAppResources() {
     watch,
     path: `/apis/${group}/${version}/${plural}`,
     onEvent: async (type, apiObj: WatchedApp) => {
-      if (type === 'DELETED' || type === 'BOOKMARK' || !apiObj.metadata?.name) {
+      if (type === 'DELETED' || type === 'BOOKMARK' || !apiObj.metadata.name) {
         return;
       }
 
@@ -246,7 +248,8 @@ function watchAppResources() {
       }
 
       const namespace = pod.metadata.namespace;
-      const name = pod.metadata.labels?.[appNameLabel] ?? pod.metadata.labels?.app;
+      const name =
+        pod.metadata.labels?.[appNameLabel] ?? pod.metadata.labels?.app;
 
       if (!name) {
         return;
@@ -296,7 +299,7 @@ function watchResource<T extends k8s.KubernetesObject>({
   onEvent: (type: string, obj: T) => Promise<void>;
 }) {
   appControllerLogger.debug({ path }, 'Registering watch');
-  watch.watch(
+  void watch.watch(
     path,
     watchOptions,
     async (type, apiObj: T) => {
@@ -322,7 +325,7 @@ function watchResource<T extends k8s.KubernetesObject>({
 
 function shouldReconcileApp(app: WatchedApp) {
   const observedGeneration = app.status?.observedGeneration;
-  const generation = app.metadata?.generation;
+  const generation = app.metadata.generation;
 
   if (typeof generation !== 'number') {
     return true;
@@ -336,9 +339,9 @@ function shouldReconcileApp(app: WatchedApp) {
 }
 
 async function reconcileApp(apiObj: WatchedApp) {
-  const name = apiObj.metadata?.name;
-  const namespace = apiObj.metadata?.namespace;
-  const uid = apiObj.metadata?.uid;
+  const name = apiObj.metadata.name;
+  const namespace = apiObj.metadata.namespace;
+  const uid = apiObj.metadata.uid;
 
   assert(typeof name === 'string', 'Name must be a string');
   assert(typeof namespace === 'string', 'Namespace must be a string');
@@ -348,7 +351,7 @@ async function reconcileApp(apiObj: WatchedApp) {
     operation: 'reconcile-app',
     name,
     namespace,
-    generation: apiObj.metadata?.generation,
+    generation: apiObj.metadata.generation,
   });
 
   const app = appSchema.parse({
@@ -417,14 +420,18 @@ async function reconcileAppStatus({
   });
 
   if (!name || !namespace || name !== namespace) {
-    statusLogger.debug('Skipping status reconcile for non-app namespace mapping');
+    statusLogger.debug(
+      'Skipping status reconcile for non-app namespace mapping',
+    );
     return;
   }
 
   const appResource = await getAppResource(name, namespace);
 
   if (!appResource) {
-    statusLogger.debug('Skipping status reconcile because app resource was not found');
+    statusLogger.debug(
+      'Skipping status reconcile because app resource was not found',
+    );
     return;
   }
 
@@ -434,7 +441,9 @@ async function reconcileAppStatus({
     namespace,
     observedGeneration:
       observedGeneration ??
-      (currentStatus.success ? currentStatus.data.observedGeneration : undefined),
+      (currentStatus.success
+        ? currentStatus.data.observedGeneration
+        : undefined),
   });
 
   if (currentStatus.success && isEqual(currentStatus.data, nextStatus)) {
@@ -445,35 +454,43 @@ async function reconcileAppStatus({
   const latestAppResource = await getAppResource(name, namespace);
 
   if (!latestAppResource) {
-    statusLogger.debug('Skipping status update because latest app resource was not found');
+    statusLogger.debug(
+      'Skipping status update because latest app resource was not found',
+    );
     return;
   }
 
   const latestStatus = appStatusSchema.safeParse(latestAppResource.status);
 
   if (latestStatus.success && isEqual(latestStatus.data, nextStatus)) {
-    statusLogger.debug('Skipping status update because latest status is unchanged');
+    statusLogger.debug(
+      'Skipping status update because latest status is unchanged',
+    );
     return;
   }
 
-  await customObjectsApi().replaceNamespacedCustomObjectStatus({
-    group,
-    version,
-    namespace,
-    plural,
-    name,
-    body: {
-      ...latestAppResource,
-      status: nextStatus,
-    },
-  }).catch((error) => {
-    if (isKubernetesError(error) && error.code === 404) {
-      statusLogger.warn('Skipping status update because app resource disappeared');
-      return;
-    }
+  await customObjectsApi()
+    .replaceNamespacedCustomObjectStatus({
+      group,
+      version,
+      namespace,
+      plural,
+      name,
+      body: {
+        ...latestAppResource,
+        status: nextStatus,
+      },
+    })
+    .catch((error) => {
+      if (isKubernetesError(error) && error.code === 404) {
+        statusLogger.warn(
+          'Skipping status update because app resource disappeared',
+        );
+        return;
+      }
 
-    throw error;
-  });
+      throw error;
+    });
 
   statusLogger.info({ phase: nextStatus.phase }, 'Updated app status');
 }
@@ -776,9 +793,9 @@ async function applyIngress(ingress: k8s.V1Ingress) {
 
 function getAppLogContext(app: WatchedApp) {
   return {
-    name: app.metadata?.name,
-    namespace: app.metadata?.namespace,
-    generation: app.metadata?.generation,
+    name: app.metadata.name,
+    namespace: app.metadata.namespace,
+    generation: app.metadata.generation,
   };
 }
 

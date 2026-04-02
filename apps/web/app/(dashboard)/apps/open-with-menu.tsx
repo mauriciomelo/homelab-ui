@@ -135,7 +135,7 @@ export function OpenWithMenu({
             value={selectedTarget}
             onValueChange={(value) => {
               if (isOpenWithTarget(value)) {
-                handleSelectTarget(value);
+                void handleSelectTarget(value);
               }
             }}
           >

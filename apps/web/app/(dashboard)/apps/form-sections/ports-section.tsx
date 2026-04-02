@@ -58,7 +58,7 @@ export function PortsSection({
           type="button"
           variant="ghost"
           onClick={onAdd}
-          className="h-6 px-2 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          className="h-6 px-2 text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700"
           aria-label="Add Port"
           data-testid="add-port-btn"
         >
@@ -67,7 +67,7 @@ export function PortsSection({
         </Button>
       </div>
       <InsetGroup role="group" aria-labelledby="ports-title">
-        <div className="flex items-center gap-4 bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
+        <div className="bg-muted/50 text-muted-foreground flex items-center gap-4 px-4 py-2 text-xs font-medium">
           <span className="w-1/3">Port Name</span>
           <span className="flex-1">Port Number</span>
           <div className="w-[72px]" />
@@ -75,10 +75,18 @@ export function PortsSection({
         {fields.map((item, index) => {
           const portLens = portsLens.focus(index).defined();
           const nameInterop = portLens.focus('name').interop();
-          const containerPortInterop = portLens.focus('containerPort').interop();
+          const containerPortInterop = portLens
+            .focus('containerPort')
+            .interop();
 
-          const currentPortName = ports?.[index]?.name;
-          const isWebPort = ingress?.port?.name === currentPortName;
+          const currentPort = ports.at(index);
+
+          if (currentPort === undefined) {
+            return null;
+          }
+
+          const currentPortName = currentPort.name;
+          const isWebPort = ingress.port.name === currentPortName;
 
           return (
             <InsetRow key={item.id}>
@@ -128,16 +136,19 @@ export function PortsSection({
                     <Button
                       type="button"
                       variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          if (currentPortName) {
-                              setValue('app.spec.ingress.port.name', currentPortName);
-                          }
-                        }}
+                      size="icon"
+                      onClick={() => {
+                        if (currentPortName) {
+                          setValue(
+                            'app.spec.ingress.port.name',
+                            currentPortName,
+                          );
+                        }
+                      }}
                       className={cn(
                         'h-8 w-8 transition-colors',
                         isWebPort
-                          ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                          ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                           : 'text-muted-foreground hover:text-foreground',
                       )}
                       aria-pressed={isWebPort}
@@ -159,7 +170,7 @@ export function PortsSection({
                   size="icon"
                   onClick={() => onRemove(index)}
                   disabled={fields.length === 1}
-                  className="h-8 w-8 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="text-muted-foreground h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
                   aria-label="Remove Port"
                   data-testid={`remove-port-${index}`}
                 >

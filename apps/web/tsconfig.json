@@ -17,6 +17,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", "**/*.d.ts", ".output/types/**/*.ts"],
+  "include": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.d.ts", ".output/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

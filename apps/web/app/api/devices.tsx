@@ -1,4 +1,3 @@
-import get from 'lodash/get';
 import { DEVICE_STATUS } from '@/app/constants';
 import crypto from 'crypto';
 import assert from 'assert';
@@ -12,7 +11,7 @@ export async function devices() {
   const nodes = await coreApi.listNode();
   return nodes.items.map((node) => {
     const readyStatus =
-      node?.status?.conditions?.find((condition) => condition.type === 'Ready')
+      node.status?.conditions?.find((condition) => condition.type === 'Ready')
         ?.status || 'Unknown';
 
     const status = nodeStatus(readyStatus);
@@ -26,11 +25,11 @@ export async function devices() {
 
     const capacity = node.status?.capacity;
     const allocable = node.status?.allocatable;
+    const labels = node.metadata?.labels;
 
     const isMaster =
-      node.metadata?.labels?.['node-role.kubernetes.io/control-plane'] ===
-        'true' &&
-      node.metadata?.labels?.['node-role.kubernetes.io/master'] === 'true';
+      labels?.['node-role.kubernetes.io/control-plane'] === 'true' &&
+      labels['node-role.kubernetes.io/master'] === 'true';
 
     const ip = node.status?.addresses?.find(
       (addr) => addr.type === 'InternalIP',
@@ -126,12 +125,21 @@ export async function deleteNode(nodeName: string) {
     const coreApi = k8s.coreApi();
     await coreApi.deleteNode({ name: nodeName });
   } catch (error) {
-    if (get(error, 'code') === 404) {
+    if (hasErrorCode(error, 404)) {
       return;
     }
 
     throw new Error(`Failed to delete node ${nodeName}: ${error}`);
   }
+}
+
+function hasErrorCode(error: unknown, code: number) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === code
+  );
 }
 
 export async function drainNode(nodeName: string) {

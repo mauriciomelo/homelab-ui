@@ -81,16 +81,14 @@ function useAuthClientEnvLinks({
     additionalResourcesLens.interop();
   const { control: envControl, name: envName } = envVariablesLens.interop();
 
-  const additionalResources =
-    useWatch({
-      control: resourcesControl,
-      name: resourcesName,
-    }) ?? [];
-  const envVariables =
-    useWatch({
-      control: envControl,
-      name: envName,
-    }) ?? [];
+  const additionalResources = useWatch({
+    control: resourcesControl,
+    name: resourcesName,
+  });
+  const envVariables = useWatch({
+    control: envControl,
+    name: envName,
+  });
   const { field: envVariablesField } = useController({
     control: envControl,
     name: envName,

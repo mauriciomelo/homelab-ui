@@ -103,7 +103,7 @@ export function parseResourceValue(
 ) {
   if (value) {
     const parsed = extractAmountAndUnit(value);
-    if (parsed && isUnitValid(parsed.unit, units)) {
+    if (isUnitValid(parsed.unit, units)) {
       return { amount: parsed.amount, unit: parsed.unit };
     }
   }

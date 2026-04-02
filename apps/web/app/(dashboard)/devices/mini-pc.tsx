@@ -17,6 +17,10 @@ function adaptLedColor(color: LedColor): string {
   switch (color) {
     case 'blue':
       return '#00346e';
+    case 'gray':
+    case 'green':
+    case 'orange':
+    case 'red':
     default:
       return color;
   }

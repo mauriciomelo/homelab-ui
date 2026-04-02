@@ -8,7 +8,7 @@ import { cpuConfig, memoryConfig, storageConfig } from '@/lib/resource-utils';
 
 describe('ResourceField', () => {
   beforeEach(() => {
-    page.viewport(414, 896);
+    void page.viewport(414, 896);
   });
 
   test('render slider labels for the memory field', async () => {

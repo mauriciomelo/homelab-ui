@@ -91,12 +91,12 @@ function watchAuthClients() {
 
   authControllerLogger.info('Starting AuthClient watch');
 
-  watch.watch(
+  void watch.watch(
     `/apis/${group}/${version}/${plural}`,
     {},
     async (type, apiObj: AuthClient) => {
-      const name = apiObj?.metadata?.name;
-      const namespace = apiObj?.metadata?.namespace;
+      const name = apiObj.metadata?.name;
+      const namespace = apiObj.metadata?.namespace;
       const eventLogger = authControllerLogger.child({
         eventType: type,
         name,
@@ -133,7 +133,9 @@ function watchAuthClients() {
         if (type === 'ADDED') {
           const exists = await secretExists({ name, namespace });
           if (exists) {
-            zitadelLogger.debug('Skipping AuthClient creation because secret already exists');
+            zitadelLogger.debug(
+              'Skipping AuthClient creation because secret already exists',
+            );
             return;
           }
 
@@ -166,7 +168,10 @@ function watchAuthClients() {
           orgId,
         });
 
-        zitadelLogger.info({ applicationId: application.id }, 'Deleting AuthClient application');
+        zitadelLogger.info(
+          { applicationId: application.id },
+          'Deleting AuthClient application',
+        );
 
         await zitadel.deleteApplication({
           id: application.id,
@@ -175,7 +180,10 @@ function watchAuthClients() {
         });
 
         await deleteSecret({ name, namespace });
-        zitadelLogger.info({ applicationId: application.id }, 'Deleted AuthClient application and secret');
+        zitadelLogger.info(
+          { applicationId: application.id },
+          'Deleted AuthClient application and secret',
+        );
       } catch (err) {
         eventLogger.error({ err }, 'AuthClient watch handler failed');
         throw err;
@@ -279,10 +287,12 @@ function deleteSecret({
     namespace,
   });
 
-  return client.deleteNamespacedSecret({
-    name,
-    namespace,
-  }).then(() => {
-    secretLogger.info('Deleted AuthClient secret');
-  });
+  return client
+    .deleteNamespacedSecret({
+      name,
+      namespace,
+    })
+    .then(() => {
+      secretLogger.info('Deleted AuthClient secret');
+    });
 }

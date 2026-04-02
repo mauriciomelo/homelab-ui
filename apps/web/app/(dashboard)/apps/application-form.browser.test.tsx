@@ -143,7 +143,7 @@ describe('Apps Page', () => {
   test('renders the Apps component with table', async ({ worker }) => {
     // macbook  resolution
     const scale = 1;
-    page.viewport(1440 * scale, 920 * scale);
+    await page.viewport(1440 * scale, 920 * scale);
     worker.use(
       http.post('*/api/app/rpc/apps/watchApps', () => {
         return orpcEventStreamResponse([[

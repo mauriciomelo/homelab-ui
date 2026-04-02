@@ -51,10 +51,10 @@ export function AuthClientCard({
   const { control, name } = lens.interop();
   const resource = useWatch({ control, name });
   const [redirectUrisInput, setRedirectUrisInput] = useState(() =>
-    formatUriList(resource?.spec?.redirectUris),
+    formatUriList(resource.spec.redirectUris),
   );
   const [postLogoutUrisInput, setPostLogoutUrisInput] = useState(() =>
-    formatUriList(resource?.spec?.postLogoutRedirectUris),
+    formatUriList(resource.spec.postLogoutRedirectUris),
   );
 
   const nameInterop = lens.focus('metadata').focus('name').interop();
@@ -95,7 +95,7 @@ export function AuthClientCard({
                 className="text-sm font-medium"
               >
                 Auth Client
-                {resource?.metadata?.name && (
+                {resource.metadata.name && (
                   <span className="text-muted-foreground ml-1 font-normal truncate">
                     — {resource.metadata.name}
                   </span>
@@ -227,7 +227,11 @@ export function AuthClientCard({
 
 function getErrorMessage(error: FieldError | FieldError[] | undefined) {
   if (Array.isArray(error)) {
-    return error.find((e) => !!e?.message)?.message;
+    const fieldError = error.find(
+      (item) => item instanceof Object && 'message' in item && Boolean(item.message),
+    );
+
+    return fieldError && 'message' in fieldError ? fieldError.message : undefined;
   }
   return error?.message;
 }

@@ -28,10 +28,6 @@ export function ClusterSwitcher() {
 
   const [activeTeam, setActiveTeam] = React.useState(clusterList[0]);
 
-  if (!activeTeam) {
-    return null;
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

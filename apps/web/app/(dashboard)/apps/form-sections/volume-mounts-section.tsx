@@ -109,7 +109,7 @@ export function VolumeMountsSection({
                         <FormItem className="flex-1 space-y-0">
                           <Select
                             onValueChange={field.onChange}
-                            value={field.value ?? ''}
+                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger

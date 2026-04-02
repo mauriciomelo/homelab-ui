@@ -106,7 +106,7 @@ describe('app-form-sheet visual', () => {
       ),
     );
 
-    page.viewport(800, 2000);
+    await page.viewport(800, 2000);
     await renderWithProviders(
       <AppFormSheet
         open

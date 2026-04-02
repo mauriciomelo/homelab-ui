@@ -116,11 +116,11 @@ function NodeApps(props: {
               <AppIcon app={item} />
             </ContextMenuTrigger>
             <ContextMenuContent>
-                <ContextMenuItem
-                  onClick={() =>
-                    restartAppMutation.mutate({ name: item.app.metadata.name })
-                  }
-                >
+              <ContextMenuItem
+                onClick={() =>
+                  restartAppMutation.mutate({ name: item.app.metadata.name })
+                }
+              >
                 Restart App
               </ContextMenuItem>
             </ContextMenuContent>
@@ -170,20 +170,22 @@ export function Devices({
     enabled: !isResetting,
   });
 
-  const invalidateQueries = () => {
-    queryClient.invalidateQueries({
-      queryKey: controlPlaneOrpc.devices.list.queryKey(),
-    });
-    queryClient.invalidateQueries({
-      queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
-    });
-    queryClient.invalidateQueries({
-      queryKey: appOrpc.apps.list.queryKey({
-        input: {
-          includeDrafts: false,
-        },
+  const invalidateQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: controlPlaneOrpc.devices.list.queryKey(),
       }),
-    });
+      queryClient.invalidateQueries({
+        queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: appOrpc.apps.list.queryKey({
+          input: {
+            includeDrafts: false,
+          },
+        }),
+      }),
+    ]);
   };
 
   const currentDevices = useMemo(
@@ -197,11 +199,11 @@ export function Devices({
 
   const newDevices = useMemo(
     () =>
-      Array.from(discoveredNodes?.data?.values() || [])
+      Array.from(discoveredNodes.data?.values() ?? [])
         .filter((node) => {
-          return currentDevices?.every((device) => device.ip !== node.ip);
+          return currentDevices.every((device) => device.ip !== node.ip);
         })
-        .map((node) => ({ ...node, status: DEVICE_STATUS.NEW })) || [],
+        .map((node) => ({ ...node, status: DEVICE_STATUS.NEW })),
     [discoveredNodes.data, currentDevices],
   );
 
@@ -225,7 +227,7 @@ export function Devices({
       port: device.port,
     });
 
-    invalidateQueries();
+    await invalidateQueries();
   };
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -285,7 +287,7 @@ export function Devices({
                 <TableCell className="w-2">
                   <Status {...statusLedProps(device.status)} />
                 </TableCell>
-                <TableCell className="overflow-hidden font-medium overflow-ellipsis">
+                <TableCell className="overflow-hidden overflow-ellipsis font-medium">
                   <ContextMenu>
                     <ContextMenuTrigger>
                       <Button
@@ -385,7 +387,7 @@ export function Devices({
                     adopting={adoptDeviceMutation.isPending}
                   />
                 </div>
-                <div className="m-4 flex h-22 flex-row items-end">
+                <div className="h-22 m-4 flex flex-row items-end">
                   <Alert
                     className={cn('flex transition-all', {
                       'flex-col border-blue-400 bg-blue-50 text-blue-900':
@@ -414,7 +416,7 @@ export function Devices({
 
                       {isNew ? (
                         <Button
-                          onClick={() => handleAdoptDevice(selected!)}
+                          onClick={() => handleAdoptDevice(selected)}
                           disabled={adoptDeviceMutation.isPending || !isNew}
                         >
                           {adoptDeviceMutation.isPending
@@ -457,7 +459,7 @@ export function Devices({
 
                 <NodeDetails node={selected} />
 
-                {selected && !isNew && (
+                {!isNew && (
                   <div className="m-4">
                     <Button
                       variant="outline"
@@ -496,20 +498,22 @@ function ResetDeviceDialog({
 }) {
   const queryClient = useQueryClient();
 
-  const invalidateQueries = () => {
-    queryClient.invalidateQueries({
-      queryKey: controlPlaneOrpc.devices.list.queryKey(),
-    });
-    queryClient.invalidateQueries({
-      queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
-    });
-    queryClient.invalidateQueries({
-      queryKey: appOrpc.apps.list.queryKey({
-        input: {
-          includeDrafts: false,
-        },
+  const invalidateQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: controlPlaneOrpc.devices.list.queryKey(),
       }),
-    });
+      queryClient.invalidateQueries({
+        queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: appOrpc.apps.list.queryKey({
+          input: {
+            includeDrafts: false,
+          },
+        }),
+      }),
+    ]);
   };
 
   const resetDeviceMutation = useMutation(
@@ -524,7 +528,7 @@ function ResetDeviceDialog({
       ip: device.ip,
       port: device.port,
     });
-    invalidateQueries();
+    await invalidateQueries();
     close?.();
   };
 
@@ -604,8 +608,7 @@ function NodeDetails({ node }: { node: Device }) {
         {
           label: 'Operating System',
           value:
-            `${capitalize(node.nodeInfo.operatingSystem)}${osImage}` ||
-            UNKNOWN,
+            `${capitalize(node.nodeInfo.operatingSystem)}${osImage}` || UNKNOWN,
           icon: Monitor,
           color: 'group-hover:text-orange-500',
         },

@@ -138,8 +138,10 @@ export function ApplicationForm(
     name: 'app.spec.volumeMounts',
   });
 
-  const additionalResources =
-    useWatch({ control: form.control, name: 'additionalResources' }) ?? [];
+  const additionalResources = useWatch({
+    control: form.control,
+    name: 'additionalResources',
+  });
   const ports = useWatch({ control: form.control, name: 'app.spec.ports' });
   const persistentVolumeClaims = additionalResources.filter(
     (resource): resource is PersistentVolumeClaimSchema =>
@@ -234,7 +236,7 @@ export function ApplicationForm(
 
       <EnvironmentVariablesSection
         envVariablesLens={appSpecLens.focus('envVariables')}
-         additionalResourcesLens={lens.focus('additionalResources')}
+        additionalResourcesLens={lens.focus('additionalResources')}
         fields={fields}
         onAdd={addEnvVariable}
         onRemove={removeEnvVariable}
@@ -280,8 +282,9 @@ export function ApplicationForm(
         {additionalResourceFields.length ? (
           <div className="space-y-4">
             {additionalResourceFields.map((resourceField, index) => {
-              const resource = additionalResources[index];
-              if (!resource) {
+              const resource = additionalResources.at(index);
+
+              if (resource === undefined) {
                 return null;
               }
 
@@ -296,10 +299,6 @@ export function ApplicationForm(
                     onRemove={removeAdditionalResource}
                   />
                 );
-              }
-
-              if (resource.kind !== 'AuthClient') {
-                return null;
               }
 
               return (

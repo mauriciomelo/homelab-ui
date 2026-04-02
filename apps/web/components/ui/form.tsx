@@ -22,12 +22,11 @@ type FormFieldContextValue<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > = {
-  name: TName;
+  name?: TName;
 };
 
 const FormFieldContext =
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  React.createContext<FormFieldContextValue>({} as FormFieldContextValue);
+  React.createContext<FormFieldContextValue>({});
 
 const FormField = <
   TFieldValues extends FieldValues = FieldValues,
@@ -45,13 +44,14 @@ const FormField = <
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext);
   const itemContext = React.useContext(FormItemContext);
+
+  if (!fieldContext.name) {
+    throw new Error('useFormField should be used within <FormField>');
+  }
+
   const { getFieldState } = useFormContext();
   const formState = useFormState({ name: fieldContext.name });
   const fieldState = getFieldState(fieldContext.name, formState);
-
-  if (!fieldContext) {
-    throw new Error('useFormField should be used within <FormField>');
-  }
 
   const { id } = itemContext;
 
@@ -70,8 +70,7 @@ type FormItemContextValue = {
 };
 
 const FormItemContext =
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  React.createContext<FormItemContextValue>({} as FormItemContextValue);
+  React.createContext<FormItemContextValue>({ id: '' });
 
 function FormItem({ className, ...props }: React.ComponentProps<'div'>) {
   const id = React.useId();
@@ -91,6 +90,20 @@ function FormLabel({
   className,
   ...props
 }: React.ComponentProps<typeof LabelPrimitive.Root>) {
+  const fieldContext = React.useContext(FormFieldContext);
+  const itemContext = React.useContext(FormItemContext);
+
+  if (!fieldContext.name) {
+    return (
+      <Label
+        data-slot="form-label"
+        className={className}
+        htmlFor={`${itemContext.id}-form-item`}
+        {...props}
+      />
+    );
+  }
+
   const { error, formItemId } = useFormField();
 
   return (
@@ -105,6 +118,19 @@ function FormLabel({
 }
 
 function FormControl({ ...props }: React.ComponentProps<typeof Slot>) {
+  const fieldContext = React.useContext(FormFieldContext);
+  const itemContext = React.useContext(FormItemContext);
+
+  if (!fieldContext.name) {
+    return (
+      <Slot
+        data-slot="form-control"
+        id={`${itemContext.id}-form-item`}
+        {...props}
+      />
+    );
+  }
+
   const { error, formItemId, formDescriptionId, formMessageId } =
     useFormField();
 
@@ -138,7 +164,7 @@ function FormDescription({ className, ...props }: React.ComponentProps<'p'>) {
 
 function FormMessage({ className, ...props }: React.ComponentProps<'p'>) {
   const { error, formMessageId } = useFormField();
-  const body = error ? String(error?.message ?? '') : props.children;
+  const body = error ? String(error.message ?? '') : props.children;
 
   if (!body) {
     return null;

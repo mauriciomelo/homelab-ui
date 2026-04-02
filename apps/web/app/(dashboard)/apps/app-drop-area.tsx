@@ -69,7 +69,7 @@ export const useAppDropArea = ({
     setIsDragActive(false);
     setValidationError(null);
 
-    const file = event.dataTransfer.files?.[0];
+    const file = event.dataTransfer.files.item(0);
     if (!file) {
       return;
     }

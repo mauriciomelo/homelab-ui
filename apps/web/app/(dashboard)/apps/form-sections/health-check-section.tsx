@@ -86,7 +86,7 @@ export function HealthCheckSection({
                     <div className="flex-1 space-y-0">
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value ?? 'httpGet'}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger
@@ -116,7 +116,7 @@ export function HealthCheckSection({
                         aria-label="Path"
                         className="text-left"
                         {...field}
-                        value={field.value ?? ''}
+                        value={field.value}
                       />
                     </FormControl>
                     <FormMessage />
@@ -131,7 +131,7 @@ export function HealthCheckSection({
                     <div className="flex-1 space-y-0">
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value ?? ''}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger
@@ -142,7 +142,7 @@ export function HealthCheckSection({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {ports?.map(
+                          {ports.map(
                             (port, index) =>
                               port.name && (
                                 <SelectItem key={index} value={port.name}>

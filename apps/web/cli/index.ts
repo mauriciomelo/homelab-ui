@@ -119,7 +119,7 @@ const formatAppSchema = (format: SchemaFormat) => {
 };
 
 const run = async () => {
-  yargs(hideBin(process.argv))
+  await yargs(hideBin(process.argv))
     .scriptName('tess')
     .usage('$0 <command> [options]')
     .command(
@@ -222,7 +222,7 @@ const run = async () => {
     .parse();
 };
 
-run().catch((error) => {
+void run().catch((error) => {
   const message = error instanceof Error ? error.message : 'Unknown error';
   process.stderr.write(`${message}\n`);
   process.exitCode = 1;

@@ -16,10 +16,7 @@ import {
   parseAppBundleIdentifier,
   type AppBundleIdentifier,
 } from './app-bundle-identifier';
-import {
-  type AppRuntimeStatus,
-  type LiveApp,
-} from './applications';
+import { type AppRuntimeStatus, type LiveApp } from './applications';
 import { toManifests } from './app-k8s-adapter';
 import {
   appBundleSchema,
@@ -180,7 +177,7 @@ export async function* watchApps(
   try {
     yield await listApps(parsedInput);
 
-    while (true) {
+    for (;;) {
       const nextEvent = await Promise.race([
         fsWatcherIterator.next().then((result) => ({ source: 'fs', result })),
         liveAppsIterator.next().then((result) => ({ source: 'live', result })),
@@ -194,7 +191,7 @@ export async function* watchApps(
     }
   } finally {
     await fsWatcherIterator.return?.();
-    await liveAppsIterator.return?.();
+    await liveAppsIterator.return();
   }
 }
 
