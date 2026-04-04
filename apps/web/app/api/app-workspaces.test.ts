@@ -64,12 +64,13 @@ const { execFileMock } = vi.hoisted(() => ({
 }));
 
 const { watchMock } = vi.hoisted(() => ({
-  watchMock: vi.fn<
-    (
-      path: string,
-      options: { recursive?: boolean },
-    ) => AsyncIterableIterator<{ eventType: string; filename: string | null }>
-  >(),
+  watchMock:
+    vi.fn<
+      (
+        path: string,
+        options: { recursive?: boolean },
+      ) => AsyncIterableIterator<{ eventType: string; filename: string | null }>
+    >(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -386,7 +387,9 @@ describe('draft workspaces', () => {
             resources: ['app.yaml', 'namespace.yaml'],
           }),
           './app1/app.yaml': YAML.stringify(app1Manifest),
-          './app1/namespace.yaml': YAML.stringify(buildNamespace({ name: 'app1' })),
+          './app1/namespace.yaml': YAML.stringify(
+            buildNamespace({ name: 'app1' }),
+          ),
         },
         '/test-project/clusters/my-cluster/my-applications/',
       );
@@ -400,7 +403,9 @@ describe('draft workspaces', () => {
             resources: ['app.yaml', 'namespace.yaml'],
           }),
           './app2/app.yaml': YAML.stringify(app2Manifest),
-          './app2/namespace.yaml': YAML.stringify(buildNamespace({ name: 'app2' })),
+          './app2/namespace.yaml': YAML.stringify(
+            buildNamespace({ name: 'app2' }),
+          ),
         },
         '/test-project/clusters/my-cluster/my-applications/',
       );
@@ -427,7 +432,9 @@ describe('draft workspaces', () => {
         };
       });
 
-      await expect(createApp(createBundle(invalidHealthPortApp))).rejects.toMatchObject({
+      await expect(
+        createApp(createBundle(invalidHealthPortApp)),
+      ).rejects.toMatchObject({
         issues: [
           {
             path: ['app', 'spec', 'health', 'check', 'port'],
@@ -440,10 +447,14 @@ describe('draft workspaces', () => {
       const invalidVolumeMountApp = produce(baseAppManifest, (draft) => {
         draft.metadata.name = 'invalid-volume-app';
         draft.spec.envVariables = [];
-        draft.spec.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
+        draft.spec.volumeMounts = [
+          { mountPath: '/data', name: 'missing-claim' },
+        ];
       });
 
-      await expect(createApp(createBundle(invalidVolumeMountApp))).rejects.toMatchObject({
+      await expect(
+        createApp(createBundle(invalidVolumeMountApp)),
+      ).rejects.toMatchObject({
         issues: [
           {
             path: ['app', 'spec', 'volumeMounts', 0, 'name'],
@@ -487,7 +498,9 @@ describe('draft workspaces', () => {
       const appManifest = produce(basePersistedAppManifest, (draft) => {
         draft.metadata.name = appName;
         draft.spec.envVariables = [];
-        draft.spec.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
+        draft.spec.volumeMounts = [
+          { mountPath: '/data', name: 'missing-claim' },
+        ];
       });
 
       vol.fromJSON(
@@ -647,24 +660,27 @@ describe('draft workspaces', () => {
     );
 
     server.use(
-      http.post('http://localhost:3000/api/control-plane/rpc/apps/getLiveApps', () => {
-        return HttpResponse.json({
-          json: [
-            {
-              ...produce(baseAppManifest, (draft) => {
-                draft.metadata.name = 'published-app';
-                draft.spec.ports = [{ name: 'http', containerPort: 80 }];
-                draft.spec.envVariables = [];
-              }),
-              status: {
-                phase: APP_STATUS.RUNNING,
-                placements: [{ nodeName: 'node-a' }],
-                conditions: [],
+      http.post(
+        'http://localhost:3000/api/control-plane/rpc/apps/getLiveApps',
+        () => {
+          return HttpResponse.json({
+            json: [
+              {
+                ...produce(baseAppManifest, (draft) => {
+                  draft.metadata.name = 'published-app';
+                  draft.spec.ports = [{ name: 'http', containerPort: 80 }];
+                  draft.spec.envVariables = [];
+                }),
+                status: {
+                  phase: APP_STATUS.RUNNING,
+                  placements: [{ nodeName: 'node-a' }],
+                  conditions: [],
+                },
               },
-            },
-          ],
-        });
-      }),
+            ],
+          });
+        },
+      ),
     );
 
     const apps = await listApps();
@@ -729,9 +745,7 @@ describe('draft workspaces', () => {
           return Promise.resolve(queuedEvent);
         }
 
-        return new Promise<
-          IteratorResult<WatchEvent, undefined>
-        >((resolve) => {
+        return new Promise<IteratorResult<WatchEvent, undefined>>((resolve) => {
           resolveNextEvent = resolve;
         });
       }),
@@ -873,7 +887,12 @@ describe('openWith', () => {
 
     expect(execFileMock).toHaveBeenCalledWith(
       'open',
-      ['-a', 'Ghostty', '/test-project/clusters/my-cluster/my-applications/demo-app'],
+      [
+        '-n',
+        '-a',
+        'Ghostty',
+        '/test-project/clusters/my-cluster/my-applications/demo-app',
+      ],
       expect.any(Function),
     );
   });

@@ -619,7 +619,7 @@ function getOpenCommand(
   if (target === 'ghostty') {
     return {
       command: 'open',
-      args: ['-a', 'Ghostty', targetPath],
+      args: ['-n', '-a', 'Ghostty', targetPath],
     };
   }
 
