@@ -7,7 +7,13 @@ import { hideBin } from 'yargs/helpers';
 import * as z from 'zod/v4';
 
 import { readAppBundleFromDirectory } from '@/app/api/app-workspaces';
-import { AppSchema, appSchema, defaultAppData } from '@/app/api/schemas';
+import {
+  AppSchema,
+  appSchema,
+  authClientSchema,
+  defaultAppData,
+  persistentVolumeClaimSchema,
+} from '@/app/api/schemas';
 
 type ValidationOutcome =
   | { ok: true; bundlePath: string }
@@ -104,8 +110,19 @@ const validateAppBundle = async (
   }
 };
 
+const appResourceSchemas = {
+  App: appSchema,
+  AuthClient: authClientSchema,
+  PersistentVolumeClaim: persistentVolumeClaimSchema,
+} as const;
+
 const formatAppSchema = (format: SchemaFormat) => {
-  const jsonSchema = z.toJSONSchema(appSchema, { io: 'input' });
+  const jsonSchema = Object.fromEntries(
+    Object.entries(appResourceSchemas).map(([name, schema]) => [
+      name,
+      z.toJSONSchema(schema, { io: 'input' }),
+    ]),
+  );
 
   if (format === 'json') {
     return JSON.stringify(jsonSchema, null, 2);
@@ -188,7 +205,7 @@ const run = async () => {
           )
           .command(
             'schema',
-            'Print the app schema',
+            'Print schemas for app bundle resources',
             {
               format: {
                 type: 'string',
