@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import { controlPlaneOrpcServerClient } from '@/control-plane-orpc/server-client';
 import fs from 'fs';
 import git from 'isomorphic-git';
-import http from 'isomorphic-git/http/node';
+import http from 'isomorphic-git/http/node/index.js';
 import { watch } from 'node:fs/promises';
 import path from 'path';
 import YAML from 'yaml';
@@ -49,6 +49,11 @@ export type AppResourceType =
 type AdditionalResourceSchema =
   | z.infer<typeof authClientSchema>
   | z.infer<typeof persistentVolumeClaimSchema>;
+
+const requiredBundleFiles: ReadonlySet<string> = new Set([
+  'app.yaml',
+  'namespace.yaml',
+]);
 
 export type PublishedAppBundle = AppBundleSchema & {
   status: AppRuntimeStatus;
@@ -350,17 +355,32 @@ export async function readAppBundleFromDirectory(appPath: string): Promise<{
   app: z.infer<typeof appSchema>;
   additionalResources: AdditionalResourceSchema[];
 }> {
-  const requiredFiles = new Set(['app.yaml', 'namespace.yaml']);
-
   const kustomizationResult = await getFile({
     path: `${appPath}/kustomization.yaml`,
     schema: kustomizationSchema,
   });
 
   const kustomizationResources = new Set(kustomizationResult.data.resources);
-  const additionalResourcesFileNames =
-    kustomizationResources.difference(requiredFiles);
+  const missingRequiredFiles = requiredBundleFiles.difference(
+    kustomizationResources,
+  );
+
+  if (missingRequiredFiles.size > 0) {
+    throw new Error(
+      Array.from(missingRequiredFiles)
+        .map(
+          (resourceFile) =>
+            `kustomization.resources: Missing required resource "${resourceFile}"`,
+        )
+        .join('; '),
+    );
+  }
+
   const appResult = await getCanonicalApp(appPath);
+  await getFile({
+    path: `${appPath}/namespace.yaml`,
+    schema: namespaceSchema,
+  });
 
   function schemaForFile(
     filename: string,
@@ -377,26 +397,33 @@ export async function readAppBundleFromDirectory(appPath: string): Promise<{
   }
 
   const additionalResources = await Promise.all(
-    Array.from(additionalResourcesFileNames).map(async (resourceFile) => {
-      const schema = schemaForFile(resourceFile);
-      if (!schema) {
-        return;
-      }
+    kustomizationResult.data.resources
+      .filter((resourceFile) => !requiredBundleFiles.has(resourceFile))
+      .map(async (resourceFile) => {
+        const schema = schemaForFile(resourceFile);
+        if (!schema) {
+          throw new Error(
+            `kustomization.resources: Unsupported resource file "${resourceFile}"`,
+          );
+        }
 
-      const { data } = await getFile({
-        path: `${appPath}/${resourceFile}`,
-        schema,
-      });
+        const { data } = await getFile({
+          path: `${appPath}/${resourceFile}`,
+          schema,
+        });
 
-      return data;
-    }),
+        return data;
+      }),
   );
 
-  return {
+  const parsedBundle = appBundleSchema.parse({
     app: appResult,
-    additionalResources: additionalResources.filter(
-      (resource) => resource !== undefined,
-    ),
+    additionalResources,
+  });
+
+  return {
+    app: parsedBundle.app,
+    additionalResources: parsedBundle.additionalResources,
   };
 }
 

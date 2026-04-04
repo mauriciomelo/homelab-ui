@@ -6,22 +6,18 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import * as z from 'zod/v4';
 
+import { readAppBundleFromDirectory } from '@/app/api/app-workspaces';
 import { AppSchema, appSchema, defaultAppData } from '@/app/api/schemas';
 
 type ValidationOutcome =
-  | { ok: true; filePath: string }
-  | { ok: false; filePath: string; errors: string[] };
+  | { ok: true; bundlePath: string }
+  | { ok: false; bundlePath: string; errors: string[] };
 
 type NodeError = Error & { code?: string };
 
 const schemaFormats = ['yaml', 'json'] as const;
 type SchemaFormat = (typeof schemaFormats)[number];
 const schemaFormatSchema = z.enum(schemaFormats);
-
-const isValidationFailure = (
-  outcome: ValidationOutcome,
-): outcome is { ok: false; filePath: string; errors: string[] } =>
-  outcome.ok === false;
 
 const isNodeError = (error: unknown): error is NodeError =>
   error instanceof Error && 'code' in error;
@@ -51,6 +47,13 @@ const formatIssuePath = (pathParts: PropertyKey[]): string => {
     .join('');
 };
 
+const resolveAppBundlePath = (appPath: string): string => {
+  const resolvedPath = path.resolve(appPath);
+  return resolvedPath.endsWith('.yaml') || resolvedPath.endsWith('.yml')
+    ? path.dirname(resolvedPath)
+    : resolvedPath;
+};
+
 const resolveAppFilePath = (appPath: string): string => {
   const resolvedPath = path.resolve(appPath);
   return resolvedPath.endsWith('.yaml') || resolvedPath.endsWith('.yml')
@@ -76,35 +79,28 @@ const fileExists = async (filePath: string) => {
   }
 };
 
-const validateAppFile = async (appPath: string): Promise<ValidationOutcome> => {
-  const filePath = resolveAppFilePath(appPath);
+const validateAppBundle = async (
+  appPath: string,
+): Promise<ValidationOutcome> => {
+  const bundlePath = resolveAppBundlePath(appPath);
 
   try {
-    const content = await fs.readFile(filePath, 'utf8');
-    const documents = YAML.parseAllDocuments(content);
-    const parseErrors = documents.flatMap((document) => document.errors);
-
-    if (parseErrors.length > 0) {
-      const errors = parseErrors.map((error) => error.message);
-      return { ok: false, filePath, errors };
-    }
-
-    const parsed = YAML.parse(content);
-    const result = appSchema.safeParse(parsed);
-
-    if (result.success) {
-      return { ok: true, filePath };
-    }
-
-    const errors = result.error.issues.map((issue) => {
-      const issuePath = formatIssuePath(issue.path);
-      return `${issuePath}: ${issue.message}`;
-    });
-
-    return { ok: false, filePath, errors };
+    await readAppBundleFromDirectory(bundlePath);
+    return { ok: true, bundlePath };
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        ok: false,
+        bundlePath,
+        errors: error.issues.map((issue) => {
+          const issuePath = formatIssuePath(issue.path);
+          return `${issuePath}: ${issue.message}`;
+        }),
+      };
+    }
+
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return { ok: false, filePath, errors: [message] };
+    return { ok: false, bundlePath, errors: [message] };
   }
 };
 
@@ -129,20 +125,21 @@ const run = async () => {
         appYargs
           .command(
             'validate <appPath>',
-            'Validate an app.yaml against the app schema',
+            'Validate an app bundle directory against the bundle schema',
             {
               appPath: {
                 type: 'string',
                 demandOption: true,
-                describe: 'Path to an app directory or app.yaml file',
+                describe:
+                  'Path to an app directory or bundle file like app.yaml',
               },
             },
             async (argv) => {
-              const outcome = await validateAppFile(argv.appPath);
+              const outcome = await validateAppBundle(argv.appPath);
 
-              if (isValidationFailure(outcome)) {
+              if (!outcome.ok) {
                 process.stderr.write(
-                  `Invalid app config: ${outcome.filePath}\n`,
+                  `Invalid app bundle: ${outcome.bundlePath}\n`,
                 );
                 outcome.errors.forEach((error) => {
                   process.stderr.write(`- ${error}\n`);
@@ -151,7 +148,7 @@ const run = async () => {
                 return;
               }
 
-              process.stdout.write(`Valid app config: ${outcome.filePath}\n`);
+              process.stdout.write(`Valid app bundle: ${outcome.bundlePath}\n`);
             },
           )
           .command(

@@ -13,6 +13,7 @@ import {
   getDraftsDir,
   getDraftDir,
   getApp,
+  readAppBundleFromDirectory,
   getPersistedPublishedAppBundles,
   publishApp,
   listApps,
@@ -443,6 +444,71 @@ describe('draft workspaces', () => {
       });
 
       await expect(createApp(createBundle(invalidVolumeMountApp))).rejects.toMatchObject({
+        issues: [
+          {
+            path: ['app', 'spec', 'volumeMounts', 0, 'name'],
+            message: 'Volume mount must reference a persistent volume',
+          },
+        ],
+      });
+    });
+
+    it('rejects bundles with missing required kustomization resources', async () => {
+      const appName = 'missing-namespace-app';
+      const appManifest = produce(basePersistedAppManifest, (draft) => {
+        draft.metadata.name = appName;
+      });
+
+      vol.fromJSON(
+        {
+          './kustomization.yaml': YAML.stringify({
+            ...baseKustomization,
+            metadata: { name: appName },
+            namespace: appName,
+            resources: ['app.yaml'],
+          }),
+          './app.yaml': YAML.stringify(appManifest),
+          './namespace.yaml': YAML.stringify(buildNamespace({ name: appName })),
+        },
+        `/test-project/clusters/my-cluster/my-applications/${appName}`,
+      );
+
+      await expect(
+        readAppBundleFromDirectory(
+          `/test-project/clusters/my-cluster/my-applications/${appName}`,
+        ),
+      ).rejects.toThrow(
+        'kustomization.resources: Missing required resource "namespace.yaml"',
+      );
+    });
+
+    it('rejects invalid bundle resource references when reading from disk', async () => {
+      const appName = 'invalid-read-bundle-app';
+      const appManifest = produce(basePersistedAppManifest, (draft) => {
+        draft.metadata.name = appName;
+        draft.spec.envVariables = [];
+        draft.spec.volumeMounts = [{ mountPath: '/data', name: 'missing-claim' }];
+      });
+
+      vol.fromJSON(
+        {
+          './kustomization.yaml': YAML.stringify({
+            ...baseKustomization,
+            metadata: { name: appName },
+            namespace: appName,
+            resources: ['app.yaml', 'namespace.yaml'],
+          }),
+          './app.yaml': YAML.stringify(appManifest),
+          './namespace.yaml': YAML.stringify(buildNamespace({ name: appName })),
+        },
+        `/test-project/clusters/my-cluster/my-applications/${appName}`,
+      );
+
+      await expect(
+        readAppBundleFromDirectory(
+          `/test-project/clusters/my-cluster/my-applications/${appName}`,
+        ),
+      ).rejects.toMatchObject({
         issues: [
           {
             path: ['app', 'spec', 'volumeMounts', 0, 'name'],

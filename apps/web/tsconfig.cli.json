@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist-cli",
+    "rootDir": ".",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "declaration": false,
+    "sourceMap": false,
+    "incremental": false
+  },
+  "include": ["cli/index.ts", "types/**/*.d.ts"]
+}
