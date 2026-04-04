@@ -1,6 +1,6 @@
 'use client';
 
-import { zodResolver } from '@hookform/resolvers/zod';
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useLens } from '@hookform/lenses';
 import { useEffect, useRef } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
@@ -68,7 +68,7 @@ export function useApplicationForm({
   defaultValues?: AppBundleSchema | (() => Promise<AppBundleSchema>);
 }) {
   const form = useForm<AppBundleSchema>({
-    resolver: zodResolver(appBundleSchema),
+    resolver: standardSchemaResolver(appBundleSchema),
     defaultValues: defaultValues ?? data ?? defaultAppBundleData,
   });
 
