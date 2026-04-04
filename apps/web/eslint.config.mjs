@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import sonarjs from 'eslint-plugin-sonarjs';
 import tseslint from 'typescript-eslint';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +25,9 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   prettier,
   {
+    plugins: {
+      sonarjs,
+    },
     rules: {
       eqeqeq: 'error',
       'no-nested-ternary': 'error',
@@ -36,6 +40,7 @@ export default tseslint.config(
           assertionStyle: 'never',
         },
       ],
+      'sonarjs/cognitive-complexity': ['error', 15],
     },
   },
   {

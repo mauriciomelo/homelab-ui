@@ -198,6 +198,158 @@ function getQueryError(error: unknown) {
   return null;
 }
 
+type DraftMutation = {
+  isPending: boolean;
+  isSuccess: boolean;
+  mutate: (bundle: AppBundleSchema) => void;
+  mutateAsync: (bundle: AppBundleSchema) => Promise<unknown>;
+};
+
+function ensureDraftExistsIfNeeded({
+  mode,
+  draftIdentifier,
+  hasPersistedDraft,
+  createDraftMutation,
+}: {
+  mode: AppFormMode;
+  draftIdentifier: { draftId: string } | null;
+  hasPersistedDraft: boolean;
+  createDraftMutation: DraftMutation;
+}): Promise<void> {
+  if (
+    mode !== 'create' ||
+    draftIdentifier === null ||
+    hasPersistedDraft ||
+    createDraftMutation.isPending
+  ) {
+    return Promise.resolve();
+  }
+
+  return createDraftMutation
+    .mutateAsync(createDefaultDraftBundle(draftIdentifier.draftId))
+    .then(() => undefined);
+}
+
+function persistDraftFromValues({
+  values,
+  hasPersistedDraft,
+  createDraftMutation,
+  updateDraftMutation,
+}: {
+  values: unknown;
+  hasPersistedDraft: boolean;
+  createDraftMutation: DraftMutation;
+  updateDraftMutation: DraftMutation;
+}) {
+  const parsedBundle = appBundleSchema.safeParse(values);
+
+  if (!parsedBundle.success) {
+    return;
+  }
+
+  if (hasPersistedDraft) {
+    updateDraftMutation.mutate(parsedBundle.data);
+    return;
+  }
+
+  createDraftMutation.mutate(parsedBundle.data);
+}
+
+function getIsEditModeMissingApp({
+  mode,
+  queryPending,
+  queryError,
+  formLoading,
+  currentData,
+}: {
+  mode: AppFormMode;
+  queryPending: boolean;
+  queryError: unknown;
+  formLoading: boolean;
+  currentData?: AppBundleSchema;
+}) {
+  return (
+    mode === 'edit' &&
+    !queryError &&
+    !queryPending &&
+    !formLoading &&
+    !currentData
+  );
+}
+
+function getIsFormLoading({
+  mode,
+  formLoading,
+  draftIdentifier,
+  queryPending,
+  currentData,
+  hasPersistedDraft,
+}: {
+  mode: AppFormMode;
+  formLoading: boolean;
+  draftIdentifier: { draftId: string } | null;
+  queryPending: boolean;
+  currentData?: AppBundleSchema;
+  hasPersistedDraft: boolean;
+}) {
+  return (
+    formLoading ||
+    (mode === 'create' && draftIdentifier === null) ||
+    (mode === 'edit' && queryPending && !currentData) ||
+    (mode === 'create' && hasPersistedDraft && queryPending)
+  );
+}
+
+function FormBodyContent({
+  isFormLoading,
+  currentData,
+  loadingMessage,
+  emptyStateMessage,
+  form,
+}: {
+  isFormLoading: boolean;
+  currentData?: AppBundleSchema;
+  loadingMessage: string;
+  emptyStateMessage: string;
+  form: ReturnType<typeof useApplicationForm>;
+}) {
+  if (isFormLoading) {
+    return (
+      <div className="text-muted-foreground flex h-full min-h-40 items-center justify-center p-4 text-sm">
+        {loadingMessage}
+      </div>
+    );
+  }
+
+  if (!currentData) {
+    return (
+      <div className="text-muted-foreground flex h-full min-h-40 items-center justify-center p-4 text-sm">
+        {emptyStateMessage}
+      </div>
+    );
+  }
+
+  return <ApplicationForm className="p-4" {...form} />;
+}
+
+function SubmitActionButton({
+  isSubmitting,
+  mode,
+}: {
+  isSubmitting: boolean;
+  mode: AppFormMode;
+}) {
+  if (isSubmitting) {
+    return (
+      <Button type="submit" disabled>
+        {mode === 'create' ? 'Creating...' : 'Updating...'}
+      </Button>
+    );
+  }
+
+  return <Button type="submit">{mode === 'create' ? 'Create' : 'Update'}</Button>;
+}
+
 export function AppFormSheet(props: AppFormSheetProps) {
   const formIdentity = getFormIdentity(props.session);
 
@@ -286,19 +438,31 @@ function AppFormSheetBody({
   });
   const appDropArea = useAppDropArea({ form: form.form });
 
-  const ensureDraftExists = async () => {
-    if (
-      mode !== 'create' ||
-      draftIdentifier === null ||
-      hasPersistedDraft ||
-      createDraftMutation.isPending
-    ) {
+  const ensureDraftExists = () =>
+    ensureDraftExistsIfNeeded({
+      mode,
+      draftIdentifier,
+      hasPersistedDraft,
+      createDraftMutation,
+    });
+
+  const handleDraftWatchChange = ({
+    type,
+    values,
+  }: {
+    type: unknown;
+    values: unknown;
+  }) => {
+    if (type !== 'change') {
       return;
     }
 
-    await createDraftMutation.mutateAsync(
-      createDefaultDraftBundle(draftIdentifier.draftId),
-    );
+    persistDraftFromValues({
+      values,
+      hasPersistedDraft,
+      createDraftMutation,
+      updateDraftMutation,
+    });
   };
 
   useEffect(() => {
@@ -307,22 +471,7 @@ function AppFormSheetBody({
     }
 
     const subscription = form.form.watch((values, { type }) => {
-      if (type !== 'change') {
-        return;
-      }
-
-      const parsedBundle = appBundleSchema.safeParse(values);
-
-      if (!parsedBundle.success) {
-        return;
-      }
-
-      if (hasPersistedDraft) {
-        updateDraftMutation.mutate(parsedBundle.data);
-        return;
-      }
-
-      createDraftMutation.mutate(parsedBundle.data);
+      handleDraftWatchChange({ type, values });
     });
 
     return () => {
@@ -332,23 +481,27 @@ function AppFormSheetBody({
     createDraftMutation,
     form.form,
     hasPersistedDraft,
+    handleDraftWatchChange,
     mode,
     open,
     draftIdentifier,
-    updateDraftMutation,
   ]);
 
-  const isEditModeMissingApp =
-    mode === 'edit' &&
-    !watchedBundlesQuery.error &&
-    !watchedBundlesQuery.isPending &&
-    !form.form.formState.isLoading &&
-    !currentData;
-  const isFormLoading =
-    form.form.formState.isLoading ||
-    (mode === 'create' && draftIdentifier === null) ||
-    (mode === 'edit' && watchedBundlesQuery.isPending && !currentData) ||
-    (mode === 'create' && hasPersistedDraft && watchedBundlesQuery.isPending);
+  const isEditModeMissingApp = getIsEditModeMissingApp({
+    mode,
+    queryPending: watchedBundlesQuery.isPending,
+    queryError: watchedBundlesQuery.error,
+    formLoading: form.form.formState.isLoading,
+    currentData,
+  });
+  const isFormLoading = getIsFormLoading({
+    mode,
+    formLoading: form.form.formState.isLoading,
+    draftIdentifier,
+    queryPending: watchedBundlesQuery.isPending,
+    currentData,
+    hasPersistedDraft,
+  });
   const openTargetIdentifier = mode === 'create' ? draftIdentifier : appIdentifier;
 
   const isOpenDisabled =
@@ -392,19 +545,13 @@ function AppFormSheetBody({
           </SheetHeader>
           <AppDropArea className="min-h-0 flex-1" {...appDropArea.dropAreaProps}>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {isFormLoading ? (
-                <div className="text-muted-foreground flex h-full min-h-40 items-center justify-center p-4 text-sm">
-                  {loadingMessage}
-                </div>
-              ) : null}
-              {!isFormLoading && !currentData ? (
-                <div className="text-muted-foreground flex h-full min-h-40 items-center justify-center p-4 text-sm">
-                  {emptyStateMessage}
-                </div>
-              ) : null}
-              {!isFormLoading && currentData ? (
-                <ApplicationForm className="p-4" {...form} />
-              ) : null}
+              <FormBodyContent
+                isFormLoading={isFormLoading}
+                currentData={currentData}
+                loadingMessage={loadingMessage}
+                emptyStateMessage={emptyStateMessage}
+                form={form}
+              />
             </div>
           </AppDropArea>
 
@@ -414,15 +561,10 @@ function AppFormSheetBody({
                 Cancel
               </Button>
             </SheetClose>
-            {form.form.formState.isSubmitting ? (
-              <Button type="submit" disabled>
-                {form.mode === 'create' ? 'Creating...' : 'Updating...'}
-              </Button>
-            ) : (
-              <Button type="submit">
-                {form.mode === 'create' ? 'Create' : 'Update'}
-              </Button>
-            )}
+            <SubmitActionButton
+              isSubmitting={form.form.formState.isSubmitting}
+              mode={form.mode}
+            />
           </SheetFooter>
         </form>
       </Form>

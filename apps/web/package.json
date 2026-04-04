@@ -99,6 +99,7 @@
     "electron": "^37.10.3",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-sonarjs": "^3.0.5",
     "jsdom": "^26.1.0",
     "memfs": "^4.51.1",
     "msw": "^2.11.2",
