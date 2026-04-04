@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import sonarjs from 'eslint-plugin-sonarjs';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -20,6 +21,9 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   prettier,
   {
+    plugins: {
+      sonarjs,
+    },
     rules: {
       'no-nested-ternary': 'error',
       '@typescript-eslint/no-unused-vars': 'error',
@@ -30,6 +34,7 @@ export default tseslint.config(
           assertionStyle: 'never',
         },
       ],
+      'sonarjs/cognitive-complexity': ['error', 15],
     },
   },
 );
