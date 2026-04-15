@@ -61,6 +61,7 @@
     "client-only": "^0.0.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "fast-json-patch": "^3.1.1",
     "immer": "^11.0.1",
     "install": "^0.13.0",
     "isomorphic-git": "^1.30.1",

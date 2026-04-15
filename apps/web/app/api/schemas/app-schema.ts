@@ -8,6 +8,8 @@ import {
 import { APP_STATUS } from '@/app/constants';
 import { z } from 'zod';
 
+import { jsonValueSchema } from './json-value-schema';
+
 const appConditionSchema = z.object({
   type: z.string(),
   status: z.string(),
@@ -107,6 +109,121 @@ const healthSchema = z.object({
   check: healthCheckSchema.meta({ description: 'Health check settings' }),
 });
 
+const allowedDeploymentPatchPrefixes = [
+  '/spec/template/spec/affinity',
+  '/spec/template/spec/containers/0/args',
+  '/spec/template/spec/containers/0/command',
+  '/spec/template/spec/containers/0/env',
+  '/spec/template/spec/containers/0/envFrom',
+  '/spec/template/spec/containers/0/livenessProbe',
+  '/spec/template/spec/containers/0/readinessProbe',
+  '/spec/template/spec/containers/0/resources',
+  '/spec/template/spec/containers/0/securityContext',
+  '/spec/template/spec/containers/0/startupProbe',
+  '/spec/template/spec/containers/0/volumeMounts',
+  '/spec/template/spec/imagePullSecrets',
+  '/spec/template/spec/initContainers',
+  '/spec/template/spec/nodeSelector',
+  '/spec/template/spec/securityContext',
+  '/spec/template/spec/serviceAccountName',
+  '/spec/template/spec/tolerations',
+  '/spec/template/spec/volumes',
+] as const;
+
+function deploymentPatchPathSchema(description: string) {
+  return z
+    .string()
+    .regex(/^\/.+/, 'JSON pointer path must start with /')
+    .refine(
+      isAllowedDeploymentPatchPath,
+      `Deployment patch path must target one of: ${allowedDeploymentPatchPrefixes.join(', ')}`,
+    )
+    .meta({ description });
+}
+
+const deploymentPatchValueSchema = jsonValueSchema.meta({
+  description: 'JSON patch value payload when required by the operation',
+});
+
+export const deploymentJsonPatchSchema = z
+  .object({
+    op: z
+      .enum(['add', 'remove', 'replace', 'move', 'copy', 'test'])
+      .meta({ description: 'RFC 6902 patch operation' }),
+    path: deploymentPatchPathSchema('RFC 6901 JSON pointer path'),
+    from: deploymentPatchPathSchema(
+      'Source JSON pointer path for move/copy operations',
+    ).optional(),
+    value: deploymentPatchValueSchema.optional(),
+  })
+  .superRefine((patch, ctx) => {
+    const requiresValue = ['add', 'replace', 'test'].includes(patch.op);
+    const requiresFrom = ['move', 'copy'].includes(patch.op);
+
+    if (requiresValue && patch.value === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Patch value is required for this operation',
+        path: ['value'],
+      });
+    }
+
+    if (!requiresValue && patch.value !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Patch value is not used by this operation',
+        path: ['value'],
+      });
+    }
+
+    if (requiresFrom && patch.from === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Patch from path is required for this operation',
+        path: ['from'],
+      });
+    }
+
+    if (!requiresFrom && patch.from !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Patch from path is not used by this operation',
+        path: ['from'],
+      });
+    }
+  });
+
+type DeploymentJsonPatchInput = z.infer<typeof deploymentJsonPatchSchema>;
+
+type DeploymentJsonPatchOperation =
+  | { op: 'add' | 'replace' | 'test'; path: string; value: unknown }
+  | { op: 'move' | 'copy'; path: string; from: string }
+  | { op: 'remove'; path: string };
+
+export const deploymentJsonPatchOperationSchema = deploymentJsonPatchSchema.transform(
+  (patch: DeploymentJsonPatchInput): DeploymentJsonPatchOperation => {
+    switch (patch.op) {
+      case 'add':
+      case 'replace':
+      case 'test':
+        return { op: patch.op, path: patch.path, value: patch.value! };
+      case 'move':
+      case 'copy':
+        return { op: patch.op, path: patch.path, from: patch.from! };
+      case 'remove':
+        return { op: patch.op, path: patch.path };
+    }
+  },
+);
+
+function isAllowedDeploymentPatchPath(path: string) {
+  return allowedDeploymentPatchPrefixes.some((prefix) => hasPathPrefix(path, prefix));
+}
+
+function hasPathPrefix(path: string, prefix: string) {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
 export const appSchema = z
   .object({
     apiVersion: z.literal('tesselar.io/v1alpha1').meta({
@@ -122,7 +239,9 @@ export const appSchema = z
         annotations: z
           .record(z.string(), z.string())
           .optional()
-          .meta({ description: 'Optional metadata annotations for the app resource' }),
+          .meta({
+            description: 'Optional metadata annotations for the app resource',
+          }),
       })
       .meta({ description: 'App resource metadata' }),
     spec: z
@@ -239,6 +358,18 @@ export const appSchema = z
         health: healthSchema
           .optional()
           .meta({ description: 'Optional health check configuration' }),
+        overrides: z
+          .object({
+            deploymentJsonPatches: z
+              .array(deploymentJsonPatchSchema)
+              .optional()
+              .meta({
+                description:
+                  'Advanced JSON patches applied to the generated Deployment before reconciliation',
+              }),
+          })
+          .optional()
+          .meta({ description: 'Advanced generated-resource overrides' }),
       })
       .meta({ description: 'Desired state for the app resource' }),
   })
@@ -267,12 +398,14 @@ export const appSchema = z
         'Health check port must reference a port in the defined ports list',
       path: ['spec', 'health', 'check', 'port'],
     },
-  )
-  ;
+  );
 
 export type AppSchema = z.infer<typeof appSchema>;
 export type AppSpecSchema = AppSchema['spec'];
 export type AppStatusSchema = z.infer<typeof appStatusSchema>;
+export type DeploymentJsonPatchSchema = z.infer<
+  typeof deploymentJsonPatchSchema
+>;
 export const appCrdSchema = z.object({
   spec: appSchema.shape.spec,
   status: appStatusSchema.optional(),

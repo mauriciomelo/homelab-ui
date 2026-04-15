@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { APP_STATUS } from '@/app/constants';
 import { logger } from '@/lib/logger';
+import { applyDeploymentJsonPatches } from './app-deployment-overrides';
 import { toManifests } from './app-k8s-adapter';
 import {
   apiextensionsV1Api,
@@ -21,6 +22,7 @@ import {
   appStatusSchema,
   type AppSchema,
 } from './schemas';
+import { toKubernetesJsonSchema } from './schemas/kubernetes-schema-compatibility';
 
 const group = 'tesselar.io';
 const version = 'v1alpha1';
@@ -74,12 +76,7 @@ const crd: k8s.V1CustomResourceDefinition = {
 };
 
 function createOpenApiV3Schema(): V1JSONSchemaProps {
-  const schema = z.toJSONSchema(appCrdSchema, {
-    io: 'input',
-  });
-
-  // @ts-expect-error zod JSON schema output is compatible at runtime
-  return schema;
+  return toKubernetesJsonSchema(appCrdSchema);
 }
 
 function isKubernetesError(err: unknown): err is { code: number } {
@@ -366,6 +363,10 @@ async function reconcileApp(apiObj: WatchedApp) {
 
   const domain = await getClusterDomain();
   const { deployment, service, ingress } = toManifests(app);
+  const patchedDeployment = applyDeploymentJsonPatches({
+    deployment,
+    patches: app.spec.overrides?.deploymentJsonPatches,
+  });
   const ownerReferences: k8s.V1OwnerReference[] = [
     {
       apiVersion: apiObj.apiVersion,
@@ -379,7 +380,7 @@ async function reconcileApp(apiObj: WatchedApp) {
 
   await Promise.all([
     applyDeployment(
-      withControlledMetadata(deployment, namespace, ownerReferences),
+      withControlledMetadata(patchedDeployment, namespace, ownerReferences),
     ),
     applyService(withControlledMetadata(service, namespace, ownerReferences)),
     applyIngress(

@@ -209,6 +209,20 @@ describe('registerAppController', () => {
           port: 'web',
         },
       };
+      draft.spec.overrides = {
+        deploymentJsonPatches: [
+          {
+            op: 'add',
+            path: '/spec/template/spec/securityContext',
+            value: { fsGroup: 1000 },
+          },
+          {
+            op: 'add',
+            path: '/spec/template/spec/containers/0/securityContext',
+            value: { runAsUser: 1000, runAsGroup: 1000 },
+          },
+        ],
+      };
     });
 
     await watchCallback('ADDED', {
@@ -241,9 +255,14 @@ describe('registerAppController', () => {
           strategy: { type: 'Recreate' },
           template: expect.objectContaining({
             spec: expect.objectContaining({
+              securityContext: { fsGroup: 1000 },
               containers: [
                 expect.objectContaining({
                   image: app.spec.image,
+                  securityContext: {
+                    runAsUser: 1000,
+                    runAsGroup: 1000,
+                  },
                   startupProbe: expect.objectContaining({
                     httpGet: { path: '/healthz', port: 'web' },
                   }),

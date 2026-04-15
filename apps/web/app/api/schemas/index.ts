@@ -9,3 +9,4 @@ export * from './kustomization-schema';
 export * from './service-schema';
 export * from './namespace-schema';
 export * from './flux-gotk-sync-schema';
+export * from './json-value-schema';

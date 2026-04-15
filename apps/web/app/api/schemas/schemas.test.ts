@@ -1,10 +1,6 @@
 import { beforeAll, describe, test } from 'vitest';
-import {
-  appSchema,
-  authClientSchema,
-  persistentVolumeClaimSchema,
-} from './';
-import * as z from 'zod/v4';
+import { appSchema, authClientSchema, persistentVolumeClaimSchema } from './';
+import { toKubernetesJsonSchema } from './kubernetes-schema-compatibility';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -28,7 +24,7 @@ describe('schemas', () => {
 
   allSchemas.forEach(({ schema, fileName }) => {
     test(`generates schema: ${fileName}`, async () => {
-      const jsonSchema = z.toJSONSchema(schema, { io: 'input' });
+      const jsonSchema = toKubernetesJsonSchema(schema);
 
       await fs.writeFile(
         path.join(schemaDir, fileName),

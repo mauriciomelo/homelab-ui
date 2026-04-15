@@ -229,6 +229,51 @@
           "required": [
             "check"
           ]
+        },
+        "overrides": {
+          "description": "Advanced generated-resource overrides",
+          "type": "object",
+          "properties": {
+            "deploymentJsonPatches": {
+              "description": "Advanced JSON patches applied to the generated Deployment before reconciliation",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "description": "RFC 6902 patch operation",
+                    "type": "string",
+                    "enum": [
+                      "add",
+                      "remove",
+                      "replace",
+                      "move",
+                      "copy",
+                      "test"
+                    ]
+                  },
+                  "path": {
+                    "description": "RFC 6901 JSON pointer path",
+                    "type": "string",
+                    "pattern": "^\\/.+"
+                  },
+                  "from": {
+                    "description": "Source JSON pointer path for move/copy operations",
+                    "type": "string",
+                    "pattern": "^\\/.+"
+                  },
+                  "value": {
+                    "x-kubernetes-preserve-unknown-fields": true,
+                    "description": "JSON patch value payload when required by the operation"
+                  }
+                },
+                "required": [
+                  "op",
+                  "path"
+                ]
+              }
+            }
+          }
         }
       },
       "required": [
