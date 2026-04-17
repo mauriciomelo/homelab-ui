@@ -70,12 +70,21 @@ const deploymentPodSpecSchema = z
     containers: z.array(deploymentContainerSchema),
     volumes: z
       .array(
-        z.object({
-          name: z.string(),
-          persistentVolumeClaim: z.object({
-            claimName: z.string(),
+        z.union([
+          z.object({
+            name: z.string(),
+            persistentVolumeClaim: z.object({
+              claimName: z.string(),
+            }),
           }),
-        }),
+          z.object({
+            name: z.string(),
+            nfs: z.object({
+              server: z.string(),
+              path: z.string(),
+            }),
+          }),
+        ]),
       )
       .optional(),
   })

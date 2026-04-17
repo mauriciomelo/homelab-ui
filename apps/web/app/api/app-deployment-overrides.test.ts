@@ -42,6 +42,19 @@ describe('applyDeploymentJsonPatches', () => {
           path: '/spec/template/spec/dnsPolicy',
           value: 'ClusterFirstWithHostNet',
         },
+        {
+          op: 'add',
+          path: '/spec/template/spec/volumes',
+          value: [
+            {
+              name: 'sync-data',
+              nfs: {
+                server: 'truenas.lan',
+                path: '/mnt/store/home-cluster/syncthing',
+              },
+            },
+          ],
+        },
       ],
     });
 
@@ -61,6 +74,15 @@ describe('applyDeploymentJsonPatches', () => {
     expect(patchedDeployment.spec.template.spec.dnsPolicy).toBe(
       'ClusterFirstWithHostNet',
     );
+    expect(patchedDeployment.spec.template.spec.volumes).toEqual([
+      {
+        name: 'sync-data',
+        nfs: {
+          server: 'truenas.lan',
+          path: '/mnt/store/home-cluster/syncthing',
+        },
+      },
+    ]);
   });
 
   it('fails when a valid patch targets a missing runtime path', () => {
