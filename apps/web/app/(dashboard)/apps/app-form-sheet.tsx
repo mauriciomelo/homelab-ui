@@ -531,7 +531,11 @@ function AppFormSheetBody({
         </Alert>
       ) : null}
       <Form {...form.form}>
-        <form onSubmit={form.onSubmit} className="flex min-h-0 flex-1 flex-col">
+        <form
+          onSubmit={form.onSubmit}
+          autoComplete="off"
+          className="flex min-h-0 flex-1 flex-col"
+        >
           <SheetHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <SheetTitle>{title}</SheetTitle>
