@@ -32,6 +32,16 @@ describe('applyDeploymentJsonPatches', () => {
           path: '/spec/template/spec/containers/0/volumeMounts/0',
           value: { name: 'config', mountPath: '/config' },
         },
+        {
+          op: 'add',
+          path: '/spec/template/spec/hostNetwork',
+          value: true,
+        },
+        {
+          op: 'add',
+          path: '/spec/template/spec/dnsPolicy',
+          value: 'ClusterFirstWithHostNet',
+        },
       ],
     });
 
@@ -46,6 +56,10 @@ describe('applyDeploymentJsonPatches', () => {
     });
     expect(patchedDeployment.spec.template.spec.containers[0].volumeMounts).toEqual(
       [{ name: 'config', mountPath: '/config' }],
+    );
+    expect(patchedDeployment.spec.template.spec.hostNetwork).toBe(true);
+    expect(patchedDeployment.spec.template.spec.dnsPolicy).toBe(
+      'ClusterFirstWithHostNet',
     );
   });
 

@@ -121,6 +121,8 @@ const allowedDeploymentPatchPrefixes = [
   '/spec/template/spec/containers/0/securityContext',
   '/spec/template/spec/containers/0/startupProbe',
   '/spec/template/spec/containers/0/volumeMounts',
+  '/spec/template/spec/dnsPolicy',
+  '/spec/template/spec/hostNetwork',
   '/spec/template/spec/imagePullSecrets',
   '/spec/template/spec/initContainers',
   '/spec/template/spec/nodeSelector',

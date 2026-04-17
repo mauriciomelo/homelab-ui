@@ -40,4 +40,24 @@ describe('deploymentJsonPatchSchema', () => {
 
     expect(result.success).toBe(true);
   });
+
+  it('parses host networking deployment patches', () => {
+    const result = deploymentJsonPatchSchema.safeParse({
+      op: 'add',
+      path: '/spec/template/spec/hostNetwork',
+      value: true,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('parses DNS policy deployment patches', () => {
+    const result = deploymentJsonPatchSchema.safeParse({
+      op: 'add',
+      path: '/spec/template/spec/dnsPolicy',
+      value: 'ClusterFirstWithHostNet',
+    });
+
+    expect(result.success).toBe(true);
+  });
 });
