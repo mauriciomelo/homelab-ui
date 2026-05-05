@@ -222,15 +222,29 @@ export async function getPersistedPublishedAppBundles() {
   const entries = await fs.promises.readdir(appDir, {
     withFileTypes: true,
   });
-  const appListPromises = entries
-    .filter((entry) => entry.isDirectory() && entry.name !== '.drafts')
-    .map((entry) => getPersistedAppByName(entry.name));
+  const appEntries = entries.filter(
+    (entry) => entry.isDirectory() && entry.name !== '.drafts',
+  );
+  const appListPromises = appEntries.map((entry) =>
+    getPersistedAppByName(entry.name),
+  );
 
   const settled = await Promise.allSettled(appListPromises);
 
-  settled.forEach((result) => {
+  settled.forEach((result, index) => {
     if (result.status === 'rejected') {
-      appWorkspacesLogger.error({ err: result.reason }, 'Error fetching app');
+      const appEntry = appEntries[index];
+
+      appWorkspacesLogger.error(
+        {
+          appName: appEntry.name,
+          appPath: path.join(appDir, appEntry.name),
+          err: result.reason,
+          errorMessage: formatErrorMessage(result.reason),
+          validationIssues: getValidationIssues(result.reason),
+        },
+        'Failed to read persisted app bundle',
+      );
     }
   });
 
@@ -459,6 +473,17 @@ function formatErrorMessage(error: unknown) {
   return String(error);
 }
 
+function getValidationIssues(error: unknown) {
+  if (!(error instanceof z.ZodError)) {
+    return undefined;
+  }
+
+  return error.issues.map((issue) => ({
+    path: issue.path.length > 0 ? issue.path.join('.') : 'root',
+    message: issue.message,
+  }));
+}
+
 async function commitAndPushChanges(appName: string, message: string) {
   const appDir = getAppDir(appName);
   const appConfig = getAppConfig();
@@ -515,14 +540,29 @@ export async function listDrafts(): Promise<DraftAppBundle[]> {
       entries
         .filter((entry) => entry.isDirectory())
         .map(async (entry) => {
-          const bundle = await readAppBundleFromDirectory(
-            getDraftDir(entry.name),
-          );
+          const draftPath = getDraftDir(entry.name);
 
-          return {
-            ...bundle,
-            draftId: entry.name,
-          } satisfies DraftAppBundle;
+          try {
+            const bundle = await readAppBundleFromDirectory(draftPath);
+
+            return {
+              ...bundle,
+              draftId: entry.name,
+            } satisfies DraftAppBundle;
+          } catch (error) {
+            appWorkspacesLogger.error(
+              {
+                draftId: entry.name,
+                draftPath,
+                err: error,
+                errorMessage: formatErrorMessage(error),
+                validationIssues: getValidationIssues(error),
+              },
+              'Failed to read draft app bundle',
+            );
+
+            throw error;
+          }
         }),
     );
 

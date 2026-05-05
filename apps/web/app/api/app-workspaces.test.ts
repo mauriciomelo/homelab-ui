@@ -42,6 +42,7 @@ import {
   type AppSchema,
 } from './schemas';
 import z from 'zod';
+import { defaultResourceRequests } from '@/lib/resource-utils';
 
 type WatchEvent = { eventType: string; filename: string | null };
 type WatchEventResolver = (
@@ -265,6 +266,7 @@ describe('draft workspaces', () => {
           draft.spec.ports = [{ name: 'http', containerPort: 80 }];
           draft.spec.envVariables = [];
           draft.spec.resources = {
+            requests: defaultResourceRequests,
             limits: { cpu: '0.5', memory: '256Mi' },
           };
           draft.spec.ingress = { port: { name: 'http' } };
@@ -349,6 +351,7 @@ describe('draft workspaces', () => {
         draft.spec.ports = [{ name: 'http', containerPort: 8081 }];
         draft.spec.envVariables = [];
         draft.spec.resources = {
+          requests: defaultResourceRequests,
           limits: { cpu: '100m', memory: '256Mi' },
         };
         draft.spec.ingress = { port: { name: 'http' } };

@@ -1,5 +1,6 @@
 import {
   CPU_UNITS,
+  defaultResourceRequests,
   extractAmountAndUnit,
   isUnitValid,
   MEMORY_UNITS,
@@ -107,6 +108,44 @@ const healthCheckSchema = z.object({
 });
 const healthSchema = z.object({
   check: healthCheckSchema.meta({ description: 'Health check settings' }),
+});
+
+function cpuQuantitySchema(description: string) {
+  return z
+    .string()
+    .min(1, 'CPU is required')
+    .transform((val) => extractAmountAndUnit(val))
+    .refine(({ amount }) => amount > 0, 'CPU must be greater than 0')
+    .refine(
+      ({ unit }) => isUnitValid(unit, CPU_UNITS),
+      'Invalid CPU unit. Use "1000m" for millicores or "1" for cores',
+    )
+    .transform(({ amount, unit }) => `${amount}${unit}`)
+    .meta({ description });
+}
+
+function memoryQuantitySchema(description: string) {
+  return z
+    .string()
+    .min(1, 'Memory is required')
+    .transform((val) => extractAmountAndUnit(val))
+    .refine(({ amount }) => amount > 0, 'Memory must be greater than 0')
+    .refine(
+      ({ unit }) => isUnitValid(unit, MEMORY_UNITS),
+      'Invalid memory unit. Use "512Mi", "1Gi", or "512Ki"',
+    )
+    .transform(({ amount, unit }) => `${amount}${unit}`)
+    .meta({ description });
+}
+
+const computeResourceRequestsSchema = z.object({
+  cpu: cpuQuantitySchema('CPU request (e.g. 50m or 0.05)'),
+  memory: memoryQuantitySchema('Memory request (e.g. 128Mi or 1Gi)'),
+});
+
+const computeResourceLimitsSchema = z.object({
+  cpu: cpuQuantitySchema('CPU limit (e.g. 1000m or 1)'),
+  memory: memoryQuantitySchema('Memory limit (e.g. 512Mi or 1Gi)'),
 });
 
 const allowedDeploymentPatchPrefixes = [
@@ -310,38 +349,10 @@ export const appSchema = z
           .meta({ description: 'Persistent volume mounts' }),
         resources: z
           .object({
-            limits: z
-              .object({
-                cpu: z
-                  .string()
-                  .min(1, 'CPU is required')
-                  .transform((val) => extractAmountAndUnit(val))
-                  .refine(
-                    ({ amount }) => amount > 0,
-                    'CPU must be greater than 0',
-                  )
-                  .refine(
-                    ({ unit }) => isUnitValid(unit, CPU_UNITS),
-                    'Invalid CPU unit. Use "1000m" for millicores or "1" for cores',
-                  )
-                  .transform(({ amount, unit }) => `${amount}${unit}`)
-                  .meta({ description: 'CPU limit (e.g. 1000m or 1)' }),
-
-                memory: z
-                  .string()
-                  .min(1, 'Memory is required')
-                  .transform((val) => extractAmountAndUnit(val))
-                  .refine(
-                    ({ amount }) => amount > 0,
-                    'Memory must be greater than 0',
-                  )
-                  .refine(
-                    ({ unit }) => isUnitValid(unit, MEMORY_UNITS),
-                    'Invalid memory unit. Use "512Mi", "1Gi", or "512Ki"',
-                  )
-                  .transform(({ amount, unit }) => `${amount}${unit}`)
-                  .meta({ description: 'Memory limit (e.g. 512Mi or 1Gi)' }),
-              })
+            requests: computeResourceRequestsSchema.meta({
+              description: 'Resource requests for the app',
+            }),
+            limits: computeResourceLimitsSchema
               .meta({ description: 'Resource limits for the app' }),
           })
           .meta({ description: 'Compute resource settings' }),
@@ -436,6 +447,7 @@ export const defaultAppData = {
     },
     volumeMounts: [],
     resources: {
+      requests: defaultResourceRequests,
       limits: resourceLimitPreset.small.limits,
     },
     ingress: {

@@ -34,6 +34,17 @@ export async function getLiveApps(): Promise<LiveApp[]> {
     if (parsedResponse.success) {
       return parsedResponse.data.items;
     }
+
+    applicationsLogger.error(
+      {
+        appCount: getResponseItemCount(response),
+        validationIssues: parsedResponse.error.issues.map((issue) => ({
+          path: issue.path.length > 0 ? issue.path.join('.') : 'root',
+          message: issue.message,
+        })),
+      },
+      'Failed to parse live apps from cluster response',
+    );
   } catch (error) {
     if (!isKubernetesNotFoundError(error)) {
       throw error;
@@ -106,6 +117,19 @@ function isKubernetesNotFoundError(error: unknown): error is { code: number } {
     'code' in error &&
     error.code === 404
   );
+}
+
+function getResponseItemCount(response: unknown) {
+  if (
+    typeof response === 'object' &&
+    response !== null &&
+    'items' in response &&
+    Array.isArray(response.items)
+  ) {
+    return response.items.length;
+  }
+
+  return undefined;
 }
 
 export async function reconcileFluxGitRepository({

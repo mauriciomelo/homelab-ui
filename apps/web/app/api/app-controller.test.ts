@@ -263,6 +263,7 @@ describe('registerAppController', () => {
                     runAsUser: 1000,
                     runAsGroup: 1000,
                   },
+                  resources: app.spec.resources,
                   startupProbe: expect.objectContaining({
                     httpGet: { path: '/healthz', port: 'web' },
                   }),

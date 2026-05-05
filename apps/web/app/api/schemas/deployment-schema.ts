@@ -54,6 +54,10 @@ const deploymentContainerSchema = z
       )
       .optional(),
     resources: z.object({
+      requests: z.object({
+        cpu: z.string(),
+        memory: z.string(),
+      }),
       limits: z.object({
         cpu: z.string(),
         memory: z.string(),

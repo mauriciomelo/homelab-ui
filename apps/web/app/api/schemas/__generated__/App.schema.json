@@ -147,6 +147,26 @@
           "description": "Compute resource settings",
           "type": "object",
           "properties": {
+            "requests": {
+              "description": "Resource requests for the app",
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "description": "CPU request (e.g. 50m or 0.05)",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "memory": {
+                  "description": "Memory request (e.g. 128Mi or 1Gi)",
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "cpu",
+                "memory"
+              ]
+            },
             "limits": {
               "description": "Resource limits for the app",
               "type": "object",
@@ -169,6 +189,7 @@
             }
           },
           "required": [
+            "requests",
             "limits"
           ]
         },

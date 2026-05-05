@@ -22,7 +22,10 @@ export const baseAppManifest: z.infer<typeof appSchema> = Object.freeze({
     image: 'postgres:16',
     ports: [{ name: 'http', containerPort: 80 }],
     envVariables: [{ name: 'DB_NAME', value: 'production' }],
-    resources: { limits: { cpu: '1000m', memory: '1Gi' } },
+    resources: {
+      requests: { cpu: '50m', memory: '128Mi' },
+      limits: { cpu: '1000m', memory: '1Gi' },
+    },
     ingress: { port: { name: 'http' } },
   },
 });
@@ -71,6 +74,10 @@ export const baseDeployment: z.infer<typeof deploymentSchema> = Object.freeze({
             ports: [{ name: 'http', containerPort: 80 }],
             env: [],
             resources: {
+              requests: {
+                cpu: '50m',
+                memory: '128Mi',
+              },
               limits: {
                 cpu: '500m',
                 memory: '512Mi',
