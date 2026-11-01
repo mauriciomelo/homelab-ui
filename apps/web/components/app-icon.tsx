@@ -7,7 +7,6 @@ import {
 import { ComponentProps, useState } from 'react';
 import { Status } from './ui/status';
 import type {
-  DraftAppBundle,
   PublishedAppBundle,
 } from '@/app/api/app-workspaces';
 
@@ -15,7 +14,7 @@ export function AppIcon({
   app,
   showStatus = true,
 }: {
-  app: PublishedAppBundle | DraftAppBundle;
+  app: PublishedAppBundle;
   showStatus?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);

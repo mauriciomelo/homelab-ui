@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { orpcEventStreamResponse } from '../orpc';
 
 export const handlers = [
+  http.post('*/api/app/rpc/apps/update', () => HttpResponse.json({ json: { success: true } })),
   http.post('*/api/app/rpc/apps/list', () => {
     return HttpResponse.json({
       json: [],
@@ -20,20 +21,12 @@ export const handlers = [
       { status: 404 },
     );
   }),
-  http.post('*/api/app/rpc/apps/watchApp', () => {
-    return orpcEventStreamResponse([null]);
-  }),
   http.post('*/api/control-plane/rpc/apps/getLiveApps', () => {
     return HttpResponse.json({
       json: [],
     });
   }),
-  http.post('*/api/control-plane/rpc/apps/reconcileFluxGitRepository', () => {
-    return HttpResponse.json({
-      json: null,
-    });
-  }),
-  http.post('*/api/app/rpc/apps/publish', () => {
+  http.post('*/api/app/rpc/apps/create', () => {
     return HttpResponse.json({
       json: { success: true },
     });

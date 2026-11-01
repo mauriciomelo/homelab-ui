@@ -56,11 +56,11 @@ const getNextPersistentVolumeName = (
 
 export function useApplicationForm({
   mode,
-  onPublishSuccess,
+  onSaveSuccess,
   defaultValues,
 }: {
   mode: FormMode;
-  onPublishSuccess?: () => Promise<void> | void;
+  onSaveSuccess?: () => Promise<void> | void;
   defaultValues?: AppBundleSchema | (() => Promise<AppBundleSchema>);
 }) {
   const form = useForm<AppBundleSchema>({
@@ -68,13 +68,22 @@ export function useApplicationForm({
     defaultValues: defaultValues ?? defaultAppBundleData,
   });
 
-  const publishAppMutation = useMutation(
-    appOrpc.apps.publish.mutationOptions(),
-  );
+  const createAppMutation = useMutation(appOrpc.apps.create.mutationOptions());
+  const updateAppMutation = useMutation(appOrpc.apps.update.mutationOptions());
 
   const onSubmit = form.handleSubmit(async (formData) => {
-    await publishAppMutation.mutateAsync(formData);
-    await onPublishSuccess?.();
+    try {
+      if (mode === 'create') {
+        await createAppMutation.mutateAsync(formData);
+      } else {
+        await updateAppMutation.mutateAsync(formData);
+      }
+      await onSaveSuccess?.();
+    } catch (error) {
+      form.setError('root', {
+        message: error instanceof Error ? error.message : 'Unable to save the app.',
+      });
+    }
   });
 
   return { form, mode, onSubmit };

@@ -1,315 +1,149 @@
-import { APP_STATUS } from '@/app/constants';
-import { logger } from '@/lib/logger';
-import { controlPlaneOrpcServerClient } from '@/control-plane-orpc/server-client';
+import { z } from 'zod/v4';
 import fs from 'fs';
-import git from 'isomorphic-git';
-import http from 'isomorphic-git/http/node/index.js';
-import { watch } from 'node:fs/promises';
-import path from 'path';
 import YAML from 'yaml';
-import z from 'zod/v4';
-import { getAppConfig } from '../(dashboard)/apps/config';
-import {
-  isDraftAppBundleIdentifier,
-  parseAppBundleIdentifier,
-  type AppBundleIdentifier,
-} from './app-bundle-identifier';
-import { type AppRuntimeStatus, type LiveApp } from './applications';
-import { toManifests } from './app-k8s-adapter';
+import isEqual from 'lodash/isEqual';
+import { customObjectsApi, coreApi } from './k8s';
+import { getLiveApps, watchLiveApps } from './applications';
 import {
   appBundleSchema,
   appSchema,
   appStatusSchema,
   authClientSchema,
+  persistentVolumeClaimSchema,
+  type AppBundleSchema,
+  type AdditionalResourceSchema,
   kustomizationSchema,
   namespaceSchema,
-  persistentVolumeClaimSchema,
 } from './schemas';
-import type { AppBundleSchema } from './schemas';
-
-const appWorkspacesLogger = logger.child({ module: 'app-workspaces-api' });
-
-export type AppResourceType =
-  | z.infer<typeof appSchema>
-  | z.infer<typeof authClientSchema>
-  | z.infer<typeof kustomizationSchema>
-  | z.infer<typeof persistentVolumeClaimSchema>
-  | z.infer<typeof namespaceSchema>;
-
-type AdditionalResourceSchema =
-  | z.infer<typeof authClientSchema>
-  | z.infer<typeof persistentVolumeClaimSchema>;
 
 const requiredBundleFiles: ReadonlySet<string> = new Set([
   'app.yaml',
   'namespace.yaml',
 ]);
 
-export type PublishedAppBundle = AppBundleSchema & {
-  status: AppRuntimeStatus;
-};
+export type PublishedAppBundle = z.infer<typeof publishedAppBundleSchema>;
 
 export const publishedAppBundleSchema = appBundleSchema.safeExtend({
   status: appStatusSchema,
 });
 
-export const draftAppBundleSchema = appBundleSchema.safeExtend({
-  draftId: z.string().min(1),
+const identity = { group: 'tesselar.io', version: 'v1alpha1', plural: 'apps' };
+
+const storedAppSchema = z.looseObject({
+  metadata: z.looseObject({
+    name: z.string(),
+    namespace: z.string(),
+    resourceVersion: z.string(),
+  }),
 });
 
-export const appBundleListItemSchema = z.union([
-  publishedAppBundleSchema,
-  draftAppBundleSchema,
-]);
-
-export const appBundleListSchema = z.array(appBundleListItemSchema);
+// PVC lists identify the item type once, so items can omit apiVersion and kind.
+const persistentVolumeClaimResponseSchema = z
+  .object({
+    ...persistentVolumeClaimSchema.shape,
+    apiVersion: z.literal('v1').optional(),
+    kind: z.literal('PersistentVolumeClaim').optional(),
+  })
+  .transform(({ metadata, spec }) =>
+    persistentVolumeClaimSchema.parse({
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata,
+      spec,
+    }),
+  );
 
 export async function getApp(input: unknown): Promise<AppBundleSchema> {
-  const parsedInput = parseAppBundleIdentifier(input);
-  const targetDir = getAppBundlePath(parsedInput);
-  const bundle = await readAppBundleFromDirectory(targetDir);
-
-  return isDraftAppBundleIdentifier(parsedInput)
-    ? {
-        ...bundle,
-        draftId: parsedInput.draftId,
-      }
-    : bundle;
+  const { appName: name } = z
+    .object({ appName: z.string().min(1) })
+    .parse(input);
+  const { stored, app } = await readStoredApp(name);
+  return appBundleSchema.parse({
+    app,
+    additionalResources: await readAdditionalResources(name),
+    clusterResourceVersion: stored.metadata.resourceVersion,
+  });
 }
 
-export async function createApp(appBundle: AppBundleSchema) {
-  const parsedAppBundle = appBundleSchema.parse(appBundle);
-
-  await writeAppBundleToDirectory(
-    getBundleDir(parsedAppBundle),
-    parsedAppBundle,
-  );
-
-  return { success: true };
-}
-
-export async function updateApp(appBundle: AppBundleSchema) {
-  const parsedAppBundle = appBundleSchema.parse(appBundle);
-  const appName = parsedAppBundle.app.metadata.name;
-  const appDir = getBundleDir(parsedAppBundle);
-
+export async function createApp(input: AppBundleSchema) {
+  const bundle = appBundleSchema.parse(input);
+  const name = bundle.app.metadata.name;
+  const existing: unknown = await customObjectsApi()
+    .getNamespacedCustomObject({ ...identity, name, namespace: name })
+    .catch((error: unknown) => {
+      if (!isNotFound(error)) throw error;
+      return undefined;
+    });
+  if (existing !== undefined) throw new Error(`App "${name}" already exists.`);
   try {
-    await writeAppBundleToDirectory(appDir, parsedAppBundle);
-
-    return { success: true };
+    await coreApi().readNamespace({ name });
   } catch (error) {
-    appWorkspacesLogger.error(
-      { appName, err: error, operation: 'update-app' },
-      'Failed to update app',
-    );
-    throw new Error(
-      `Failed to update app "${appName}": ${formatErrorMessage(error)}`,
-      {
-        cause: error,
-      },
-    );
-  }
-}
-
-export async function publishApp(appBundle: AppBundleSchema) {
-  const parsedAppBundle = appBundleSchema.parse(appBundle);
-  const appName = parsedAppBundle.app.metadata.name;
-
-  await writeAppBundleToDirectory(getAppDir(appName), parsedAppBundle);
-
-  await commitAndPushChanges(
-    appName,
-    `${parsedAppBundle.draftId ? 'Create' : 'Update'} app ${appName}`,
-  );
-
-  if (parsedAppBundle.draftId) {
-    await fs.promises.rm(getDraftDir(parsedAppBundle.draftId), {
-      recursive: true,
-      force: true,
+    if (
+      typeof error !== 'object' ||
+      error === null ||
+      !('code' in error) ||
+      error.code !== 404
+    )
+      throw error;
+    await coreApi().createNamespace({
+      body: { apiVersion: 'v1', kind: 'Namespace', metadata: { name } },
     });
   }
-
+  await applyAdditionalResources(name, bundle.additionalResources);
+  await customObjectsApi().createNamespacedCustomObject({
+    ...identity,
+    namespace: name,
+    body: {
+      ...bundle.app,
+      metadata: { ...bundle.app.metadata, namespace: name },
+    },
+  });
   return { success: true };
 }
 
-export async function* watchApp(
-  input: unknown,
-): AsyncGenerator<AppBundleSchema> {
-  const parsedInput = parseAppBundleIdentifier(input);
+export async function updateApp(input: AppBundleSchema) {
+  const bundle = appBundleSchema.parse(input);
+  if (!bundle.clusterResourceVersion) {
+    throw new Error('Reload the app from the cluster before updating it.');
+  }
+  const name = bundle.app.metadata.name;
+  const { stored } = await readStoredApp(name);
+  if (bundle.clusterResourceVersion !== stored.metadata.resourceVersion) {
+    throw new Error('The app changed in the cluster. Reload it before saving.');
+  }
+  await applyAdditionalResources(name, bundle.additionalResources);
+  await customObjectsApi().replaceNamespacedCustomObject({
+    ...identity,
+    name,
+    namespace: name,
+    body: {
+      ...stored,
+      metadata: { ...stored.metadata, ...bundle.app.metadata },
+      spec: bundle.app.spec,
+    },
+  });
+  return { success: true };
+}
 
-  yield await getApp(parsedInput);
-
-  for await (const event of watch(getAppsDir(), { recursive: true })) {
-    appWorkspacesLogger.debug({ event, target: parsedInput }, 'watchApp event');
-    yield await getApp(parsedInput);
+export async function* watchApps(): AsyncGenerator<PublishedAppBundle[]> {
+  for await (const apps of watchLiveApps()) {
+    yield await Promise.all(
+      apps.map(async (app) => ({
+        ...(await getApp({ appName: app.metadata.name })),
+        status: app.status,
+      })),
+    );
   }
 }
 
-export function watchApps<TInput extends ListAppsInput>(
-  input: TInput,
-): AsyncGenerator<
-  TInput['includeDrafts'] extends true
-    ? AppBundleListItem[]
-    : PublishedAppBundle[]
->;
-export function watchApps(): AsyncGenerator<PublishedAppBundle[]>;
-export async function* watchApps(
-  input: unknown = {},
-): AsyncGenerator<AppBundleListItem[] | PublishedAppBundle[]> {
-  const parsedInput = listAppsInputSchema.parse(input);
-  const fsWatcherIterator = watch(getAppsDir(), {
-    recursive: true,
-  })[Symbol.asyncIterator]();
-  const liveAppsIterator =
-    await controlPlaneOrpcServerClient.apps.watchLiveApps();
-
-  try {
-    yield await listApps(parsedInput);
-
-    for (;;) {
-      const nextEvent = await Promise.race([
-        fsWatcherIterator.next().then((result) => ({ source: 'fs', result })),
-        liveAppsIterator.next().then((result) => ({ source: 'live', result })),
-      ]);
-
-      if (nextEvent.result.done) {
-        return;
-      }
-
-      yield await listApps(parsedInput);
-    }
-  } finally {
-    await fsWatcherIterator.return?.();
-    await liveAppsIterator.return();
-  }
-}
-
-export type DraftAppBundle = AppBundleSchema & {
-  draftId: string;
-};
-
-export type AppBundleListItem = PublishedAppBundle | DraftAppBundle;
-
-export const listAppsInputSchema = z.union([
-  z.object({
-    includeDrafts: z.literal(true),
-  }),
-  z.object({
-    includeDrafts: z.literal(false).default(false),
-  }),
-]);
-
-export type ListAppsInput = z.infer<typeof listAppsInputSchema>;
-
-export async function getPersistedPublishedAppBundles() {
-  const appDir = getAppsDir();
-  const entries = await fs.promises.readdir(appDir, {
-    withFileTypes: true,
-  });
-  const appEntries = entries.filter(
-    (entry) => entry.isDirectory() && entry.name !== '.drafts',
+export async function listApps(): Promise<PublishedAppBundle[]> {
+  const apps = await getLiveApps();
+  return Promise.all(
+    apps.map(async (app) => ({
+      ...(await getApp({ appName: app.metadata.name })),
+      status: app.status,
+    })),
   );
-  const appListPromises = appEntries.map((entry) =>
-    getPersistedAppByName(entry.name),
-  );
-
-  const settled = await Promise.allSettled(appListPromises);
-
-  settled.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      const appEntry = appEntries[index];
-
-      appWorkspacesLogger.error(
-        {
-          appName: appEntry.name,
-          appPath: path.join(appDir, appEntry.name),
-          err: result.reason,
-          errorMessage: formatErrorMessage(result.reason),
-          validationIssues: getValidationIssues(result.reason),
-        },
-        'Failed to read persisted app bundle',
-      );
-    }
-  });
-
-  const fulfilled = settled.filter((result) => result.status === 'fulfilled');
-
-  return fulfilled.map((result) => result.value);
-}
-
-export function listApps<TInput extends ListAppsInput>(
-  input: TInput,
-): Promise<
-  TInput['includeDrafts'] extends true
-    ? AppBundleListItem[]
-    : PublishedAppBundle[]
->;
-export function listApps(): Promise<PublishedAppBundle[]>;
-export async function listApps(
-  input: unknown = {},
-): Promise<AppBundleListItem[] | PublishedAppBundle[]> {
-  const parsedInput = listAppsInputSchema.parse(input);
-  const [persistedApps, liveApps] = await Promise.all([
-    getPersistedPublishedAppBundles(),
-    getLiveAppsFromControlPlane(),
-  ]);
-
-  return buildAppListSnapshot(parsedInput, persistedApps, liveApps);
-}
-
-async function buildAppListSnapshot(
-  input: ListAppsInput,
-  persistedApps: PublishedAppBundle[],
-  liveApps: LiveApp[],
-): Promise<AppBundleListItem[] | PublishedAppBundle[]> {
-  const apps = mergeLiveApps(persistedApps, liveApps);
-
-  if (!input.includeDrafts) {
-    return apps;
-  }
-
-  const drafts = await listDrafts();
-
-  return [...drafts, ...apps];
-}
-
-function mergeLiveApps(
-  persistedApps: PublishedAppBundle[],
-  liveApps: LiveApp[],
-): PublishedAppBundle[] {
-  const liveStatusesByName = new Map(
-    liveApps.map((app) => [app.metadata.name, app.status]),
-  );
-
-  return persistedApps.map((app) => ({
-    ...app,
-    status:
-      liveStatusesByName.get(app.app.metadata.name) ?? getUnknownAppStatus(),
-  }));
-}
-
-function getUnknownAppStatus(): AppRuntimeStatus {
-  return appStatusSchema.parse({
-    phase: APP_STATUS.UNKNOWN,
-    placements: [],
-    conditions: [],
-  });
-}
-
-async function getPersistedAppByName(name: string) {
-  const { app, additionalResources } = await getManifestsFromAppFiles(name);
-
-  return {
-    app,
-    additionalResources,
-    status: getUnknownAppStatus(),
-  } satisfies PublishedAppBundle;
-}
-
-function createPersistedAppManifest(
-  app: z.infer<typeof appSchema>,
-): z.infer<typeof appSchema> {
-  return app;
 }
 
 export async function getFile<T>({
@@ -339,14 +173,6 @@ export async function getFile<T>({
   }
 
   return { data: schema.parse(matched), raw: matched };
-}
-
-async function getManifestsFromAppFiles(appName: string): Promise<{
-  app: z.infer<typeof appSchema>;
-  additionalResources: AdditionalResourceSchema[];
-}> {
-  const appPath = getAppDir(appName);
-  return readAppBundleFromDirectory(appPath);
 }
 
 export async function readAppBundleFromDirectory(appPath: string): Promise<{
@@ -425,186 +251,6 @@ export async function readAppBundleFromDirectory(appPath: string): Promise<{
   };
 }
 
-export async function writeAppBundleToDirectory(
-  appDir: string,
-  appBundle: AppBundleSchema,
-) {
-  const parsedAppBundle = appBundleSchema.parse(appBundle);
-  const appManifest = createPersistedAppManifest(parsedAppBundle.app);
-  const { namespace } = toManifests(appManifest);
-
-  await writeResourcesToDirectory(appDir, parsedAppBundle.app.metadata.name, [
-    appManifest,
-    namespace,
-    ...parsedAppBundle.additionalResources,
-  ]);
-}
-
-function formatErrorMessage(error: unknown) {
-  if (error instanceof z.ZodError) {
-    return error.issues
-      .map((issue) => {
-        const issuePath = issue.path.length > 0 ? issue.path.join('.') : 'root';
-        return `${issuePath}: ${issue.message}`;
-      })
-      .join('; ');
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
-}
-
-function getValidationIssues(error: unknown) {
-  if (!(error instanceof z.ZodError)) {
-    return undefined;
-  }
-
-  return error.issues.map((issue) => ({
-    path: issue.path.length > 0 ? issue.path.join('.') : 'root',
-    message: issue.message,
-  }));
-}
-
-async function commitAndPushChanges(appName: string, message: string) {
-  const appDir = getAppDir(appName);
-  const appConfig = getAppConfig();
-
-  await git.add({
-    fs,
-    dir: appConfig.PROJECT_DIR,
-    filepath: path.relative(appConfig.PROJECT_DIR, appDir),
-  });
-
-  await git.commit({
-    fs,
-    dir: appConfig.PROJECT_DIR,
-    message,
-    author: {
-      name: appConfig.USER_NAME,
-      email: appConfig.USER_EMAIL,
-    },
-  });
-
-  await git.push({
-    fs,
-    http,
-    dir: appConfig.PROJECT_DIR,
-    remote: 'origin',
-    ref: 'main',
-    onAuth: () => ({ username: appConfig.GITHUB_TOKEN }),
-  });
-
-  await reconcileFluxGitRepository({
-    name: 'flux-system',
-    namespace: 'flux-system',
-  });
-}
-
-async function getLiveAppsFromControlPlane(): Promise<LiveApp[]> {
-  return controlPlaneOrpcServerClient.apps.getLiveApps();
-}
-
-async function reconcileFluxGitRepository(input: {
-  name: string;
-  namespace: string;
-}) {
-  return controlPlaneOrpcServerClient.apps.reconcileFluxGitRepository(input);
-}
-
-export async function listDrafts(): Promise<DraftAppBundle[]> {
-  try {
-    const entries = await fs.promises.readdir(getDraftsDir(), {
-      withFileTypes: true,
-    });
-
-    const drafts = await Promise.all(
-      entries
-        .filter((entry) => entry.isDirectory())
-        .map(async (entry) => {
-          const draftPath = getDraftDir(entry.name);
-
-          try {
-            const bundle = await readAppBundleFromDirectory(draftPath);
-
-            return {
-              ...bundle,
-              draftId: entry.name,
-            } satisfies DraftAppBundle;
-          } catch (error) {
-            appWorkspacesLogger.error(
-              {
-                draftId: entry.name,
-                draftPath,
-                err: error,
-                errorMessage: formatErrorMessage(error),
-                validationIssues: getValidationIssues(error),
-              },
-              'Failed to read draft app bundle',
-            );
-
-            throw error;
-          }
-        }),
-    );
-
-    return drafts;
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return [];
-    }
-
-    throw error;
-  }
-}
-
-export async function discardDraft(draftId: string) {
-  const parsedDraftId = z.string().min(1).parse(draftId);
-
-  await fs.promises.rm(getDraftDir(parsedDraftId), {
-    recursive: true,
-    force: true,
-  });
-
-  return { success: true };
-}
-
-export function getDraftsDir() {
-  return path.join(getAppsDir(), '.drafts');
-}
-
-export function getAppsDir() {
-  const config = getAppConfig();
-  return path.join(
-    config.PROJECT_DIR,
-    'clusters',
-    config.CLUSTER_NAME,
-    'my-applications',
-  );
-}
-
-export function getAppDir(appName: string) {
-  return path.join(getAppsDir(), appName);
-}
-
-export function getDraftDir(draftId: string) {
-  return path.join(getDraftsDir(), draftId);
-}
-
-function getBundleDir(appBundle: AppBundleSchema) {
-  return appBundle.draftId
-    ? getDraftDir(appBundle.draftId)
-    : getAppDir(appBundle.app.metadata.name);
-}
-
-function getAppBundlePath(identifier: AppBundleIdentifier) {
-  return isDraftAppBundleIdentifier(identifier)
-    ? getDraftDir(identifier.draftId)
-    : getAppDir(identifier.appName);
-}
-
 async function getCanonicalApp(
   appPath: string,
 ): Promise<z.infer<typeof appSchema>> {
@@ -616,78 +262,113 @@ async function getCanonicalApp(
   return data;
 }
 
-function getFileName(resource: AppResourceType) {
-  if (resource.kind === 'App') {
-    return 'app.yaml';
-  }
-
-  if (resource.kind === 'Kustomization' || resource.kind === 'Namespace') {
-    return `${resource.kind.toLowerCase()}.yaml`;
-  }
-
-  return `${resource.metadata.name}.${resource.kind.toLowerCase()}.yaml`;
-}
-
-async function writeResourcesToDirectory(
-  appDir: string,
-  appName: string,
-  resources: AppResourceType[],
-) {
-  const files = resources.map((resource) => {
-    const filename = getFileName(resource);
-    return { filename, textContent: YAML.stringify(resource) };
+async function readStoredApp(name: string) {
+  const result: unknown = await customObjectsApi().getNamespacedCustomObject({
+    ...identity,
+    name,
+    namespace: name,
   });
+  const stored = storedAppSchema.parse(result);
+  if (stored.metadata.name !== name || stored.metadata.namespace !== name) {
+    throw new Error('App name must match its namespace.');
+  }
+  return { stored, app: appSchema.parse(result) };
+}
 
-  const kustomization = {
-    apiVersion: 'kustomize.config.k8s.io/v1beta1',
-    kind: 'Kustomization' as const,
-    metadata: { name: appName },
-    namespace: appName,
-    resources: files.map((file) => file.filename),
-  } satisfies z.infer<typeof kustomizationSchema>;
-
-  const kustomizationFile = {
-    filename: getFileName(kustomization),
-    textContent: YAML.stringify(kustomization),
-  };
-
-  await fs.promises.mkdir(appDir, { recursive: true });
-
-  await Promise.all(
-    [...files, kustomizationFile].map(async (resource) => {
-      await fs.promises.writeFile(
-        `${appDir}/${resource.filename}`,
-        resource.textContent,
-      );
+async function readAdditionalResources(namespace: string) {
+  const [volumes, clients] = await Promise.all([
+    coreApi().listNamespacedPersistentVolumeClaim({ namespace }),
+    customObjectsApi().listNamespacedCustomObject({
+      group: 'tesselar.io',
+      version: 'v1',
+      plural: 'authclients',
+      namespace,
     }),
-  );
-
-  await deleteObsoleteGeneratedFiles(appDir);
-}
-
-async function deleteObsoleteGeneratedFiles(appDir: string) {
-  await Promise.all(
-    ['deployment.yaml', 'service.yaml', 'ingress.yaml'].map(
-      async (filename) => {
-        const filePath = `${appDir}/${filename}`;
-
-        try {
-          await fs.promises.unlink(filePath);
-        } catch (error) {
-          if (!isMissingFileError(error)) {
-            throw error;
-          }
-        }
-      },
+  ]);
+  return [
+    ...volumes.items.map((volume) =>
+      persistentVolumeClaimResponseSchema.parse(volume),
     ),
-  );
+    ...z.object({ items: z.array(authClientSchema) }).parse(clients).items,
+  ];
 }
 
-function isMissingFileError(error: unknown): error is { code: string } {
+function isNotFound(error: unknown) {
   return (
     typeof error === 'object' &&
     error !== null &&
     'code' in error &&
-    error.code === 'ENOENT'
+    error.code === 404
   );
+}
+
+async function applyAdditionalResources(
+  namespace: string,
+  resources: AdditionalResourceSchema[],
+) {
+  for (const resource of resources) {
+    const name = resource.metadata.name;
+    if (resource.kind === 'PersistentVolumeClaim') {
+      const existing = await coreApi()
+        .readNamespacedPersistentVolumeClaim({ name, namespace })
+        .catch((error: unknown) => {
+          if (!isNotFound(error)) throw error;
+          return undefined;
+        });
+      if (!existing) {
+        await coreApi().createNamespacedPersistentVolumeClaim({
+          namespace,
+          body: {
+            ...resource,
+            metadata: { ...resource.metadata, namespace },
+          },
+        });
+      } else if (
+        !isEqual(persistentVolumeClaimResponseSchema.parse(existing), resource)
+      ) {
+        await coreApi().replaceNamespacedPersistentVolumeClaim({
+          name,
+          namespace,
+          body: {
+            ...existing,
+            metadata: { ...existing.metadata, ...resource.metadata, namespace },
+            spec: { ...existing.spec, ...resource.spec },
+          },
+        });
+      }
+    } else {
+      const resourceIdentity = {
+        group: 'tesselar.io',
+        version: 'v1',
+        plural: 'authclients',
+        namespace,
+      };
+      const result: unknown = await customObjectsApi()
+        .getNamespacedCustomObject({ ...resourceIdentity, name })
+        .catch((error: unknown) => {
+          if (!isNotFound(error)) throw error;
+          return undefined;
+        });
+      if (result === undefined) {
+        await customObjectsApi().createNamespacedCustomObject({
+          ...resourceIdentity,
+          body: {
+            ...resource,
+            metadata: { ...resource.metadata, namespace },
+          },
+        });
+      } else if (!isEqual(authClientSchema.parse(result), resource)) {
+        const existing = storedAppSchema.parse(result);
+        await customObjectsApi().replaceNamespacedCustomObject({
+          ...resourceIdentity,
+          name,
+          body: {
+            ...existing,
+            metadata: { ...existing.metadata, ...resource.metadata, namespace },
+            spec: resource.spec,
+          },
+        });
+      }
+    }
+  }
 }

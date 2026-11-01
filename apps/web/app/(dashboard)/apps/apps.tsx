@@ -17,8 +17,6 @@ import {
 } from '@tanstack/react-query';
 import { useState } from 'react';
 import type {
-  AppBundleListItem,
-  DraftAppBundle,
   PublishedAppBundle,
 } from '@/app/api/app-workspaces';
 import { Status } from '@/components/ui/status';
@@ -31,24 +29,14 @@ import {
   type AppFormSheetSession,
 } from './app-form-sheet';
 
-const initialAppItems: AppBundleListItem[] = [];
-
-function isDraftApp(item: AppBundleListItem): item is DraftAppBundle {
-  return 'draftId' in item;
-}
-
-function getListItemStatus(item: AppBundleListItem) {
-  return isDraftApp(item) ? APP_STATUS.UNKNOWN : item.status.phase;
-}
+const initialAppItems: PublishedAppBundle[] = [];
 
 export function Apps() {
   const watchedApps = useQuery({
     queryKey: ['watch-apps'],
     queryFn: streamedQuery({
       streamFn: async () =>
-        appOrpcClient.apps.watchApps({
-          includeDrafts: true,
-        }),
+        appOrpcClient.apps.watchApps(),
       initialValue: initialAppItems,
       reducer: (_previous, nextItems) => nextItems,
       refetchMode: 'reset',
@@ -61,32 +49,13 @@ export function Apps() {
   const appItems = watchedApps.data ?? [];
 
   const handleCreateApp = () => {
-    const nextIdentifier = {
-      draftId: crypto.randomUUID(),
-      persisted: false,
-    };
-
-    setSheetSession({
-      mode: 'create',
-      identifier: nextIdentifier,
-      initialData: undefined,
-    });
+    setSheetSession({ mode: 'create' });
   };
 
   const handleEditApp = (app: PublishedAppBundle) => {
     const identifier = { appName: app.app.metadata.name };
 
     setSheetSession({ mode: 'edit', identifier, initialData: app });
-  };
-
-  const handleEditDraft = (draft: DraftAppBundle) => {
-    const identifier = { draftId: draft.draftId, persisted: true };
-
-    setSheetSession({
-      mode: 'create',
-      identifier,
-      initialData: draft,
-    });
   };
 
   const handleCloseForm = () => {
@@ -120,18 +89,14 @@ export function Apps() {
           <TableBody>
             {appItems.map((app) => (
               <TableRow
-                key={
-                  isDraftApp(app)
-                    ? `draft-${app.draftId}`
-                    : `app-${app.app.metadata.name}`
-                }
+                key={app.app.metadata.name}
                 className={cn({
                   'animate-pulse':
-                    getListItemStatus(app) === APP_STATUS.PENDING,
+                    app.status.phase === APP_STATUS.PENDING,
                 })}
               >
                 <TableCell className="w-2">
-                  <Status {...appStatusProps(getListItemStatus(app))} />
+                  <Status {...appStatusProps(app.status.phase)} />
                 </TableCell>
                 <TableCell>
                   <div className="size-4">
@@ -141,11 +106,6 @@ export function Apps() {
                 <TableCell
                   className="cursor-pointer font-medium"
                   onClick={() => {
-                    if (isDraftApp(app)) {
-                      handleEditDraft(app);
-                      return;
-                    }
-
                     handleEditApp(app);
                   }}
                 >
@@ -155,7 +115,7 @@ export function Apps() {
                 </TableCell>
 
                 <TableCell className="font-medium">
-                  {isDraftApp(app) ? 'Draft' : app.status.phase}
+                  {app.status.phase}
                 </TableCell>
               </TableRow>
             ))}

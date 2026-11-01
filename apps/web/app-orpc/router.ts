@@ -1,63 +1,27 @@
 import {
-  appBundleListSchema,
   createApp,
-  discardDraft,
   getApp,
   listApps,
-  listAppsInputSchema,
-  publishApp,
   updateApp,
-  watchApp,
   watchApps,
-  type ListAppsInput,
+  publishedAppBundleSchema,
 } from '@/app/api/app-workspaces';
-import { appBundleIdentifierSchema } from '@/app/api/app-bundle-identifier';
 import { appBundleSchema } from '@/app/api/schemas';
 import { eventIterator, os } from '@orpc/server';
 import z from 'zod/v4';
 
 export const appRouter = {
   apps: {
-    list: os
-      .input(listAppsInputSchema)
-      .handler(async <TInput extends ListAppsInput>({ input }: { input: TInput }) => {
-        return listApps(input);
-      }),
+    list: os.handler(() => listApps()),
     getApp: os
-      .input(appBundleIdentifierSchema)
-      .output(appBundleSchema)
-      .handler(async ({ input }) => {
-        return getApp(input);
-      }),
-    create: os.input(appBundleSchema).handler(async ({ input }) => {
-      return createApp(input);
-    }),
-    update: os.input(appBundleSchema).handler(async ({ input }) => {
-      return updateApp(input);
-    }),
-    publish: os.input(appBundleSchema).handler(async ({ input }) => {
-      return publishApp(input);
-    }),
-    watchApp: os
-      .input(appBundleIdentifierSchema)
-      .output(eventIterator(appBundleSchema))
-      .handler(async function* ({ input }) {
-        yield* watchApp(input);
-      }),
+      .input(z.object({ appName: z.string().min(1) }))
+      .handler(({ input }) => getApp(input)),
+    create: os.input(appBundleSchema).handler(({ input }) => createApp(input)),
+    update: os.input(appBundleSchema).handler(({ input }) => updateApp(input)),
     watchApps: os
-      .input(listAppsInputSchema)
-      .output(eventIterator(appBundleListSchema))
-      .handler(async function* ({ input }) {
-        yield* watchApps(input);
-      }),
-    discardDraft: os
-      .input(
-        z.object({
-          draftId: z.string().min(1),
-        }),
-      )
-      .handler(async ({ input }) => {
-        return discardDraft(input.draftId);
+      .output(eventIterator(z.array(publishedAppBundleSchema)))
+      .handler(async function* () {
+        yield* watchApps();
       }),
   },
 };

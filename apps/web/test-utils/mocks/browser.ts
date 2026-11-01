@@ -65,11 +65,6 @@ const handlers = [
       json: { success: true },
     });
   }),
-  http.post('*/api/app/rpc/apps/publish', () => {
-    return HttpResponse.json({
-      json: { success: true },
-    });
-  }),
 ];
 
 export const worker = setupWorker(...handlers);

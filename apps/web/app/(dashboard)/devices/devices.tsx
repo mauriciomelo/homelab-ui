@@ -161,11 +161,7 @@ export function Devices({
     enabled: !isResetting,
   });
   const apps = useQuery({
-    ...appOrpc.apps.list.queryOptions({
-      input: {
-        includeDrafts: false,
-      },
-    }),
+    ...appOrpc.apps.list.queryOptions(),
     refetchInterval: appsPollIntervalMs,
     enabled: !isResetting,
   });
@@ -179,11 +175,7 @@ export function Devices({
         queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
       }),
       queryClient.invalidateQueries({
-        queryKey: appOrpc.apps.list.queryKey({
-          input: {
-            includeDrafts: false,
-          },
-        }),
+        queryKey: appOrpc.apps.list.queryKey(),
       }),
     ]);
   };
@@ -507,11 +499,7 @@ function ResetDeviceDialog({
         queryKey: controlPlaneOrpc.devices.discoveredNodes.queryKey(),
       }),
       queryClient.invalidateQueries({
-        queryKey: appOrpc.apps.list.queryKey({
-          input: {
-            includeDrafts: false,
-          },
-        }),
+        queryKey: appOrpc.apps.list.queryKey(),
       }),
     ]);
   };

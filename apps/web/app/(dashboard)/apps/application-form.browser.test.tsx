@@ -1,5 +1,5 @@
 import { describe, expect, vi } from 'vitest';
-import { HttpResponse, http } from 'msw';
+import { http } from 'msw';
 import {
   userEvent,
   renderWithProviders,
@@ -15,7 +15,7 @@ import {
 } from '@/test-utils/fixtures';
 import { produce } from 'immer';
 import { Apps } from './apps';
-import { page, type Locator } from 'vitest/browser';
+import { page } from 'vitest/browser';
 import YAML from 'yaml';
 import {
   defaultResourceRequests,
@@ -29,9 +29,6 @@ test.beforeEach(async ({ worker }) => {
   worker.use(
     http.post('*/api/app/rpc/apps/watchApps', () => {
       return orpcEventStreamResponse([{ data: [] }]);
-    }),
-    http.post('*/api/app/rpc/apps/watchApp', () => {
-      return orpcEventStreamResponse([]);
     }),
   );
 });
@@ -52,179 +49,6 @@ function readInputValue(locator: ReturnType<typeof page.getByPlaceholder>) {
   }
 
   return element.value;
-}
-
-function locatorHasFocus(locator: Locator) {
-  return locator.element() === document.activeElement;
-}
-
-function orpcDelayedSequenceResponse({
-  initialData,
-  getNextData,
-  waitForNext,
-  onNext,
-}: {
-  initialData: unknown;
-  getNextData: () => unknown[];
-  waitForNext: () => Promise<void>;
-  onNext: () => void;
-}) {
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      controller.enqueue(encoder.encode(formatOrpcEvent(initialData)));
-      await waitForNext();
-      for (const nextData of getNextData()) {
-        controller.enqueue(encoder.encode(formatOrpcEvent(nextData)));
-      }
-      onNext();
-      controller.close();
-    },
-  });
-
-  return new HttpResponse(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-    },
-  });
-}
-
-function formatOrpcEvent(data: unknown) {
-  return `event: message\ndata: ${JSON.stringify({ json: data })}\n\n`;
-}
-
-async function waitForStreamProcessing() {
-  await new Promise((resolve) => setTimeout(resolve, 100));
-}
-
-function createDeferred() {
-  let resolveDeferred = () => {};
-  const promise = new Promise<void>((resolve) => {
-    resolveDeferred = resolve;
-  });
-
-  return { promise, resolve: resolveDeferred };
-}
-
-function getAuthClientRedirectUri(bundle: AppBundleSchema) {
-  const authClient = bundle.additionalResources.find(
-    (resource) => resource.kind === 'AuthClient',
-  );
-
-  return authClient?.spec.redirectUris.at(0);
-}
-
-function getAutosavedRedirectUri(bundle?: AppBundleSchema) {
-  return bundle ? getAuthClientRedirectUri(bundle) : undefined;
-}
-
-function createDraftWithRedirectUri({
-  name,
-  redirectUri,
-}: {
-  name: string;
-  redirectUri: string;
-}) {
-  return produce(baseAppBundle, (draft) => {
-    draft.draftId = 'draft-1234';
-    draft.app.metadata.name = name;
-    draft.app.spec.image = 'nginx:latest';
-    draft.additionalResources = [
-      {
-        apiVersion: 'tesselar.io/v1',
-        kind: 'AuthClient',
-        metadata: { name: `${name}-auth` },
-        spec: {
-          redirectUris: [redirectUri],
-        },
-      },
-    ];
-  });
-}
-
-function isAppIdentifier(value: unknown): value is { appName: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'appName' in value &&
-    typeof value.appName === 'string'
-  );
-}
-
-function setupDraftHandlers(
-  worker: {
-    use: (...handlers: Array<ReturnType<typeof http.post>>) => void;
-  },
-  initialBundle?: AppBundleSchema,
-) {
-  const draftId = 'draft-1234';
-  let draftBundle =
-    initialBundle ??
-    produce(baseAppBundle, (draft) => {
-      draft.draftId = draftId;
-      draft.app.metadata.name = draftId;
-      draft.app.spec.image = 'nginx:latest';
-      draft.app.spec.envVariables = [];
-      draft.app.spec.health = {
-        check: {
-          type: 'httpGet',
-          path: '/',
-          port: 'http',
-        },
-      };
-      draft.app.spec.volumeMounts = [];
-      draft.additionalResources = [];
-    });
-
-  worker.use(
-    http.post('*/api/app/rpc/apps/watchApps', () => {
-      return orpcEventStreamResponse([
-        {
-          data: [
-            {
-            ...draftBundle,
-            draftId: draftBundle.draftId ?? draftId,
-          },
-        ],
-        },
-      ]);
-    }),
-    http.post('*/api/app/rpc/apps/watchApp', () => {
-      return orpcEventStreamResponse([
-        {
-          data: {
-            ...draftBundle,
-            draftId: draftBundle.draftId ?? draftId,
-          },
-        },
-      ]);
-    }),
-    http.post('*/api/app/rpc/apps/getApp', () => {
-      return orpcJsonResponse(draftBundle);
-    }),
-    http.post('*/api/app/rpc/apps/create', async ({ request }) => {
-      const input = await readOrpcInput(request);
-
-      draftBundle = appBundleSchema.parse(input);
-
-      return orpcJsonResponse({ success: true });
-    }),
-    http.post('*/api/app/rpc/apps/update', async ({ request }) => {
-      const input = await readOrpcInput(request);
-
-      draftBundle = appBundleSchema.parse(input);
-
-      return orpcJsonResponse({ success: true });
-    }),
-    http.post('*/api/app/rpc/apps/discardDraft', () => {
-      return orpcJsonResponse({ success: true });
-    }),
-  );
-
-  return {
-    draftId,
-    getDraftBundle: () => draftBundle,
-  };
 }
 
 describe('Apps Page', () => {
@@ -260,34 +84,6 @@ describe('Apps Page', () => {
       .toBeInTheDocument();
 
     await page.screenshot({});
-  });
-
-  test('lists drafts alongside committed apps', async ({ worker }) => {
-    worker.use(
-      http.post('*/api/app/rpc/apps/watchApps', () => {
-        return orpcEventStreamResponse([[
-          produce(baseApp, (app) => {
-            app.app.metadata.name = 'committed-app';
-          }),
-          {
-            draftId: 'draft-1234',
-            ...produce(baseAppBundle, (draft) => {
-              draft.app.metadata.name = 'draft-app';
-            }),
-          },
-        ]]);
-      }),
-    );
-
-    await renderWithProviders(<Apps />);
-
-    await expect
-      .poll(() => page.getByText('committed-app'))
-      .toBeInTheDocument();
-    await expect.poll(() => page.getByText('draft-app')).toBeInTheDocument();
-    await expect
-      .poll(() => page.getByRole('cell', { name: 'Draft', exact: true }))
-      .toBeInTheDocument();
   });
 
   test('displays list of applications', async ({ worker }) => {
@@ -555,79 +351,6 @@ describe('ApplicationForm', () => {
       await expect
         .element(mountVolumeSelect)
         .toHaveTextContent('openwebui-data');
-    });
-
-    test('resets form when switching apps and creating new app', async ({
-      worker,
-    }) => {
-      const user = userEvent.setup();
-      const appOne = produce(baseApp, (app) => {
-        app.app.metadata.name = 'app-one';
-        app.app.spec.image = 'redis:7-alpine';
-      });
-      const appTwo = produce(baseApp, (app) => {
-        app.app.metadata.name = 'app-two';
-        app.app.spec.image = 'nginx:1.27';
-      });
-
-      const draftHandlers = setupDraftHandlers(worker);
-
-      worker.use(
-        http.post('*/api/app/rpc/apps/watchApps', () => {
-          return orpcEventStreamResponse([{ data: [appOne, appTwo] }]);
-        }),
-        http.post('*/api/app/rpc/apps/watchApp', async ({ request }) => {
-          const input = await readOrpcInput(request);
-
-          if (isAppIdentifier(input)) {
-            const matchingApp = [appOne, appTwo].find(
-              (app) => app.app.metadata.name === input.appName,
-            );
-
-            if (matchingApp) {
-              return orpcEventStreamResponse([{ data: matchingApp }]);
-            }
-          }
-
-          return orpcEventStreamResponse([{ data: draftHandlers.getDraftBundle() }]);
-        }),
-      );
-
-      await renderWithProviders(<Apps />);
-
-      // Step 1: open the first app
-      await user.click(page.getByText('app-one'));
-
-      const nameInput = page.getByPlaceholder('App Name');
-      const imageInput = page.getByPlaceholder(
-        'nginx:latest or registry.example.com/my-app:v1.0.0',
-      );
-
-      await expect.element(nameInput).toHaveValue('app-one');
-      await expect.element(imageInput).toHaveValue('redis:7-alpine');
-
-      await user.fill(imageInput, 'custom-image:1.0');
-
-      // Step 2: open the second app and verify the form resets
-      await user.keyboard('{Escape}');
-      await user.click(page.getByText('app-two'));
-
-      await expect.element(nameInput).toHaveValue('app-two');
-      await expect.element(imageInput).toHaveValue('nginx:1.27');
-
-      // Step 3: open create app and verify draft defaults are restored
-      await user.keyboard('{Escape}');
-      await user.click(page.getByText('Create App'));
-
-      const createNameInput = page.getByPlaceholder('App Name');
-      const createImageInput = page.getByPlaceholder(
-        'nginx:latest or registry.example.com/my-app:v1.0.0',
-      );
-
-      await expect
-        .poll(() => readInputValue(createNameInput))
-        .toMatch(/^draft-/);
-      await expect.element(createImageInput).toHaveValue('nginx:latest');
     });
 
     test('renders existing auth clients', async ({ worker }) => {
@@ -1096,7 +819,7 @@ describe('ApplicationForm', () => {
           ] }]);
         }),
         http.post(
-          '*/api/app/rpc/apps/publish',
+          '*/api/app/rpc/apps/update',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1154,58 +877,6 @@ describe('ApplicationForm', () => {
         });
     });
 
-    test('applies external updates automatically', async ({ worker }) => {
-      const user = userEvent.setup();
-      const app = produce(baseApp, (draft) => {
-        draft.app.metadata.name = 'external-accept-app';
-        draft.app.spec.image = 'nginx:latest';
-      });
-      const updatedApp = produce(app, (draft) => {
-        draft.app.spec.image = 'redis:7-alpine';
-      });
-
-      worker.use(
-        http.post('*/api/app/rpc/apps/watchApps', () => {
-          return orpcEventStreamResponse([
-            { data: [app] },
-            { data: [updatedApp], delayMs: 300 },
-          ]);
-        }),
-        http.post('*/api/app/rpc/apps/watchApp', () => {
-          return orpcEventStreamResponse([
-            { data: { app: app.app, additionalResources: app.additionalResources } },
-            {
-              data: {
-                app: updatedApp.app,
-                additionalResources: updatedApp.additionalResources,
-              },
-              delayMs: 300,
-            },
-          ]);
-        }),
-      );
-
-      await renderWithProviders(<Apps />);
-      await user.click(await page.getByText('external-accept-app'));
-
-      const imageInput = page.getByPlaceholder(
-        'nginx:latest or registry.example.com/my-app:v1.0.0',
-      );
-      await user.fill(imageInput, 'custom-image:1.0');
-
-      await expect
-        .poll(
-          () =>
-            page.getByPlaceholder(
-              'nginx:latest or registry.example.com/my-app:v1.0.0',
-            ),
-          {
-            timeout: 5000,
-          },
-        )
-        .toHaveValue('redis:7-alpine');
-    });
-
     test('links environment variable to auth client secret', async ({
       worker,
     }) => {
@@ -1234,7 +905,7 @@ describe('ApplicationForm', () => {
           return orpcEventStreamResponse([{ data: [app] }]);
         }),
         http.post(
-          '*/api/app/rpc/apps/publish',
+          '*/api/app/rpc/apps/update',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1318,7 +989,7 @@ describe('ApplicationForm', () => {
           return orpcEventStreamResponse([{ data: [app] }]);
         }),
         http.post(
-          '*/api/app/rpc/apps/publish',
+          '*/api/app/rpc/apps/update',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1426,7 +1097,7 @@ describe('ApplicationForm', () => {
           return orpcEventStreamResponse([{ data: [app] }]);
         }),
         http.post(
-          '*/api/app/rpc/apps/publish',
+          '*/api/app/rpc/apps/update',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1643,226 +1314,18 @@ describe('ApplicationForm', () => {
   });
 
   describe('create application', () => {
-    test('opens a draft from the list and persists updates through update', async ({
-      worker,
-    }) => {
-      let updatedDraft: AppBundleSchema | undefined;
-      let updateCallCount = 0;
-      const user = userEvent.setup();
-
-      setupDraftHandlers(
-        worker,
-        produce(baseAppBundle, (draft) => {
-          draft.draftId = 'draft-1234';
-          draft.app.metadata.name = 'persistent-draft';
-          draft.app.spec.image = 'nginx:latest';
-          draft.additionalResources = [];
-        }),
-      );
-      worker.use(
-        http.post(
-          '*/api/app/rpc/apps/update',
-          async ({ request }) => {
-            updateCallCount += 1;
-            updatedDraft = appBundleSchema.parse(await readOrpcInput(request));
-            return orpcJsonResponse({ success: true });
-          },
-        ),
-      );
-
-      await renderWithProviders(<Apps />);
-
-      await user.click(page.getByText('persistent-draft'));
-      await expect
-        .element(page.getByPlaceholder('App Name'))
-        .toHaveValue('persistent-draft');
-
-      expect(updateCallCount).toBe(0);
-
-      await user.fill(page.getByPlaceholder('App Name'), 'persistent-draft-2');
-
-      await expect.poll(() => updatedDraft).toMatchObject({
-        draftId: 'draft-1234',
-        app: {
-          metadata: {
-            name: 'persistent-draft-2',
-          },
-        },
-      });
-    });
-
-    test('keeps focus when draft autosave echoes array changes', async ({
-      worker,
-    }) => {
-      const initialRedirectUri = 'https://app.example.com/callback';
-      const intermediateRedirectUri = 'https://app.example.com/oauth/callback';
-      const updatedRedirectUri = 'https://app.example.com/final/callback';
-      let updateCallCount = 0;
-      const pendingAutosavedDrafts: {
-        first?: AppBundleSchema;
-        latest?: AppBundleSchema;
-      } = {};
-      let currentAutosavedDraft: AppBundleSchema | undefined;
-      let echoSent = false;
-      const echoSignal = createDeferred();
-      const user = userEvent.setup();
-
-      const initialDraft = createDraftWithRedirectUri({
-        name: 'focus-draft',
-        redirectUri: initialRedirectUri,
-      });
-
-      setupDraftHandlers(worker, initialDraft);
-      worker.use(
-        http.post('*/api/app/rpc/apps/watchApp', () => {
-          return orpcDelayedSequenceResponse({
-            initialData: initialDraft,
-            getNextData: () => {
-              if (!pendingAutosavedDrafts.first || !pendingAutosavedDrafts.latest) {
-                throw new Error('Expected pending autosaved drafts before echoing');
-              }
-
-              return [pendingAutosavedDrafts.first, pendingAutosavedDrafts.latest];
-            },
-            waitForNext: () => echoSignal.promise,
-            onNext: () => {
-              echoSent = true;
-            },
-          });
-        }),
-        http.post('*/api/app/rpc/apps/update', async ({ request }) => {
-          const draftBundle = appBundleSchema.parse(await readOrpcInput(request));
-          currentAutosavedDraft = draftBundle;
-          updateCallCount += 1;
-
-          return orpcJsonResponse({ success: true });
-        }),
-      );
-
-      await renderWithProviders(<Apps />);
-
-      await user.click(page.getByText('focus-draft'));
-
-      const redirectUriInput = page.getByLabelText('Redirect URIs');
-
-      await expect.element(redirectUriInput).toHaveValue(initialRedirectUri);
-      await user.fill(redirectUriInput, intermediateRedirectUri);
-      await expect.poll(() => updateCallCount).toBeGreaterThan(0);
-      await expect.poll(() => getAutosavedRedirectUri(currentAutosavedDraft)).toBe(
-        intermediateRedirectUri,
-      );
-      pendingAutosavedDrafts.first = currentAutosavedDraft;
-
-      await user.fill(redirectUriInput, updatedRedirectUri);
-      await expect.poll(() => updateCallCount).toBeGreaterThan(1);
-      await expect.poll(() => getAutosavedRedirectUri(currentAutosavedDraft)).toBe(
-        updatedRedirectUri,
-      );
-      pendingAutosavedDrafts.latest = currentAutosavedDraft;
-      await user.click(redirectUriInput);
-      await expect.poll(() => locatorHasFocus(redirectUriInput)).toBe(true);
-
-      echoSignal.resolve();
-      await expect.poll(() => echoSent).toBe(true);
-      await waitForStreamProcessing();
-
-      expect(locatorHasFocus(redirectUriInput)).toBe(true);
-      await expect.element(redirectUriInput).toHaveValue(updatedRedirectUri);
-    });
-
-    test('applies a later remote snapshot after matching local echoes are consumed', async ({
-      worker,
-    }) => {
-      const initialRedirectUri = 'https://app.example.com/callback';
-      const intermediateRedirectUri = 'https://app.example.com/oauth/callback';
-      const finalRedirectUri = 'https://app.example.com/final/callback';
-      let updateCallCount = 0;
-      const consumedAutosavedDrafts: {
-        first?: AppBundleSchema;
-        latest?: AppBundleSchema;
-      } = {};
-      let currentAutosavedDraft: AppBundleSchema | undefined;
-      let echoSent = false;
-      const echoSignal = createDeferred();
-      const user = userEvent.setup();
-
-      const initialDraft = createDraftWithRedirectUri({
-        name: 'consumed-focus-draft',
-        redirectUri: initialRedirectUri,
-      });
-
-      setupDraftHandlers(worker, initialDraft);
-      worker.use(
-        http.post('*/api/app/rpc/apps/watchApp', () => {
-          return orpcDelayedSequenceResponse({
-            initialData: initialDraft,
-            getNextData: () => {
-              if (!consumedAutosavedDrafts.first || !consumedAutosavedDrafts.latest) {
-                throw new Error('Expected consumed autosave drafts before echoing');
-              }
-
-              return [
-                consumedAutosavedDrafts.first,
-                consumedAutosavedDrafts.latest,
-                consumedAutosavedDrafts.first,
-              ];
-            },
-            waitForNext: () => echoSignal.promise,
-            onNext: () => {
-              echoSent = true;
-            },
-          });
-        }),
-        http.post('*/api/app/rpc/apps/update', async ({ request }) => {
-          const draftBundle = appBundleSchema.parse(await readOrpcInput(request));
-          currentAutosavedDraft = draftBundle;
-          updateCallCount += 1;
-
-          return orpcJsonResponse({ success: true });
-        }),
-      );
-
-      await renderWithProviders(<Apps />);
-
-      await user.click(page.getByText('consumed-focus-draft'));
-
-      const redirectUriInput = page.getByLabelText('Redirect URIs');
-
-      await expect.element(redirectUriInput).toHaveValue(initialRedirectUri);
-      await user.fill(redirectUriInput, intermediateRedirectUri);
-      await expect.poll(() => updateCallCount).toBeGreaterThan(0);
-      await expect.poll(() => getAutosavedRedirectUri(currentAutosavedDraft)).toBe(
-        intermediateRedirectUri,
-      );
-      consumedAutosavedDrafts.first = currentAutosavedDraft;
-
-      await user.fill(redirectUriInput, finalRedirectUri);
-      await expect.poll(() => updateCallCount).toBeGreaterThan(1);
-      await expect.poll(() => getAutosavedRedirectUri(currentAutosavedDraft)).toBe(
-        finalRedirectUri,
-      );
-      consumedAutosavedDrafts.latest = currentAutosavedDraft;
-
-      echoSignal.resolve();
-      await expect.poll(() => echoSent).toBe(true);
-      await waitForStreamProcessing();
-
-      await expect.element(redirectUriInput).toHaveValue(intermediateRedirectUri);
-    });
-
     test('captures default health check inputs on create', async ({
       worker,
     }) => {
       let submittedApp: AppBundleSchema | undefined;
       const user = userEvent.setup();
-      setupDraftHandlers(worker);
 
       worker.use(
         http.post('*/api/app/rpc/apps/watchApps', () => {
           return orpcEventStreamResponse([{ data: [] }]);
         }),
         http.post(
-          '*/api/app/rpc/apps/publish',
+          '*/api/app/rpc/apps/create',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -1897,7 +1360,6 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
-          draftId: expect.any(String),
           app: {
             apiVersion: 'tesselar.io/v1alpha1',
             kind: 'App',
@@ -1932,7 +1394,6 @@ describe('ApplicationForm', () => {
 
     test('fills form from dropped yaml file', async ({ worker }) => {
       const user = userEvent.setup();
-      setupDraftHandlers(worker);
       worker.use(
         http.post('*/api/app/rpc/apps/watchApps', () => {
           return orpcEventStreamResponse([{ data: [] }]);
@@ -1944,7 +1405,7 @@ describe('ApplicationForm', () => {
       await user.click(page.getByText('Create App'));
 
       const nameInput = page.getByPlaceholder('App Name');
-      await expect.poll(() => readInputValue(nameInput)).toMatch(/^draft-/);
+      await expect.poll(() => readInputValue(nameInput)).toBe('');
 
       const appSpec = produce(baseAppBundle, (app) => {
         app.app.metadata.name = 'yaml-app';
@@ -2014,7 +1475,6 @@ describe('ApplicationForm', () => {
 
     test('fills form from dropped bare app manifest', async ({ worker }) => {
       const user = userEvent.setup();
-      setupDraftHandlers(worker);
       worker.use(
         http.post('*/api/app/rpc/apps/watchApps', () => {
           return orpcEventStreamResponse([{ data: [] }]);
@@ -2072,14 +1532,13 @@ describe('ApplicationForm', () => {
     test('handles successful app creation', async ({ worker }) => {
       let submittedApp: AppBundleSchema | undefined;
       const user = userEvent.setup();
-      setupDraftHandlers(worker);
 
       worker.use(
         http.post('*/api/app/rpc/apps/watchApps', () => {
           return orpcEventStreamResponse([{ data: [] }]);
         }),
         http.post(
-          '*/api/app/rpc/apps/publish',
+          '*/api/app/rpc/apps/create',
           async ({ request }) => {
             submittedApp = appBundleSchema.parse(await readOrpcInput(request));
             return orpcJsonResponse({ success: true });
@@ -2117,7 +1576,6 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() => submittedApp)
         .toEqual({
-          draftId: expect.any(String),
           app: {
             apiVersion: 'tesselar.io/v1alpha1',
             kind: 'App',
@@ -2149,5 +1607,38 @@ describe('ApplicationForm', () => {
         .poll(() => document.body.textContent?.includes('Create New App'))
         .toBe(false);
     });
+  });
+});
+
+
+describe('cluster app editing', () => {
+  test('loads the cluster snapshot and submits its version with the edited image', async ({ worker }) => {
+    const listed = produce(baseApp, (draft) => {
+      draft.app.metadata.name = 'podinfo';
+      draft.app.spec.image = 'podinfo:listed';
+    });
+    const current = produce(baseAppBundle, (draft) => {
+      draft.app.metadata.name = 'podinfo';
+      draft.app.spec.image = 'podinfo:cluster';
+      draft.clusterResourceVersion = '7';
+    });
+    let submitted: AppBundleSchema | undefined;
+    worker.use(
+      http.post('*/api/app/rpc/apps/watchApps', () => orpcEventStreamResponse([[{ ...listed, ...current }]])),
+      http.post('*/api/app/rpc/apps/update', async ({ request }) => {
+        submitted = appBundleSchema.parse(await readOrpcInput(request));
+        return orpcJsonResponse({ success: true });
+      }),
+    );
+    const user = userEvent.setup();
+    await renderWithProviders(<Apps />);
+    await user.click(page.getByText('podinfo', { exact: true }));
+    const image = page.getByPlaceholder('nginx:latest or registry.example.com/my-app:v1.0.0');
+    await expect.element(image).toHaveValue('podinfo:cluster');
+    await user.fill(image, 'podinfo:updated');
+    await user.click(page.getByRole('button', { name: 'Update', exact: true }));
+    await expect.poll(() => submitted?.app.spec.image).toBe('podinfo:updated');
+    expect(submitted?.clusterResourceVersion).toBe('7');
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
   });
 });

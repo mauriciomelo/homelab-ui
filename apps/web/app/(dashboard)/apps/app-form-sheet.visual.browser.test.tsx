@@ -1,11 +1,8 @@
 import { describe, expect, vi } from 'vitest';
 import { page } from 'vitest/browser';
 import { produce } from 'immer';
-import { http } from 'msw';
 import { AppFormSheet } from './app-form-sheet';
 import {
-  orpcEventStreamResponse,
-  orpcJsonResponse,
   renderWithProviders,
   test,
 } from '@/test-utils/browser';
@@ -14,7 +11,7 @@ import { baseApp } from '@/test-utils/fixtures';
 vi.mock('server-only', () => ({}));
 
 describe('app-form-sheet visual', () => {
-  test('renders a full-featured app edit sheet', async ({ worker }) => {
+  test('renders a full-featured app edit sheet', async () => {
     const fullFeaturedApp = produce(baseApp, (app) => {
       app.app.metadata.name = 'openwebui';
       app.app.spec.image = 'ghcr.io/open-webui/open-webui:main';
@@ -88,23 +85,6 @@ describe('app-form-sheet visual', () => {
         },
       ];
     });
-
-    worker.use(
-      http.post('*/api/app/rpc/apps/getApp', () =>
-        orpcJsonResponse({
-          app: fullFeaturedApp.app,
-          additionalResources: fullFeaturedApp.additionalResources,
-        }),
-      ),
-      http.post('*/api/app/rpc/apps/watchApp', () =>
-        orpcEventStreamResponse([
-          {
-            app: fullFeaturedApp.app,
-            additionalResources: fullFeaturedApp.additionalResources,
-          },
-        ]),
-      ),
-    );
 
     await page.viewport(800, 2000);
     await renderWithProviders(

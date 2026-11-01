@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getLiveApps,
-  reconcileFluxGitRepository,
   restartApp,
   watchLiveApps,
 } from './applications';
@@ -201,42 +200,4 @@ describe('applications cluster operations', () => {
     });
   });
 
-  describe('reconcileFluxGitRepository', () => {
-    it('patches the Flux GitRepository reconcile annotation', async () => {
-      await reconcileFluxGitRepository({
-        name: 'flux-system',
-        namespace: 'flux-system',
-      });
-
-      expect(patchNamespacedCustomObjectMock).toHaveBeenCalledWith({
-        namespace: 'flux-system',
-        group: 'source.toolkit.fluxcd.io',
-        version: 'v1',
-        plural: 'gitrepositories',
-        name: 'flux-system',
-        body: [
-          {
-            op: 'add',
-            path: '/metadata/annotations',
-            value: {
-              'reconcile.fluxcd.io/requestedAt': expect.any(String),
-            },
-          },
-        ],
-      });
-    });
-
-    it('swallows unexpected reconcile errors', async () => {
-      patchNamespacedCustomObjectMock.mockRejectedValueOnce(
-        new Error('reconcile failed'),
-      );
-
-      await expect(
-        reconcileFluxGitRepository({
-          name: 'flux-system',
-          namespace: 'flux-system',
-        }),
-      ).resolves.toBeUndefined();
-    });
-  });
 });

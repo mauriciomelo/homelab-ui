@@ -1,3 +1,4 @@
+import { APP_STATUS } from '@/app/constants';
 import { EventEmitter, on } from 'node:events';
 import * as z from 'zod';
 import { logger } from '@/lib/logger';
@@ -12,7 +13,7 @@ const applicationsLogger = logger.child({ module: 'applications-api' });
 export type AppRuntimeStatus = z.infer<typeof appStatusSchema>;
 
 export const liveAppSchema = appSchema.safeExtend({
-  status: appStatusSchema,
+  status: appStatusSchema.default({ phase: APP_STATUS.UNKNOWN, placements: [], conditions: [] }),
 });
 
 export type LiveApp = z.infer<typeof liveAppSchema>;
@@ -130,43 +131,4 @@ function getResponseItemCount(response: unknown) {
   }
 
   return undefined;
-}
-
-export async function reconcileFluxGitRepository({
-  name,
-  namespace,
-}: {
-  namespace: string;
-  name: string;
-}): Promise<void> {
-  const patch = [
-    {
-      op: 'add',
-      path: '/metadata/annotations',
-      value: {
-        'reconcile.fluxcd.io/requestedAt': new Date().toISOString(),
-      },
-    },
-  ];
-
-  try {
-    await k.customObjectsApi().patchNamespacedCustomObject({
-      namespace,
-      group: 'source.toolkit.fluxcd.io',
-      version: 'v1',
-      plural: 'gitrepositories',
-      name,
-      body: patch,
-    });
-
-    applicationsLogger.info(
-      { name, namespace, operation: 'reconcile-flux-git-repository' },
-      'Triggered reconciliation for GitRepository',
-    );
-  } catch (err) {
-    applicationsLogger.error(
-      { err, name, namespace, operation: 'reconcile-flux-git-repository' },
-      'Error triggering reconciliation',
-    );
-  }
 }

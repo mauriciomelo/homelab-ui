@@ -1,6 +1,5 @@
 import {
   getLiveApps,
-  reconcileFluxGitRepository,
   restartApp,
   liveAppSchema,
   watchLiveApps,
@@ -29,16 +28,6 @@ export const controlPlaneRouter = {
       .output(eventIterator(z.array(liveAppSchema)))
       .handler(async function* () {
         yield* watchLiveApps();
-      }),
-    reconcileFluxGitRepository: os
-      .input(
-        z.object({
-          name: z.string().min(1),
-          namespace: z.string().min(1),
-        }),
-      )
-      .handler(async ({ input }) => {
-        return reconcileFluxGitRepository(input);
       }),
   },
   devices: {
