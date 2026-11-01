@@ -2,14 +2,12 @@
 
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { useLens } from '@hookform/lenses';
-import { useEffect, useRef } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Plus, Shield, HardDrive } from 'lucide-react';
-import isEqual from 'lodash/isEqual';
 import {
-  AppBundleSchema,
+  type AppBundleSchema,
   appBundleSchema,
   defaultAppBundleData,
   type PersistentVolumeClaimSchema,
@@ -57,19 +55,17 @@ const getNextPersistentVolumeName = (
 };
 
 export function useApplicationForm({
-  data,
   mode,
   onPublishSuccess,
   defaultValues,
 }: {
-  data?: AppBundleSchema;
   mode: FormMode;
   onPublishSuccess?: () => Promise<void> | void;
   defaultValues?: AppBundleSchema | (() => Promise<AppBundleSchema>);
 }) {
   const form = useForm<AppBundleSchema>({
     resolver: standardSchemaResolver(appBundleSchema),
-    defaultValues: defaultValues ?? data ?? defaultAppBundleData,
+    defaultValues: defaultValues ?? defaultAppBundleData,
   });
 
   const publishAppMutation = useMutation(
@@ -81,7 +77,7 @@ export function useApplicationForm({
     await onPublishSuccess?.();
   });
 
-  return { form, data, mode, onSubmit };
+  return { form, mode, onSubmit };
 }
 
 export function ApplicationForm(
@@ -90,21 +86,11 @@ export function ApplicationForm(
   } & ReturnType<typeof useApplicationForm>,
 ) {
   const { form, mode } = props;
-  const previousDataRef = useRef(props.data);
 
   const lens = useLens({ control: form.control });
   const appLens = lens.focus('app');
   const appSpecLens = appLens.focus('spec');
   const additionalResourcesLens = lens.focus('additionalResources').defined();
-
-  useEffect(() => {
-    if (isEqual(previousDataRef.current, props.data)) {
-      return;
-    }
-
-    form.reset(props.data);
-    previousDataRef.current = props.data;
-  }, [form, props.data]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,

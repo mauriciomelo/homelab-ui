@@ -1,5 +1,5 @@
 import { describe, expect, vi } from 'vitest';
-import { http } from 'msw';
+import { HttpResponse, http } from 'msw';
 import {
   userEvent,
   renderWithProviders,
@@ -15,7 +15,7 @@ import {
 } from '@/test-utils/fixtures';
 import { produce } from 'immer';
 import { Apps } from './apps';
-import { page } from 'vitest/browser';
+import { page, type Locator } from 'vitest/browser';
 import YAML from 'yaml';
 import {
   defaultResourceRequests,
@@ -52,6 +52,94 @@ function readInputValue(locator: ReturnType<typeof page.getByPlaceholder>) {
   }
 
   return element.value;
+}
+
+function locatorHasFocus(locator: Locator) {
+  return locator.element() === document.activeElement;
+}
+
+function orpcDelayedSequenceResponse({
+  initialData,
+  getNextData,
+  waitForNext,
+  onNext,
+}: {
+  initialData: unknown;
+  getNextData: () => unknown[];
+  waitForNext: () => Promise<void>;
+  onNext: () => void;
+}) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      controller.enqueue(encoder.encode(formatOrpcEvent(initialData)));
+      await waitForNext();
+      for (const nextData of getNextData()) {
+        controller.enqueue(encoder.encode(formatOrpcEvent(nextData)));
+      }
+      onNext();
+      controller.close();
+    },
+  });
+
+  return new HttpResponse(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+    },
+  });
+}
+
+function formatOrpcEvent(data: unknown) {
+  return `event: message\ndata: ${JSON.stringify({ json: data })}\n\n`;
+}
+
+async function waitForStreamProcessing() {
+  await new Promise((resolve) => setTimeout(resolve, 100));
+}
+
+function createDeferred() {
+  let resolveDeferred = () => {};
+  const promise = new Promise<void>((resolve) => {
+    resolveDeferred = resolve;
+  });
+
+  return { promise, resolve: resolveDeferred };
+}
+
+function getAuthClientRedirectUri(bundle: AppBundleSchema) {
+  const authClient = bundle.additionalResources.find(
+    (resource) => resource.kind === 'AuthClient',
+  );
+
+  return authClient?.spec.redirectUris.at(0);
+}
+
+function getAutosavedRedirectUri(bundle?: AppBundleSchema) {
+  return bundle ? getAuthClientRedirectUri(bundle) : undefined;
+}
+
+function createDraftWithRedirectUri({
+  name,
+  redirectUri,
+}: {
+  name: string;
+  redirectUri: string;
+}) {
+  return produce(baseAppBundle, (draft) => {
+    draft.draftId = 'draft-1234';
+    draft.app.metadata.name = name;
+    draft.app.spec.image = 'nginx:latest';
+    draft.additionalResources = [
+      {
+        apiVersion: 'tesselar.io/v1',
+        kind: 'AuthClient',
+        metadata: { name: `${name}-auth` },
+        spec: {
+          redirectUris: [redirectUri],
+        },
+      },
+    ];
+  });
 }
 
 function isAppIdentifier(value: unknown): value is { appName: string } {
@@ -1601,6 +1689,165 @@ describe('ApplicationForm', () => {
           },
         },
       });
+    });
+
+    test('keeps focus when draft autosave echoes array changes', async ({
+      worker,
+    }) => {
+      const initialRedirectUri = 'https://app.example.com/callback';
+      const intermediateRedirectUri = 'https://app.example.com/oauth/callback';
+      const updatedRedirectUri = 'https://app.example.com/final/callback';
+      let updateCallCount = 0;
+      const pendingAutosavedDrafts: {
+        first?: AppBundleSchema;
+        latest?: AppBundleSchema;
+      } = {};
+      let currentAutosavedDraft: AppBundleSchema | undefined;
+      let echoSent = false;
+      const echoSignal = createDeferred();
+      const user = userEvent.setup();
+
+      const initialDraft = createDraftWithRedirectUri({
+        name: 'focus-draft',
+        redirectUri: initialRedirectUri,
+      });
+
+      setupDraftHandlers(worker, initialDraft);
+      worker.use(
+        http.post('*/api/app/rpc/apps/watchApp', () => {
+          return orpcDelayedSequenceResponse({
+            initialData: initialDraft,
+            getNextData: () => {
+              if (!pendingAutosavedDrafts.first || !pendingAutosavedDrafts.latest) {
+                throw new Error('Expected pending autosaved drafts before echoing');
+              }
+
+              return [pendingAutosavedDrafts.first, pendingAutosavedDrafts.latest];
+            },
+            waitForNext: () => echoSignal.promise,
+            onNext: () => {
+              echoSent = true;
+            },
+          });
+        }),
+        http.post('*/api/app/rpc/apps/update', async ({ request }) => {
+          const draftBundle = appBundleSchema.parse(await readOrpcInput(request));
+          currentAutosavedDraft = draftBundle;
+          updateCallCount += 1;
+
+          return orpcJsonResponse({ success: true });
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('focus-draft'));
+
+      const redirectUriInput = page.getByLabelText('Redirect URIs');
+
+      await expect.element(redirectUriInput).toHaveValue(initialRedirectUri);
+      await user.fill(redirectUriInput, intermediateRedirectUri);
+      await expect.poll(() => updateCallCount).toBeGreaterThan(0);
+      await expect.poll(() => getAutosavedRedirectUri(currentAutosavedDraft)).toBe(
+        intermediateRedirectUri,
+      );
+      pendingAutosavedDrafts.first = currentAutosavedDraft;
+
+      await user.fill(redirectUriInput, updatedRedirectUri);
+      await expect.poll(() => updateCallCount).toBeGreaterThan(1);
+      await expect.poll(() => getAutosavedRedirectUri(currentAutosavedDraft)).toBe(
+        updatedRedirectUri,
+      );
+      pendingAutosavedDrafts.latest = currentAutosavedDraft;
+      await user.click(redirectUriInput);
+      await expect.poll(() => locatorHasFocus(redirectUriInput)).toBe(true);
+
+      echoSignal.resolve();
+      await expect.poll(() => echoSent).toBe(true);
+      await waitForStreamProcessing();
+
+      expect(locatorHasFocus(redirectUriInput)).toBe(true);
+      await expect.element(redirectUriInput).toHaveValue(updatedRedirectUri);
+    });
+
+    test('applies a later remote snapshot after matching local echoes are consumed', async ({
+      worker,
+    }) => {
+      const initialRedirectUri = 'https://app.example.com/callback';
+      const intermediateRedirectUri = 'https://app.example.com/oauth/callback';
+      const finalRedirectUri = 'https://app.example.com/final/callback';
+      let updateCallCount = 0;
+      const consumedAutosavedDrafts: {
+        first?: AppBundleSchema;
+        latest?: AppBundleSchema;
+      } = {};
+      let currentAutosavedDraft: AppBundleSchema | undefined;
+      let echoSent = false;
+      const echoSignal = createDeferred();
+      const user = userEvent.setup();
+
+      const initialDraft = createDraftWithRedirectUri({
+        name: 'consumed-focus-draft',
+        redirectUri: initialRedirectUri,
+      });
+
+      setupDraftHandlers(worker, initialDraft);
+      worker.use(
+        http.post('*/api/app/rpc/apps/watchApp', () => {
+          return orpcDelayedSequenceResponse({
+            initialData: initialDraft,
+            getNextData: () => {
+              if (!consumedAutosavedDrafts.first || !consumedAutosavedDrafts.latest) {
+                throw new Error('Expected consumed autosave drafts before echoing');
+              }
+
+              return [
+                consumedAutosavedDrafts.first,
+                consumedAutosavedDrafts.latest,
+                consumedAutosavedDrafts.first,
+              ];
+            },
+            waitForNext: () => echoSignal.promise,
+            onNext: () => {
+              echoSent = true;
+            },
+          });
+        }),
+        http.post('*/api/app/rpc/apps/update', async ({ request }) => {
+          const draftBundle = appBundleSchema.parse(await readOrpcInput(request));
+          currentAutosavedDraft = draftBundle;
+          updateCallCount += 1;
+
+          return orpcJsonResponse({ success: true });
+        }),
+      );
+
+      await renderWithProviders(<Apps />);
+
+      await user.click(page.getByText('consumed-focus-draft'));
+
+      const redirectUriInput = page.getByLabelText('Redirect URIs');
+
+      await expect.element(redirectUriInput).toHaveValue(initialRedirectUri);
+      await user.fill(redirectUriInput, intermediateRedirectUri);
+      await expect.poll(() => updateCallCount).toBeGreaterThan(0);
+      await expect.poll(() => getAutosavedRedirectUri(currentAutosavedDraft)).toBe(
+        intermediateRedirectUri,
+      );
+      consumedAutosavedDrafts.first = currentAutosavedDraft;
+
+      await user.fill(redirectUriInput, finalRedirectUri);
+      await expect.poll(() => updateCallCount).toBeGreaterThan(1);
+      await expect.poll(() => getAutosavedRedirectUri(currentAutosavedDraft)).toBe(
+        finalRedirectUri,
+      );
+      consumedAutosavedDrafts.latest = currentAutosavedDraft;
+
+      echoSignal.resolve();
+      await expect.poll(() => echoSent).toBe(true);
+      await waitForStreamProcessing();
+
+      await expect.element(redirectUriInput).toHaveValue(intermediateRedirectUri);
     });
 
     test('captures default health check inputs on create', async ({

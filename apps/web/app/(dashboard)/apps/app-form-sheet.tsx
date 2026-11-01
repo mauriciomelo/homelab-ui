@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import {
   Sheet,
   SheetClose,
@@ -14,7 +13,6 @@ import { Form } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-  appBundleSchema,
   defaultAppBundleData,
   type AppBundleSchema,
 } from '@/app/api/schemas';
@@ -27,6 +25,7 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { produce } from 'immer';
+import { useAppFormSync } from './use-app-form-sync';
 
 export type AppFormMode = 'edit' | 'create';
 
@@ -197,38 +196,6 @@ function getQueryError(error: unknown) {
   return null;
 }
 
-type DraftMutation = {
-  isPending: boolean;
-  isSuccess: boolean;
-  mutate: (bundle: AppBundleSchema) => void;
-  mutateAsync: (bundle: AppBundleSchema) => Promise<unknown>;
-};
-
-function persistDraftFromValues({
-  values,
-  hasPersistedDraft,
-  createDraftMutation,
-  updateDraftMutation,
-}: {
-  values: unknown;
-  hasPersistedDraft: boolean;
-  createDraftMutation: DraftMutation;
-  updateDraftMutation: DraftMutation;
-}) {
-  const parsedBundle = appBundleSchema.safeParse(values);
-
-  if (!parsedBundle.success) {
-    return;
-  }
-
-  if (hasPersistedDraft) {
-    updateDraftMutation.mutate(parsedBundle.data);
-    return;
-  }
-
-  createDraftMutation.mutate(parsedBundle.data);
-}
-
 function getIsEditModeMissingApp({
   mode,
   queryPending,
@@ -395,9 +362,18 @@ function AppFormSheetBody({
     draftIdentifier,
   });
   const defaultValues = currentData ?? defaultAppBundleData;
+  const isDraftSyncEnabled =
+    open && mode === 'create' && draftIdentifier !== null;
+  const persistApp = (bundle: AppBundleSchema) => {
+    if (hasPersistedDraft) {
+      updateDraftMutation.mutate(bundle);
+      return;
+    }
+
+    createDraftMutation.mutate(bundle);
+  };
 
   const form = useApplicationForm({
-    data: currentData,
     mode,
     defaultValues,
     onPublishSuccess: async () => {
@@ -410,48 +386,20 @@ function AppFormSheetBody({
       onOpenChange(false);
     },
   });
+  useAppFormSync({
+    // Compare the form against the resolved source snapshot, not raw watcher
+    // events, so resets only happen when the actual backing data changes.
+    data: currentData,
+    // The sync hook needs the form instance to watch local edits and reset fields
+    // when a real remote update arrives.
+    form: form.form,
+    // Enable local draft autosave only for an open create session with a draft id.
+    enabled: isDraftSyncEnabled,
+    // The parent keeps the create-vs-update decision so the hook only knows how
+    // to request persistence, not which mutation strategy to use.
+    persistApp,
+  });
   const appDropArea = useAppDropArea({ form: form.form });
-
-  const handleDraftWatchChange = ({
-    type,
-    values,
-  }: {
-    type: unknown;
-    values: unknown;
-  }) => {
-    if (type !== 'change') {
-      return;
-    }
-
-    persistDraftFromValues({
-      values,
-      hasPersistedDraft,
-      createDraftMutation,
-      updateDraftMutation,
-    });
-  };
-
-  useEffect(() => {
-    if (!open || mode !== 'create' || !draftIdentifier) {
-      return;
-    }
-
-    const subscription = form.form.watch((values, { type }) => {
-      handleDraftWatchChange({ type, values });
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [
-    createDraftMutation,
-    form.form,
-    hasPersistedDraft,
-    handleDraftWatchChange,
-    mode,
-    open,
-    draftIdentifier,
-  ]);
 
   const isEditModeMissingApp = getIsEditModeMissingApp({
     mode,
