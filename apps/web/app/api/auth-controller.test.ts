@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { server } from '@/test-utils';
 import { http, HttpResponse } from 'msw';
-import { registerAuthClientController } from './auth-controller';
+import {
+  registerAuthClientController,
+  stopAuthClientController,
+} from './auth-controller';
 import * as k8s from '@kubernetes/client-node';
 import { getOptionalConfig } from '@/app/(dashboard)/apps/config';
 
@@ -339,5 +342,32 @@ describe('registerAuthClientController', () => {
       name: 'my-auth-client',
       namespace: 'default',
     });
+  });
+
+  it('reconnects when the AuthClient watch closes and aborts on shutdown', async () => {
+    mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockResolvedValue(
+      {},
+    );
+    const abortSpy = vi.fn();
+    mockWatch.watch.mockResolvedValue({ abort: abortSpy });
+
+    await registerAuthClientController();
+
+    expect(mockWatch.watch).toHaveBeenCalledTimes(1);
+
+    const onWatchDone = mockWatch.watch.mock.calls[0][3];
+    onWatchDone(new Error('Watch stream reset'));
+
+    expect(mockWatch.watch).toHaveBeenCalledTimes(2);
+
+    await Promise.resolve();
+    stopAuthClientController();
+
+    expect(abortSpy).toHaveBeenCalledOnce();
+
+    const onWatchDoneAfterStop = mockWatch.watch.mock.calls[1][3];
+    onWatchDoneAfterStop(new Error('Closed on shutdown'));
+
+    expect(mockWatch.watch).toHaveBeenCalledTimes(2);
   });
 });

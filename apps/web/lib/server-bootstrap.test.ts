@@ -1,13 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { registerAppController, registerAuthClientController } = vi.hoisted(
-  () => ({
-    registerAppController: vi.fn<() => Promise<void>>(),
-    registerAuthClientController: vi.fn<() => Promise<void>>(),
-  }),
-);
-vi.mock('@/app/api/app-controller', () => ({ registerAppController }));
-vi.mock('@/app/api/auth-controller', () => ({ registerAuthClientController }));
+const {
+  registerAppController,
+  stopAppController,
+  registerAuthClientController,
+  stopAuthClientController,
+} = vi.hoisted(() => ({
+  registerAppController: vi.fn<() => Promise<void>>(),
+  stopAppController: vi.fn<() => void>(),
+  registerAuthClientController: vi.fn<() => Promise<void>>(),
+  stopAuthClientController: vi.fn<() => void>(),
+}));
+vi.mock('@/app/api/app-controller', () => ({
+  registerAppController,
+  stopAppController,
+}));
+vi.mock('@/app/api/auth-controller', () => ({
+  registerAuthClientController,
+  stopAuthClientController,
+}));
 vi.mock('@/mdns', () => ({ publishService: vi.fn() }));
 vi.mock('@/app/(dashboard)/apps/config', () => ({
   getOptionalConfig: () => ({ PUBLISH_MDNS_SERVICE: false }),
@@ -101,5 +112,17 @@ describe('server health', () => {
     );
     expect(registerAppController).toHaveBeenCalledOnce();
     expect(registerAuthClientController).toHaveBeenCalledOnce();
+  });
+
+  it('stops controller watches cleanly on shutdown', async () => {
+    const { ensureServerBootstrap, shutdownServer, ready } = await loadServer();
+    await ensureServerBootstrap();
+    expect(ready().status).toBe(200);
+
+    shutdownServer();
+
+    expect(ready().status).toBe(503);
+    expect(stopAppController).toHaveBeenCalledOnce();
+    expect(stopAuthClientController).toHaveBeenCalledOnce();
   });
 });

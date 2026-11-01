@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as k8s from '@kubernetes/client-node';
 import { produce } from 'immer';
 
-import { registerAppController } from './app-controller';
+import { registerAppController, stopAppController } from './app-controller';
 import { baseAppManifest } from '@/test-utils/fixtures';
 
 const {
@@ -538,4 +538,33 @@ describe('registerAppController', () => {
     });
   });
 
+  it('reconnects when a controller watch closes and aborts watches on shutdown', async () => {
+    mockApiextensionsV1ApiClient.readCustomResourceDefinition.mockResolvedValue(
+      {},
+    );
+    const abortSpy = vi.fn();
+    mockWatch.watch.mockResolvedValue({ abort: abortSpy });
+
+    await registerAppController();
+
+    expect(mockWatch.watch).toHaveBeenCalledTimes(3);
+
+    const onAppsWatchDone = mockWatch.watch.mock.calls[0][3];
+    onAppsWatchDone(new Error('Watch connection reset'));
+
+    expect(mockWatch.watch).toHaveBeenCalledTimes(4);
+    expect(mockWatch.watch.mock.calls[3][0]).toBe(
+      '/apis/tesselar.io/v1alpha1/apps',
+    );
+
+    await Promise.resolve();
+    stopAppController();
+
+    expect(abortSpy).toHaveBeenCalled();
+
+    const onAppsWatchDoneAfterStop = mockWatch.watch.mock.calls[3][3];
+    onAppsWatchDoneAfterStop(new Error('Closed on shutdown'));
+
+    expect(mockWatch.watch).toHaveBeenCalledTimes(4);
+  });
 });

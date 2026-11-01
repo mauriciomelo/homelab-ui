@@ -84,115 +84,201 @@ async function createCrdIfNotExists() {
   }
 }
 
+const RECONNECT_DELAY_MS = 1000;
+let stopActiveWatch: (() => void) | undefined;
+
+async function handleAuthClientEvent(type: string, apiObj: AuthClient) {
+  const name = apiObj.metadata?.name;
+  const namespace = apiObj.metadata?.namespace;
+  const eventLogger = authControllerLogger.child({
+    eventType: type,
+    name,
+    namespace,
+  });
+
+  try {
+    assert(typeof name === 'string', 'Name must be a string');
+    assert(typeof namespace === 'string', 'Namespace must be a string');
+
+    const oidcApplicationName = `${namespace}-${name}`;
+
+    if (type !== 'ADDED' && type !== 'DELETED') {
+      eventLogger.debug('Ignoring AuthClient event');
+      return;
+    }
+
+    eventLogger.info('Reconciling AuthClient event');
+
+    const zitadel = await ZitadelClient.create();
+
+    const { id: orgId } = await zitadel.getOrgByName({
+      name: ZITADEL.orgName,
+    });
+    const { id: projectId } = await zitadel.getProjectByName({
+      name: ZITADEL.projectName,
+    });
+
+    assert(typeof orgId === 'string', 'orgId must be a string');
+    assert(typeof projectId === 'string', 'projectId must be a string');
+
+    const zitadelLogger = eventLogger.child({ orgId, projectId });
+
+    if (type === 'ADDED') {
+      const exists = await secretExists({ name, namespace });
+      if (exists) {
+        zitadelLogger.debug(
+          'Skipping AuthClient creation because secret already exists',
+        );
+        return;
+      }
+
+      zitadelLogger.info('Creating AuthClient application');
+
+      const { clientId, clientSecret } = await zitadel.createApplication({
+        name: oidcApplicationName,
+        projectId,
+        orgId,
+        redirectUris: apiObj.spec.redirectUris,
+        postLogoutRedirectUris: apiObj.spec.postLogoutRedirectUris,
+      });
+
+      await createSecret({
+        name,
+        namespace,
+        secretData: {
+          clientId,
+          clientSecret,
+        },
+      });
+
+      zitadelLogger.info('Created AuthClient application and secret');
+      return;
+    }
+
+    const application = await zitadel.getApplicationByName({
+      name: oidcApplicationName,
+      projectId,
+      orgId,
+    });
+
+    zitadelLogger.info(
+      { applicationId: application.id },
+      'Deleting AuthClient application',
+    );
+
+    await zitadel.deleteApplication({
+      id: application.id,
+      projectId,
+      orgId,
+    });
+
+    await deleteSecret({ name, namespace });
+    zitadelLogger.info(
+      { applicationId: application.id },
+      'Deleted AuthClient application and secret',
+    );
+  } catch (err) {
+    eventLogger.error({ err }, 'AuthClient watch handler failed');
+    throw err;
+  }
+}
+
+function handleAuthClientWatchClosed(
+  isStopped: () => boolean,
+  err: unknown,
+  reconnect: () => void,
+) {
+  if (isStopped()) {
+    return;
+  }
+
+  if (err) {
+    authControllerLogger.error({ err }, 'AuthClient watch stream failed');
+  } else {
+    authControllerLogger.info('AuthClient watch stream closed; reconnecting');
+  }
+
+  reconnect();
+}
+
 function watchAuthClients() {
   const kc = new k8s.KubeConfig();
   kc.loadFromDefault();
   const watch = new k8s.Watch(kc);
+  let stopped = false;
+  let currentAbortController: AbortController | undefined;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
   authControllerLogger.info('Starting AuthClient watch');
 
-  void watch.watch(
-    `/apis/${group}/${version}/${plural}`,
-    {},
-    async (type, apiObj: AuthClient) => {
-      const name = apiObj.metadata?.name;
-      const namespace = apiObj.metadata?.namespace;
-      const eventLogger = authControllerLogger.child({
-        eventType: type,
-        name,
-        namespace,
-      });
+  const startWatch = () => {
+    if (stopped) {
+      return;
+    }
 
-      try {
-        assert(typeof name === 'string', 'Name must be a string');
-        assert(typeof namespace === 'string', 'Namespace must be a string');
-
-        const oidcApplicationName = `${namespace}-${name}`;
-
-        if (type !== 'ADDED' && type !== 'DELETED') {
-          eventLogger.debug('Ignoring AuthClient event');
-          return;
-        }
-
-        eventLogger.info('Reconciling AuthClient event');
-
-        const zitadel = await ZitadelClient.create();
-
-        const { id: orgId } = await zitadel.getOrgByName({
-          name: ZITADEL.orgName,
-        });
-        const { id: projectId } = await zitadel.getProjectByName({
-          name: ZITADEL.projectName,
-        });
-
-        assert(typeof orgId === 'string', 'orgId must be a string');
-        assert(typeof projectId === 'string', 'projectId must be a string');
-
-        const zitadelLogger = eventLogger.child({ orgId, projectId });
-
-        if (type === 'ADDED') {
-          const exists = await secretExists({ name, namespace });
-          if (exists) {
-            zitadelLogger.debug(
-              'Skipping AuthClient creation because secret already exists',
-            );
+    void Promise.resolve(
+      watch.watch(
+        `/apis/${group}/${version}/${plural}`,
+        {},
+        async (type, apiObj: AuthClient) => {
+          if (stopped) {
             return;
           }
 
-          zitadelLogger.info('Creating AuthClient application');
-
-          const { clientId, clientSecret } = await zitadel.createApplication({
-            name: oidcApplicationName,
-            projectId,
-            orgId,
-            redirectUris: apiObj.spec.redirectUris,
-            postLogoutRedirectUris: apiObj.spec.postLogoutRedirectUris,
-          });
-
-          await createSecret({
-            name,
-            namespace,
-            secretData: {
-              clientId,
-              clientSecret,
-            },
-          });
-
-          zitadelLogger.info('Created AuthClient application and secret');
+          await handleAuthClientEvent(type, apiObj);
+        },
+        (err) => {
+          currentAbortController = undefined;
+          handleAuthClientWatchClosed(() => stopped, err, startWatch);
+        },
+      ),
+    )
+      .then((controller: AbortController | undefined) => {
+        if (!controller) {
           return;
         }
 
-        const application = await zitadel.getApplicationByName({
-          name: oidcApplicationName,
-          projectId,
-          orgId,
-        });
+        if (stopped) {
+          controller.abort();
+          return;
+        }
 
-        zitadelLogger.info(
-          { applicationId: application.id },
-          'Deleting AuthClient application',
-        );
+        currentAbortController = controller;
+      })
+      .catch((err: unknown) => {
+        if (!stopped) {
+          authControllerLogger.error(
+            { err },
+            'AuthClient watch startup failed',
+          );
+          retryTimer = setTimeout(() => {
+            retryTimer = undefined;
+            if (!stopped) {
+              startWatch();
+            }
+          }, RECONNECT_DELAY_MS);
+        }
+      });
+  };
 
-        await zitadel.deleteApplication({
-          id: application.id,
-          projectId,
-          orgId,
-        });
+  startWatch();
 
-        await deleteSecret({ name, namespace });
-        zitadelLogger.info(
-          { applicationId: application.id },
-          'Deleted AuthClient application and secret',
-        );
-      } catch (err) {
-        eventLogger.error({ err }, 'AuthClient watch handler failed');
-        throw err;
-      }
-    },
-    (err) => {
-      authControllerLogger.error({ err }, 'AuthClient watch stream failed');
-    },
-  );
+  return () => {
+    if (stopped) {
+      return;
+    }
+
+    stopped = true;
+    authControllerLogger.info('Stopping AuthClient watch');
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = undefined;
+    }
+    if (currentAbortController) {
+      currentAbortController.abort();
+      currentAbortController = undefined;
+    }
+  };
 }
 
 async function secretExists({
@@ -234,8 +320,14 @@ interface AuthClient extends k8s.KubernetesObject {
 export async function registerAuthClientController() {
   authControllerLogger.info('Registering AuthClient controller');
   await createCrdIfNotExists();
-  watchAuthClients();
+  stopAuthClientController();
+  stopActiveWatch = watchAuthClients();
   authControllerLogger.info('AuthClient controller registered');
+}
+
+export function stopAuthClientController() {
+  stopActiveWatch?.();
+  stopActiveWatch = undefined;
 }
 
 async function createSecret({

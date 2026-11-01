@@ -83,11 +83,27 @@ function isKubernetesError(err: unknown): err is { code: number } {
   return typeof err === 'object' && err !== null && 'code' in err;
 }
 
+const RECONNECT_DELAY_MS = 1000;
+let stopActiveWatches: (() => void) | undefined;
+
+type WatchSession = {
+  watch: k8s.Watch;
+  isStopped: () => boolean;
+  abortControllers: Set<AbortController>;
+  retryTimers: Set<ReturnType<typeof setTimeout>>;
+};
+
 export async function registerAppController() {
   appControllerLogger.info('Registering app controller');
   await createCrdIfNotExists();
-  watchAppResources();
+  stopAppController();
+  stopActiveWatches = watchAppResources();
   appControllerLogger.info('App controller registered');
+}
+
+export function stopAppController() {
+  stopActiveWatches?.();
+  stopActiveWatches = undefined;
 }
 
 async function createCrdIfNotExists() {
@@ -155,118 +171,146 @@ function watchAppResources() {
   const kc = new k8s.KubeConfig();
   kc.loadFromDefault();
   const watch = new k8s.Watch(kc);
+  let stopped = false;
+  const session: WatchSession = {
+    watch,
+    isStopped: () => stopped,
+    abortControllers: new Set(),
+    retryTimers: new Set(),
+  };
 
   appControllerLogger.info('Starting resource watches');
 
   watchResource({
-    watch,
+    session,
     path: `/apis/${group}/${version}/${plural}`,
-    onEvent: async (type, apiObj: WatchedApp) => {
-      if (type === 'DELETED' || type === 'BOOKMARK' || !apiObj.metadata.name) {
-        return;
-      }
-
-      const eventLogger = appControllerLogger.child({
-        eventType: type,
-        ...getAppLogContext(apiObj),
-      });
-
-      if (!shouldReconcileApp(apiObj)) {
-        eventLogger.debug('Skipping app reconcile because status is current');
-        return;
-      }
-
-      const namespace = apiObj.metadata.namespace;
-      const name = apiObj.metadata.name;
-
-      if (!namespace) {
-        return;
-      }
-
-      await runSerialized(`${namespace}/${name}`, async () => {
-        eventLogger.info('Reconciling app resources');
-        await reconcileApp(apiObj);
-        await reconcileAppStatus({
-          name,
-          namespace,
-          observedGeneration: apiObj.metadata.generation,
-        });
-        eventLogger.info('Reconciled app resources');
-      });
-    },
+    onEvent: handleAppWatchEvent,
   });
 
   watchResource({
-    watch,
+    session,
     path: '/apis/apps/v1/deployments',
-    onEvent: async (type, deployment: k8s.V1Deployment) => {
-      if (
-        type === 'DELETED' ||
-        type === 'BOOKMARK' ||
-        !deployment.metadata?.namespace
-      ) {
-        return;
-      }
-
-      const namespace = deployment.metadata.namespace;
-      const name = deployment.metadata.name;
-
-      if (!name) {
-        return;
-      }
-
-      const eventLogger = appControllerLogger.child({
-        eventType: type,
-        name,
-        namespace,
-        resource: 'deployment',
-      });
-
-      await runSerialized(`${namespace}/${name}`, async () => {
-        eventLogger.debug('Refreshing app status from deployment event');
-        await reconcileAppStatus({
-          name,
-          namespace,
-        });
-      });
-    },
+    onEvent: handleDeploymentWatchEvent,
   });
 
   watchResource({
-    watch,
+    session,
     path: '/api/v1/pods',
-    onEvent: async (type, pod: k8s.V1Pod) => {
-      if (
-        type === 'DELETED' ||
-        type === 'BOOKMARK' ||
-        !pod.metadata?.namespace
-      ) {
-        return;
-      }
+    onEvent: handlePodWatchEvent,
+  });
 
-      const namespace = pod.metadata.namespace;
-      const name =
-        pod.metadata.labels?.[appNameLabel] ?? pod.metadata.labels?.app;
+  return () => {
+    if (stopped) {
+      return;
+    }
 
-      if (!name) {
-        return;
-      }
+    stopped = true;
+    appControllerLogger.info('Stopping resource watches');
+    for (const timer of session.retryTimers) {
+      clearTimeout(timer);
+    }
+    session.retryTimers.clear();
+    for (const controller of session.abortControllers) {
+      controller.abort();
+    }
+    session.abortControllers.clear();
+  };
+}
 
-      const eventLogger = appControllerLogger.child({
-        eventType: type,
-        name,
-        namespace,
-        resource: 'pod',
-      });
+async function handleAppWatchEvent(type: string, apiObj: WatchedApp) {
+  if (type === 'DELETED' || type === 'BOOKMARK' || !apiObj.metadata.name) {
+    return;
+  }
 
-      await runSerialized(`${namespace}/${name}`, async () => {
-        eventLogger.debug('Refreshing app status from pod event');
-        await reconcileAppStatus({
-          name,
-          namespace,
-        });
-      });
-    },
+  const eventLogger = appControllerLogger.child({
+    eventType: type,
+    ...getAppLogContext(apiObj),
+  });
+
+  if (!shouldReconcileApp(apiObj)) {
+    eventLogger.debug('Skipping app reconcile because status is current');
+    return;
+  }
+
+  const namespace = apiObj.metadata.namespace;
+  const name = apiObj.metadata.name;
+
+  if (!namespace) {
+    return;
+  }
+
+  await runSerialized(`${namespace}/${name}`, async () => {
+    eventLogger.info('Reconciling app resources');
+    await reconcileApp(apiObj);
+    await reconcileAppStatus({
+      name,
+      namespace,
+      observedGeneration: apiObj.metadata.generation,
+    });
+    eventLogger.info('Reconciled app resources');
+  });
+}
+
+async function handleDeploymentWatchEvent(
+  type: string,
+  deployment: k8s.V1Deployment,
+) {
+  if (
+    type === 'DELETED' ||
+    type === 'BOOKMARK' ||
+    !deployment.metadata?.namespace
+  ) {
+    return;
+  }
+
+  const namespace = deployment.metadata.namespace;
+  const name = deployment.metadata.name;
+
+  if (!name) {
+    return;
+  }
+
+  const eventLogger = appControllerLogger.child({
+    eventType: type,
+    name,
+    namespace,
+    resource: 'deployment',
+  });
+
+  await runSerialized(`${namespace}/${name}`, async () => {
+    eventLogger.debug('Refreshing app status from deployment event');
+    await reconcileAppStatus({
+      name,
+      namespace,
+    });
+  });
+}
+
+async function handlePodWatchEvent(type: string, pod: k8s.V1Pod) {
+  if (type === 'DELETED' || type === 'BOOKMARK' || !pod.metadata?.namespace) {
+    return;
+  }
+
+  const namespace = pod.metadata.namespace;
+  const name = pod.metadata.labels?.[appNameLabel] ?? pod.metadata.labels?.app;
+
+  if (!name) {
+    return;
+  }
+
+  const eventLogger = appControllerLogger.child({
+    eventType: type,
+    name,
+    namespace,
+    resource: 'pod',
+  });
+
+  await runSerialized(`${namespace}/${name}`, async () => {
+    eventLogger.debug('Refreshing app status from pod event');
+    await reconcileAppStatus({
+      name,
+      namespace,
+    });
   });
 }
 
@@ -286,38 +330,123 @@ async function runSerialized(key: string, operation: () => Promise<void>) {
   await next;
 }
 
+function registerAbortController(
+  session: WatchSession,
+  controller: AbortController | undefined,
+  onRegistered: (registered: AbortController) => void,
+) {
+  if (!controller) {
+    return;
+  }
+
+  if (session.isStopped()) {
+    controller.abort();
+    return;
+  }
+
+  session.abortControllers.add(controller);
+  onRegistered(controller);
+}
+
+function scheduleWatchRetry(session: WatchSession, retry: () => void) {
+  if (session.isStopped()) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    session.retryTimers.delete(timer);
+    if (!session.isStopped()) {
+      retry();
+    }
+  }, RECONNECT_DELAY_MS);
+  session.retryTimers.add(timer);
+}
+
+function handleWatchClosed(
+  session: WatchSession,
+  path: string,
+  error: unknown,
+  reconnect: () => void,
+) {
+  if (session.isStopped()) {
+    return;
+  }
+
+  if (error) {
+    appControllerLogger.error({ err: error, path }, 'Watch stream failed');
+  } else {
+    appControllerLogger.info({ path }, 'Watch stream closed; reconnecting');
+  }
+
+  reconnect();
+}
+
 function watchResource<T extends k8s.KubernetesObject>({
-  watch,
+  session,
   path,
   onEvent,
 }: {
-  watch: k8s.Watch;
+  session: WatchSession;
   path: string;
   onEvent: (type: string, obj: T) => Promise<void>;
 }) {
-  appControllerLogger.debug({ path }, 'Registering watch');
-  void watch.watch(
-    path,
-    watchOptions,
-    async (type, apiObj: T) => {
-      try {
-        await onEvent(type, apiObj);
-      } catch (error) {
-        appControllerLogger.error(
-          {
-            err: error,
-            path,
-            eventType: type,
-            ...getObjectLogContext(apiObj),
-          },
-          'Watch event handler failed',
-        );
-      }
-    },
-    (error) => {
-      appControllerLogger.error({ err: error, path }, 'Watch stream failed');
-    },
-  );
+  const startWatch = () => {
+    if (session.isStopped()) {
+      return;
+    }
+
+    appControllerLogger.debug({ path }, 'Registering watch');
+    let currentAbortController: AbortController | undefined;
+
+    void Promise.resolve(
+      session.watch.watch(
+        path,
+        { ...watchOptions },
+        async (type, apiObj: T) => {
+          if (session.isStopped()) {
+            return;
+          }
+
+          try {
+            await onEvent(type, apiObj);
+          } catch (error) {
+            appControllerLogger.error(
+              {
+                err: error,
+                path,
+                eventType: type,
+                ...getObjectLogContext(apiObj),
+              },
+              'Watch event handler failed',
+            );
+          }
+        },
+        (error) => {
+          if (currentAbortController) {
+            session.abortControllers.delete(currentAbortController);
+          }
+
+          handleWatchClosed(session, path, error, startWatch);
+        },
+      ),
+    )
+      .then((controller: AbortController | undefined) => {
+        registerAbortController(session, controller, (registered) => {
+          currentAbortController = registered;
+        });
+      })
+      .catch((error: unknown) => {
+        if (!session.isStopped()) {
+          appControllerLogger.error(
+            { err: error, path },
+            'Watch startup failed',
+          );
+          scheduleWatchRetry(session, startWatch);
+        }
+      });
+  };
+
+  startWatch();
 }
 
 function shouldReconcileApp(app: WatchedApp) {
