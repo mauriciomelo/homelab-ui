@@ -5,8 +5,6 @@ import {
   getApp,
   listApps,
   listAppsInputSchema,
-  openWith,
-  openWithTargetSchema,
   publishApp,
   updateApp,
   watchApp,
@@ -60,17 +58,6 @@ export const appRouter = {
       )
       .handler(async ({ input }) => {
         return discardDraft(input.draftId);
-      }),
-    openWith: os
-      .input(
-        z
-          .object({
-            target: openWithTargetSchema,
-          })
-          .and(appBundleIdentifierSchema),
-      )
-      .handler(async ({ input }) => {
-        return openWith(input);
       }),
   },
 };

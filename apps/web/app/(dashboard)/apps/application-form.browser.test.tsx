@@ -131,9 +131,6 @@ function setupDraftHandlers(
     http.post('*/api/app/rpc/apps/discardDraft', () => {
       return orpcJsonResponse({ success: true });
     }),
-    http.post('*/api/app/rpc/apps/openWith', () => {
-      return orpcJsonResponse({ success: true });
-    }),
   );
 
   return {
@@ -308,41 +305,6 @@ describe('ApplicationForm', () => {
   });
 
   describe('update application', () => {
-    test('opens the committed app directory from edit mode', async ({
-      worker,
-    }) => {
-      let openRequest: unknown;
-      const user = userEvent.setup();
-
-      worker.use(
-        http.post('*/api/app/rpc/apps/watchApps', () => {
-          return orpcEventStreamResponse([{ data: [
-            produce(baseApp, (app) => {
-              app.app.metadata.name = 'edit-open-app';
-            }),
-          ] }]);
-        }),
-        http.post('*/api/app/rpc/apps/openWith', async ({ request }) => {
-          openRequest = await readOrpcInput(request);
-          return orpcJsonResponse({ success: true });
-        }),
-      );
-
-      await renderWithProviders(<Apps />);
-      await user.click(await page.getByText('edit-open-app'));
-      await user.click(
-        page.getByRole('button', { name: 'Choose app to open with' }),
-      );
-      await user.click(page.getByRole('menuitemradio', { name: 'Finder' }));
-
-      await expect
-        .poll(() => openRequest)
-        .toEqual({
-          target: 'finder',
-          appName: 'edit-open-app',
-        });
-    });
-
     test('populates form fields with initial data', async ({ worker }) => {
       const user = userEvent.setup();
       const openwebuiApp = produce(baseApp, (app) => {
@@ -1639,31 +1601,6 @@ describe('ApplicationForm', () => {
           },
         },
       });
-    });
-
-    test('opens the draft workspace in VSCode', async ({ worker }) => {
-      let openRequest: unknown;
-      const user = userEvent.setup();
-
-      setupDraftHandlers(worker);
-      worker.use(
-        http.post('*/api/app/rpc/apps/openWith', async ({ request }) => {
-          openRequest = await readOrpcInput(request);
-          return orpcJsonResponse({ success: true });
-        }),
-      );
-
-      await renderWithProviders(<Apps />);
-
-      await user.click(page.getByText('Create App'));
-      await user.click(page.getByRole('button', { name: 'Open in' }));
-
-      await expect
-        .poll(() => openRequest)
-        .toEqual({
-          target: 'vscode',
-          draftId: expect.any(String),
-        });
     });
 
     test('captures default health check inputs on create', async ({

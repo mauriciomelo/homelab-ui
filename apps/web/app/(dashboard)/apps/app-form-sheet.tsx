@@ -26,7 +26,6 @@ import {
   useMutation,
   useQuery,
 } from '@tanstack/react-query';
-import { OpenWithMenu } from './open-with-menu';
 import { produce } from 'immer';
 
 export type AppFormMode = 'edit' | 'create';
@@ -204,31 +203,6 @@ type DraftMutation = {
   mutate: (bundle: AppBundleSchema) => void;
   mutateAsync: (bundle: AppBundleSchema) => Promise<unknown>;
 };
-
-function ensureDraftExistsIfNeeded({
-  mode,
-  draftIdentifier,
-  hasPersistedDraft,
-  createDraftMutation,
-}: {
-  mode: AppFormMode;
-  draftIdentifier: { draftId: string } | null;
-  hasPersistedDraft: boolean;
-  createDraftMutation: DraftMutation;
-}): Promise<void> {
-  if (
-    mode !== 'create' ||
-    draftIdentifier === null ||
-    hasPersistedDraft ||
-    createDraftMutation.isPending
-  ) {
-    return Promise.resolve();
-  }
-
-  return createDraftMutation
-    .mutateAsync(createDefaultDraftBundle(draftIdentifier.draftId))
-    .then(() => undefined);
-}
 
 function persistDraftFromValues({
   values,
@@ -438,14 +412,6 @@ function AppFormSheetBody({
   });
   const appDropArea = useAppDropArea({ form: form.form });
 
-  const ensureDraftExists = () =>
-    ensureDraftExistsIfNeeded({
-      mode,
-      draftIdentifier,
-      hasPersistedDraft,
-      createDraftMutation,
-    });
-
   const handleDraftWatchChange = ({
     type,
     values,
@@ -502,12 +468,6 @@ function AppFormSheetBody({
     currentData,
     hasPersistedDraft,
   });
-  const openTargetIdentifier = mode === 'create' ? draftIdentifier : appIdentifier;
-
-  const isOpenDisabled =
-    openTargetIdentifier === null ||
-    createDraftMutation.isPending ||
-    updateDraftMutation.isPending;
   const displayedError = getQueryError(watchedBundlesQuery.error);
   const showError = displayedError !== null || isEditModeMissingApp;
   const title = getSheetTitle({ mode, currentData, appIdentifier });
@@ -539,11 +499,6 @@ function AppFormSheetBody({
           <SheetHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <SheetTitle>{title}</SheetTitle>
-              <OpenWithMenu
-                targetIdentifier={openTargetIdentifier}
-                disabled={isOpenDisabled}
-                beforeOpen={mode === 'create' ? ensureDraftExists : undefined}
-              />
             </div>
             <SheetDescription>{description}</SheetDescription>
           </SheetHeader>

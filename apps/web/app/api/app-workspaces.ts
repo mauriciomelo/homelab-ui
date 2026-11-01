@@ -1,4 +1,3 @@
-import { execFile } from 'child_process';
 import { APP_STATUS } from '@/app/constants';
 import { logger } from '@/lib/logger';
 import { controlPlaneOrpcServerClient } from '@/control-plane-orpc/server-client';
@@ -11,7 +10,6 @@ import YAML from 'yaml';
 import z from 'zod/v4';
 import { getAppConfig } from '../(dashboard)/apps/config';
 import {
-  appBundleIdentifierSchema,
   isDraftAppBundleIdentifier,
   parseAppBundleIdentifier,
   type AppBundleIdentifier,
@@ -30,14 +28,6 @@ import {
 import type { AppBundleSchema } from './schemas';
 
 const appWorkspacesLogger = logger.child({ module: 'app-workspaces-api' });
-
-export const openWithTargetSchema = z.enum([
-  'finder',
-  'terminal',
-  'vscode',
-  'cursor',
-  'ghostty',
-]);
 
 export type AppResourceType =
   | z.infer<typeof appSchema>
@@ -73,12 +63,6 @@ export const appBundleListItemSchema = z.union([
 ]);
 
 export const appBundleListSchema = z.array(appBundleListItemSchema);
-
-const openWithInputSchema = z
-  .object({
-    target: openWithTargetSchema,
-  })
-  .and(appBundleIdentifierSchema);
 
 export async function getApp(input: unknown): Promise<AppBundleSchema> {
   const parsedInput = parseAppBundleIdentifier(input);
@@ -587,19 +571,6 @@ export async function discardDraft(draftId: string) {
   return { success: true };
 }
 
-export async function openWith(input: unknown) {
-  const parsedInput = openWithInputSchema.parse(input);
-  const targetIdentifier = parseAppBundleIdentifier(parsedInput);
-  const targetPath = getAppBundlePath(targetIdentifier);
-
-  await fs.promises.access(targetPath, fs.constants.F_OK);
-
-  const { command, args } = getOpenCommand(parsedInput.target, targetPath);
-  await execFileAsync(command, args);
-
-  return { success: true };
-}
-
 export function getDraftsDir() {
   return path.join(getAppsDir(), '.drafts');
 }
@@ -632,61 +603,6 @@ function getAppBundlePath(identifier: AppBundleIdentifier) {
   return isDraftAppBundleIdentifier(identifier)
     ? getDraftDir(identifier.draftId)
     : getAppDir(identifier.appName);
-}
-
-function getOpenCommand(
-  target: z.infer<typeof openWithTargetSchema>,
-  targetPath: string,
-) {
-  if (process.platform !== 'darwin') {
-    throw new Error('openWith currently supports only macOS');
-  }
-
-  if (target === 'finder') {
-    return {
-      command: 'open',
-      args: [targetPath],
-    };
-  }
-
-  if (target === 'terminal') {
-    return {
-      command: 'open',
-      args: ['-a', 'Terminal', targetPath],
-    };
-  }
-
-  if (target === 'ghostty') {
-    return {
-      command: 'open',
-      args: ['-n', '-a', 'Ghostty', targetPath],
-    };
-  }
-
-  if (target === 'cursor') {
-    return {
-      command: 'open',
-      args: ['-a', 'Cursor', targetPath],
-    };
-  }
-
-  return {
-    command: 'code',
-    args: [targetPath],
-  };
-}
-
-async function execFileAsync(command: string, args: string[]) {
-  await new Promise<void>((resolve, reject) => {
-    execFile(command, args, (error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
 }
 
 async function getCanonicalApp(

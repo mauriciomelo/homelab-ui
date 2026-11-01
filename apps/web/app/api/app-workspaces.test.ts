@@ -18,7 +18,6 @@ import {
   publishApp,
   listApps,
   listDrafts,
-  openWith,
   updateApp,
   watchApp,
 } from './app-workspaces';
@@ -51,18 +50,6 @@ type WatchEventResolver = (
 
 const gotkSyncPath =
   '/test-project/clusters/my-cluster/flux-system/gotk-sync.yaml';
-
-const { execFileMock } = vi.hoisted(() => ({
-  execFileMock: vi.fn(
-    (
-      _command: string,
-      _args: string[],
-      callback: (error: Error | null) => void,
-    ) => {
-      callback(null);
-    },
-  ),
-}));
 
 const { watchMock } = vi.hoisted(() => ({
   watchMock:
@@ -97,13 +84,6 @@ vi.mock('node:fs/promises', async () => {
     watch: watchMock,
   };
 });
-
-vi.mock('child_process', () => ({
-  default: {
-    execFile: execFileMock,
-  },
-  execFile: execFileMock,
-}));
 
 vi.mock('./k8s', () => ({
   customObjectsApi: vi.fn().mockReturnValue({
@@ -143,7 +123,6 @@ beforeEach(() => {
     PORT: 3000,
   });
 
-  execFileMock.mockClear();
   watchMock.mockClear();
   vol.reset();
 });
@@ -800,170 +779,5 @@ describe('draft workspaces', () => {
     });
 
     await appWatcher.return(undefined);
-  });
-});
-
-describe('openWith', () => {
-  it('opens a draft workspace in Terminal', async () => {
-    await createApp(
-      produce(baseAppBundle, (draft) => {
-        draft.draftId = 'draft-1';
-      }),
-    );
-
-    await openWith({
-      target: 'terminal',
-      draftId: 'draft-1',
-    });
-
-    expect(execFileMock).toHaveBeenCalledWith(
-      'open',
-      ['-a', 'Terminal', getDraftDir('draft-1')],
-      expect.any(Function),
-    );
-  });
-
-  it('opens a draft workspace in VSCode', async () => {
-    await createApp(
-      produce(baseAppBundle, (draft) => {
-        draft.draftId = 'draft-1';
-      }),
-    );
-
-    await openWith({
-      target: 'vscode',
-      draftId: 'draft-1',
-    });
-
-    expect(execFileMock).toHaveBeenCalledWith(
-      'code',
-      [getDraftDir('draft-1')],
-      expect.any(Function),
-    );
-  });
-
-  it('opens a draft workspace in Cursor', async () => {
-    await createApp(
-      produce(baseAppBundle, (draft) => {
-        draft.draftId = 'draft-1';
-      }),
-    );
-
-    await openWith({
-      target: 'cursor',
-      draftId: 'draft-1',
-    });
-
-    expect(execFileMock).toHaveBeenCalledWith(
-      'open',
-      ['-a', 'Cursor', getDraftDir('draft-1')],
-      expect.any(Function),
-    );
-  });
-
-  it('opens a committed app directory in Finder', async () => {
-    vol.fromJSON({
-      '/test-project/clusters/my-cluster/my-applications/demo-app/.keep': '',
-    });
-
-    await openWith({
-      target: 'finder',
-      appName: 'demo-app',
-    });
-
-    expect(execFileMock).toHaveBeenCalledWith(
-      'open',
-      ['/test-project/clusters/my-cluster/my-applications/demo-app'],
-      expect.any(Function),
-    );
-  });
-
-  it('opens a committed app directory in Ghostty', async () => {
-    vol.fromJSON({
-      '/test-project/clusters/my-cluster/my-applications/demo-app/.keep': '',
-    });
-
-    await openWith({
-      target: 'ghostty',
-      appName: 'demo-app',
-    });
-
-    expect(execFileMock).toHaveBeenCalledWith(
-      'open',
-      [
-        '-n',
-        '-a',
-        'Ghostty',
-        '/test-project/clusters/my-cluster/my-applications/demo-app',
-      ],
-      expect.any(Function),
-    );
-  });
-
-  it('rejects requests without a single target identifier', async () => {
-    await expect(
-      openWith({
-        target: 'finder',
-      }),
-    ).rejects.toThrow('Provide exactly one of appName or draftId');
-
-    await expect(
-      openWith({
-        target: 'finder',
-        appName: 'demo-app',
-        draftId: 'draft-1234',
-      }),
-    ).rejects.toThrow('Provide exactly one of appName or draftId');
-  });
-
-  it('fails when the target path is missing', async () => {
-    await expect(
-      openWith({
-        target: 'finder',
-        appName: 'missing-app',
-      }),
-    ).rejects.toThrow();
-  });
-
-  it('surfaces command execution failures', async () => {
-    await createApp(
-      produce(baseAppBundle, (draft) => {
-        draft.draftId = 'draft-1';
-      }),
-    );
-    execFileMock.mockImplementationOnce(
-      (
-        _command: string,
-        _args: string[],
-        callback: (error: Error | null) => void,
-      ) => {
-        callback(new Error('VSCode is unavailable'));
-      },
-    );
-
-    await expect(
-      openWith({
-        target: 'vscode',
-        draftId: 'draft-1',
-      }),
-    ).rejects.toThrow('VSCode is unavailable');
-  });
-
-  it('fails on unsupported platforms', async () => {
-    vol.fromJSON({
-      '/test-project/clusters/my-cluster/my-applications/demo-app/.keep': '',
-    });
-    const platformSpy = vi
-      .spyOn(process, 'platform', 'get')
-      .mockReturnValue('linux');
-
-    await expect(
-      openWith({
-        target: 'finder',
-        appName: 'demo-app',
-      }),
-    ).rejects.toThrow('openWith currently supports only macOS');
-
-    platformSpy.mockRestore();
   });
 });
