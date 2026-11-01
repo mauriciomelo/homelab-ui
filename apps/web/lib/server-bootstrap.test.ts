@@ -23,11 +23,14 @@ vi.mock('@/app/api/auth-controller', () => ({
 }));
 vi.mock('@/mdns', () => ({ stopMdns }));
 
-beforeEach(() => {
+let server: Awaited<ReturnType<typeof loadServer>>;
+
+beforeEach(async () => {
   vi.resetModules();
   vi.resetAllMocks();
   registerAppController.mockResolvedValue();
   registerAuthClientController.mockResolvedValue();
+  server = await loadServer();
 });
 
 async function loadServer() {
@@ -47,7 +50,7 @@ function deferred() {
 
 describe('server health', () => {
   it('responds to liveness before controller startup without starting controllers', async () => {
-    const { live, ready } = await loadServer();
+    const { live, ready } = server;
     const response = live();
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'ok' });
@@ -62,7 +65,7 @@ describe('server health', () => {
     const auth = deferred();
     registerAppController.mockReturnValue(apps.promise);
     registerAuthClientController.mockReturnValue(auth.promise);
-    const { ensureServerBootstrap, ready } = await loadServer();
+    const { ensureServerBootstrap, ready } = server;
     const startup = ensureServerBootstrap();
     expect(ready().status).toBe(503);
     apps.resolve();
@@ -83,7 +86,7 @@ describe('server health', () => {
   it('shares startup across concurrent calls and does not register controllers twice', async () => {
     const apps = deferred();
     registerAppController.mockReturnValue(apps.promise);
-    const { ensureServerBootstrap, ready } = await loadServer();
+    const { ensureServerBootstrap, ready } = server;
     const first = ensureServerBootstrap();
     const second = ensureServerBootstrap();
     expect(registerAppController).toHaveBeenCalledOnce();
@@ -100,7 +103,7 @@ describe('server health', () => {
     registerAuthClientController.mockRejectedValue(
       new Error('Registration failed'),
     );
-    const { ensureServerBootstrap, live, ready } = await loadServer();
+    const { ensureServerBootstrap, live, ready } = server;
     await expect(ensureServerBootstrap()).rejects.toThrow(
       'Registration failed',
     );
@@ -114,7 +117,7 @@ describe('server health', () => {
   });
 
   it('stops controller watches cleanly on shutdown', async () => {
-    const { ensureServerBootstrap, shutdownServer, ready } = await loadServer();
+    const { ensureServerBootstrap, shutdownServer, ready } = server;
     await ensureServerBootstrap();
     expect(ready().status).toBe(200);
 
