@@ -12,11 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as AppsRouteImport } from './routes/apps'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as RpcSplatRouteImport } from './routes/rpc/$'
 import { Route as HealthReadyRouteImport } from './routes/health/ready'
 import { Route as HealthLiveRouteImport } from './routes/health/live'
-import { Route as ApiResetRouteImport } from './routes/api/reset'
-import { Route as ApiJoinRouteImport } from './routes/api/join'
 import { Route as ApiControlPlaneRpcSplatRouteImport } from './routes/api/control-plane/rpc/$'
 import { Route as ApiAppRpcSplatRouteImport } from './routes/api/app/rpc/$'
 
@@ -35,11 +32,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RpcSplatRoute = RpcSplatRouteImport.update({
-  id: '/rpc/$',
-  path: '/rpc/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const HealthReadyRoute = HealthReadyRouteImport.update({
   id: '/health/ready',
   path: '/health/ready',
@@ -48,16 +40,6 @@ const HealthReadyRoute = HealthReadyRouteImport.update({
 const HealthLiveRoute = HealthLiveRouteImport.update({
   id: '/health/live',
   path: '/health/live',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiResetRoute = ApiResetRouteImport.update({
-  id: '/api/reset',
-  path: '/api/reset',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiJoinRoute = ApiJoinRouteImport.update({
-  id: '/api/join',
-  path: '/api/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiControlPlaneRpcSplatRoute = ApiControlPlaneRpcSplatRouteImport.update({
@@ -75,11 +57,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
   '/devices': typeof DevicesRoute
-  '/api/join': typeof ApiJoinRoute
-  '/api/reset': typeof ApiResetRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
-  '/rpc/$': typeof RpcSplatRoute
   '/api/app/rpc/$': typeof ApiAppRpcSplatRoute
   '/api/control-plane/rpc/$': typeof ApiControlPlaneRpcSplatRoute
 }
@@ -87,11 +66,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
   '/devices': typeof DevicesRoute
-  '/api/join': typeof ApiJoinRoute
-  '/api/reset': typeof ApiResetRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
-  '/rpc/$': typeof RpcSplatRoute
   '/api/app/rpc/$': typeof ApiAppRpcSplatRoute
   '/api/control-plane/rpc/$': typeof ApiControlPlaneRpcSplatRoute
 }
@@ -100,11 +76,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/apps': typeof AppsRoute
   '/devices': typeof DevicesRoute
-  '/api/join': typeof ApiJoinRoute
-  '/api/reset': typeof ApiResetRoute
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
-  '/rpc/$': typeof RpcSplatRoute
   '/api/app/rpc/$': typeof ApiAppRpcSplatRoute
   '/api/control-plane/rpc/$': typeof ApiControlPlaneRpcSplatRoute
 }
@@ -114,11 +87,8 @@ export interface FileRouteTypes {
     | '/'
     | '/apps'
     | '/devices'
-    | '/api/join'
-    | '/api/reset'
     | '/health/live'
     | '/health/ready'
-    | '/rpc/$'
     | '/api/app/rpc/$'
     | '/api/control-plane/rpc/$'
   fileRoutesByTo: FileRoutesByTo
@@ -126,11 +96,8 @@ export interface FileRouteTypes {
     | '/'
     | '/apps'
     | '/devices'
-    | '/api/join'
-    | '/api/reset'
     | '/health/live'
     | '/health/ready'
-    | '/rpc/$'
     | '/api/app/rpc/$'
     | '/api/control-plane/rpc/$'
   id:
@@ -138,11 +105,8 @@ export interface FileRouteTypes {
     | '/'
     | '/apps'
     | '/devices'
-    | '/api/join'
-    | '/api/reset'
     | '/health/live'
     | '/health/ready'
-    | '/rpc/$'
     | '/api/app/rpc/$'
     | '/api/control-plane/rpc/$'
   fileRoutesById: FileRoutesById
@@ -151,11 +115,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppsRoute: typeof AppsRoute
   DevicesRoute: typeof DevicesRoute
-  ApiJoinRoute: typeof ApiJoinRoute
-  ApiResetRoute: typeof ApiResetRoute
   HealthLiveRoute: typeof HealthLiveRoute
   HealthReadyRoute: typeof HealthReadyRoute
-  RpcSplatRoute: typeof RpcSplatRoute
   ApiAppRpcSplatRoute: typeof ApiAppRpcSplatRoute
   ApiControlPlaneRpcSplatRoute: typeof ApiControlPlaneRpcSplatRoute
 }
@@ -183,13 +144,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/rpc/$': {
-      id: '/rpc/$'
-      path: '/rpc/$'
-      fullPath: '/rpc/$'
-      preLoaderRoute: typeof RpcSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/health/ready': {
       id: '/health/ready'
       path: '/health/ready'
@@ -202,20 +156,6 @@ declare module '@tanstack/react-router' {
       path: '/health/live'
       fullPath: '/health/live'
       preLoaderRoute: typeof HealthLiveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/reset': {
-      id: '/api/reset'
-      path: '/api/reset'
-      fullPath: '/api/reset'
-      preLoaderRoute: typeof ApiResetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/join': {
-      id: '/api/join'
-      path: '/api/join'
-      fullPath: '/api/join'
-      preLoaderRoute: typeof ApiJoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/control-plane/rpc/$': {
@@ -239,11 +179,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppsRoute: AppsRoute,
   DevicesRoute: DevicesRoute,
-  ApiJoinRoute: ApiJoinRoute,
-  ApiResetRoute: ApiResetRoute,
   HealthLiveRoute: HealthLiveRoute,
   HealthReadyRoute: HealthReadyRoute,
-  RpcSplatRoute: RpcSplatRoute,
   ApiAppRpcSplatRoute: ApiAppRpcSplatRoute,
   ApiControlPlaneRpcSplatRoute: ApiControlPlaneRpcSplatRoute,
 }

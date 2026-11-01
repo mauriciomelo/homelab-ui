@@ -5,11 +5,13 @@ const {
   stopAppController,
   registerAuthClientController,
   stopAuthClientController,
+  stopMdns,
 } = vi.hoisted(() => ({
   registerAppController: vi.fn<() => Promise<void>>(),
   stopAppController: vi.fn<() => void>(),
   registerAuthClientController: vi.fn<() => Promise<void>>(),
   stopAuthClientController: vi.fn<() => void>(),
+  stopMdns: vi.fn<() => void>(),
 }));
 vi.mock('@/app/api/app-controller', () => ({
   registerAppController,
@@ -19,10 +21,7 @@ vi.mock('@/app/api/auth-controller', () => ({
   registerAuthClientController,
   stopAuthClientController,
 }));
-vi.mock('@/mdns', () => ({ publishService: vi.fn() }));
-vi.mock('@/app/(dashboard)/apps/config', () => ({
-  getOptionalConfig: () => ({ PUBLISH_MDNS_SERVICE: false }),
-}));
+vi.mock('@/mdns', () => ({ stopMdns }));
 
 beforeEach(() => {
   vi.resetModules();
@@ -124,5 +123,6 @@ describe('server health', () => {
     expect(ready().status).toBe(503);
     expect(stopAppController).toHaveBeenCalledOnce();
     expect(stopAuthClientController).toHaveBeenCalledOnce();
+    expect(stopMdns).toHaveBeenCalledOnce();
   });
 });

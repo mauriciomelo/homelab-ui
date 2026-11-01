@@ -1,10 +1,8 @@
 import assert from 'assert';
-import { Bonjour } from 'bonjour-service';
+import { Bonjour, type Browser, type Service } from 'bonjour-service';
 import os from 'node:os';
 import * as z from 'zod/v4';
 import { getOptionalConfig } from './app/(dashboard)/apps/config';
-
-const bonjour = new Bonjour();
 
 const hostname = os.hostname();
 
@@ -23,13 +21,23 @@ const servicePayloadSchema = z.object({
 
 type ServicePayload = z.infer<typeof servicePayloadSchema>;
 
+let advertiserBonjour: Bonjour | undefined;
+let publishedService: Service | undefined;
+let discoveryBonjour: Bonjour | undefined;
+let discoveryBrowser: Browser | undefined;
+
 export function publishService() {
+  if (publishedService) {
+    return;
+  }
+
   console.log('Initializing mDNS service advertiser...');
   console.log(`Publishing service with name: ${serviceName}`);
 
   const config = getOptionalConfig();
+  advertiserBonjour ??= new Bonjour();
 
-  const service = bonjour.publish({
+  const service = advertiserBonjour.publish({
     name: serviceName,
     type: 'http',
     host: `${serviceName}.local`,
@@ -44,6 +52,8 @@ export function publishService() {
     port: config.PORT,
   });
 
+  publishedService = service;
+
   service.on('up', () => {
     console.log('----------------------------------------------------');
     console.log(`Service is up and running!`);
@@ -55,9 +65,8 @@ export function publishService() {
     console.log('----------------------------------------------------');
   });
 
-  service.on('error', (error) => {
+  service.on('error', (error: unknown) => {
     console.error('Error publishing service:', error);
-    process.exit(1);
   });
 }
 
@@ -78,11 +87,7 @@ export type DiscoveredNode = {
 
 const nodesMap = new Map<string, DiscoveredNode>();
 
-export function getDiscoveredNodes() {
-  return nodesMap;
-}
-
-bonjour.find({ type: 'http' }, function (service) {
+function handleDiscoveredService(service: Service) {
   if (service.txt && service.txt.kind === CLUSTER_NODE) {
     try {
       assert(service.referer?.address, 'Service referer address is undefined');
@@ -107,13 +112,42 @@ bonjour.find({ type: 'http' }, function (service) {
       console.error('Error processing service:', error);
     }
   }
-});
+}
 
-process.on('SIGINT', () => {
-  console.log('\nStopping mDNS service...');
-  bonjour.unpublishAll(() => {
-    bonjour.destroy();
-    console.log('mDNS service stopped.');
-    process.exit(0);
-  });
-});
+export function startNodeDiscovery() {
+  if (discoveryBrowser) {
+    return;
+  }
+
+  discoveryBonjour ??= new Bonjour();
+  discoveryBrowser = discoveryBonjour.find(
+    { type: 'http' },
+    handleDiscoveredService,
+  );
+}
+
+export function getDiscoveredNodes() {
+  startNodeDiscovery();
+  return nodesMap;
+}
+
+export function stopMdns() {
+  if (discoveryBrowser) {
+    discoveryBrowser.stop();
+    discoveryBrowser = undefined;
+  }
+
+  if (discoveryBonjour) {
+    discoveryBonjour.destroy();
+    discoveryBonjour = undefined;
+  }
+
+  if (advertiserBonjour) {
+    const instance = advertiserBonjour;
+    advertiserBonjour = undefined;
+    publishedService = undefined;
+    instance.unpublishAll(() => {
+      instance.destroy();
+    });
+  }
+}

@@ -15,8 +15,6 @@ import {
 import { getDiscoveredNodes } from '@/mdns';
 import { eventIterator, os } from '@orpc/server';
 import axios from 'axios';
-import { exec } from 'child_process';
-import util from 'util';
 import { z } from 'zod/v4';
 
 export const controlPlaneRouter = {
@@ -45,19 +43,6 @@ export const controlPlaneRouter = {
       )
       .handler(async ({ input }) => {
         return restartApp(input.name);
-      }),
-    joinCluster: os
-      .input(
-        z.object({
-          token: z.string().min(1).max(300),
-        }),
-      )
-      .handler(async ({ input }) => {
-        const execAsync = util.promisify(exec);
-        const res = await execAsync(`./join_cluster.sh '${input.token}'`);
-
-        console.log(res.stdout);
-        console.error(res.stderr);
       }),
     adopt: os
       .input(

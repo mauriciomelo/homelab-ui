@@ -1,4 +1,3 @@
-import { getOptionalConfig } from '@/app/(dashboard)/apps/config';
 import {
   registerAuthClientController,
   stopAuthClientController,
@@ -7,7 +6,7 @@ import {
   registerAppController,
   stopAppController,
 } from '@/app/api/app-controller';
-import { publishService } from '@/mdns';
+import { stopMdns } from '@/mdns';
 
 let bootstrapped = false;
 let bootstrapPromise: Promise<void> | undefined;
@@ -28,6 +27,7 @@ export function shutdownServer() {
   unregisterShutdownHandlers();
   stopAppController();
   stopAuthClientController();
+  stopMdns();
 }
 
 function registerShutdownHandlers() {
@@ -53,10 +53,6 @@ function unregisterShutdownHandlers() {
 async function bootstrapServer() {
   registerShutdownHandlers();
 
-  if (getOptionalConfig().PUBLISH_MDNS_SERVICE) {
-    publishService();
-  }
-
   try {
     await registerAppController();
     await registerAuthClientController();
@@ -64,6 +60,7 @@ async function bootstrapServer() {
   } catch (error) {
     stopAppController();
     stopAuthClientController();
+    stopMdns();
     unregisterShutdownHandlers();
     throw error;
   }
