@@ -23,7 +23,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm --filter web exec playwright install --with-deps chromium
-      - run: pnpm run dance
+      - run: pnpm run lint
+      - run: pnpm run tsc
+      - name: Unit and browser tests
+        run: pnpm --filter web run test:ci --project unit --project browser
       - run: git diff --exit-code
 
   image:
