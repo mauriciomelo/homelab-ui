@@ -10,3 +10,11 @@
 ```sh
 curl -sfL https://raw.githubusercontent.com/mauriciomelo/homelab-ui/refs/heads/main/install.sh | sh -s -
 ```
+
+## Production
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+pnpm start
+```
