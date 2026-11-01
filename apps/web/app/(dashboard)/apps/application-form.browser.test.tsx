@@ -17,7 +17,10 @@ import { produce } from 'immer';
 import { Apps } from './apps';
 import { page } from 'vitest/browser';
 import YAML from 'yaml';
-import { resourceLimitPreset } from '@/lib/resource-utils';
+import {
+  defaultResourceRequests,
+  resourceLimitPreset,
+} from '@/lib/resource-utils';
 import { appBundleSchema, type AppBundleSchema } from '@/app/api/schemas';
 
 vi.mock('server-only', () => ({}));
@@ -1090,6 +1093,7 @@ describe('ApplicationForm', () => {
               ports: [{ name: 'http', containerPort: 80 }],
               envVariables: [{ name: 'NEW_VAR', value: 'new_value' }],
               resources: {
+                requests: defaultResourceRequests,
                 limits: { cpu: '1000m', memory: '1Gi' },
               },
               ingress: { port: { name: 'http' } },
@@ -1226,6 +1230,7 @@ describe('ApplicationForm', () => {
                 },
               ],
               resources: {
+                requests: defaultResourceRequests,
                 limits: { cpu: '1000m', memory: '1Gi' },
               },
               ingress: { port: { name: 'http' } },
@@ -1418,6 +1423,7 @@ describe('ApplicationForm', () => {
             spec: {
               ...app.app.spec,
               resources: {
+                requests: defaultResourceRequests,
                 limits: { cpu: '750m', memory: '768Mi' },
               },
               ingress: { port: { name: 'http' } },
@@ -1719,6 +1725,7 @@ describe('ApplicationForm', () => {
               ports: [{ name: 'http', containerPort: 80 }],
               envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
               resources: {
+                requests: defaultResourceRequests,
                 limits: { cpu: '500m', memory: '512Mi' },
               },
               ingress: { port: { name: 'http' } },
@@ -1762,7 +1769,10 @@ describe('ApplicationForm', () => {
         app.app.spec.envVariables = [
           { name: 'REDIS_HOST', value: 'localhost' },
         ];
-        app.app.spec.resources = { limits: { cpu: '750m', memory: '768Mi' } };
+        app.app.spec.resources = {
+          requests: defaultResourceRequests,
+          limits: { cpu: '750m', memory: '768Mi' },
+        };
         app.app.spec.ingress = { port: { name: 'http' } };
         app.app.spec.health = {
           check: {
@@ -1935,6 +1945,7 @@ describe('ApplicationForm', () => {
               ports: [{ name: 'http', containerPort: 80 }],
               envVariables: [{ name: 'REDIS_HOST', value: 'localhost' }],
               resources: {
+                requests: defaultResourceRequests,
                 limits: { cpu: '500m', memory: '512Mi' },
               },
               ingress: { port: { name: 'http' } },

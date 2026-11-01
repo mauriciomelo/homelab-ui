@@ -85,6 +85,46 @@ describe('applyDeploymentJsonPatches', () => {
     ]);
   });
 
+  it('allows emptyDir volumes from deployment JSON patches', () => {
+    const deployment = produce(baseDeployment, (draft) => {
+      draft.spec.template.spec.volumes = [
+        {
+          name: 'config',
+          persistentVolumeClaim: { claimName: 'config' },
+        },
+      ];
+    });
+
+    const patchedDeployment = applyDeploymentJsonPatches({
+      deployment,
+      patches: [
+        {
+          op: 'add',
+          path: '/spec/template/spec/volumes/-',
+          value: {
+            name: 'transcodes',
+            emptyDir: {
+              sizeLimit: '10Gi',
+            },
+          },
+        },
+      ],
+    });
+
+    expect(patchedDeployment.spec.template.spec.volumes).toEqual([
+      {
+        name: 'config',
+        persistentVolumeClaim: { claimName: 'config' },
+      },
+      {
+        name: 'transcodes',
+        emptyDir: {
+          sizeLimit: '10Gi',
+        },
+      },
+    ]);
+  });
+
   it('fails when a valid patch targets a missing runtime path', () => {
     const deployment = produce(baseDeployment, (draft) => {
       draft.metadata.name = 'demo-app';

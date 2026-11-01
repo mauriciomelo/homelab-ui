@@ -88,6 +88,15 @@ const deploymentPodSpecSchema = z
               path: z.string(),
             }),
           }),
+          z.object({
+            name: z.string(),
+            emptyDir: z
+              .object({
+                medium: z.enum(['', 'Memory']).optional(),
+                sizeLimit: z.string().optional(),
+              })
+              .catchall(jsonValueSchema),
+          }),
         ]),
       )
       .optional(),
