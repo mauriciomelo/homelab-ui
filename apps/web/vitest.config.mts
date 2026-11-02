@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import react from '@vitejs/plugin-react';
@@ -116,6 +117,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'visual',
+          attachmentsDir: './.vitest-attachments/visual',
           setupFiles: ['./vitest.browser.setup.ts'],
           include: [visualTestPattern],
 
@@ -124,11 +126,53 @@ export default defineConfig({
             headless: true,
             ui: false,
             provider: playwright({
+              connectOptions: {
+                wsEndpoint:
+                  process.env.PLAYWRIGHT_WS_ENDPOINT ?? 'ws://127.0.0.1:0',
+                exposeNetwork: '<loopback>',
+              },
               contextOptions: {
-                // Set a high device scale factor for better screenshot quality
                 deviceScaleFactor: 3,
+                locale: 'en-US',
+                timezoneId: 'UTC',
+                colorScheme: 'light',
+                reducedMotion: 'reduce',
               },
             }),
+            expect: {
+              toMatchScreenshot: {
+                resolveScreenshotPath: ({
+                  root,
+                  testFileDirectory,
+                  screenshotDirectory,
+                  testFileName,
+                  arg,
+                  ext,
+                }) =>
+                  join(
+                    root,
+                    testFileDirectory,
+                    screenshotDirectory,
+                    testFileName,
+                    `${arg}${ext}`,
+                  ),
+                resolveDiffPath: ({
+                  root,
+                  attachmentsDir,
+                  testFileDirectory,
+                  testFileName,
+                  arg,
+                  ext,
+                }) =>
+                  join(
+                    root,
+                    attachmentsDir,
+                    testFileDirectory,
+                    testFileName,
+                    `${arg}${ext}`,
+                  ),
+              },
+            },
             screenshotFailures: false,
             instances: [
               {
