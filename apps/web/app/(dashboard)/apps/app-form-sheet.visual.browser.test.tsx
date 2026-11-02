@@ -13,7 +13,7 @@ vi.mock('server-only', () => ({}));
 describe('app-form-sheet visual', () => {
   test('renders a full-featured app edit sheet', async () => {
     const fullFeaturedApp = produce(baseApp, (app) => {
-      app.app.metadata.name = 'visual-regression-check';
+      app.app.metadata.name = 'openwebui';
       app.app.spec.image = 'ghcr.io/open-webui/open-webui:main';
       app.app.spec.ports = [
         { name: 'web', containerPort: 8080 },
