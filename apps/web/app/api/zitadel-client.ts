@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import assert from 'assert';
+import isEqual from 'lodash/isEqual';
 import { coreApi } from './k8s';
 import { getOptionalConfig } from '@/app/(dashboard)/apps/config';
 
@@ -150,6 +151,52 @@ export class ZitadelClient {
     );
 
     return res.data.result[0];
+  }
+
+  async updateApplication({
+    id,
+    projectId,
+    orgId,
+    redirectUris,
+    postLogoutRedirectUris = [],
+  }: {
+    id: string;
+    projectId: string;
+    orgId: string;
+    redirectUris: string[];
+    postLogoutRedirectUris?: string[];
+  }) {
+    const url = `/management/v1/projects/${projectId}/apps/${id}`;
+    const options = { headers: { 'x-zitadel-orgid': orgId } };
+    const response = await this.axiosInstance.get<{
+      app: { oidcConfig?: Record<string, unknown> };
+    }>(url, options);
+    const current = response.data.app.oidcConfig;
+    assert(current, 'Zitadel application must have OIDC configuration');
+
+    if (
+      isEqual(current.redirectUris ?? [], redirectUris) &&
+      isEqual(current.postLogoutRedirectUris ?? [], postLogoutRedirectUris)
+    ) {
+      return;
+    }
+
+    // These response fields are not accepted by the OIDC update endpoint.
+    const readOnlyFields = [
+      'clientId',
+      'version',
+      'noneCompliant',
+      'complianceProblems',
+      'allowedOrigins',
+    ];
+    const configuration = Object.fromEntries(
+      Object.entries(current).filter(([key]) => !readOnlyFields.includes(key)),
+    );
+    await this.axiosInstance.put(
+      `${url}/oidc_config`,
+      { ...configuration, redirectUris, postLogoutRedirectUris },
+      options,
+    );
   }
 
   async deleteApplication({

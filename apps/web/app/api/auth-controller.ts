@@ -102,7 +102,7 @@ async function handleAuthClientEvent(type: string, apiObj: AuthClient) {
 
     const oidcApplicationName = `${namespace}-${name}`;
 
-    if (type !== 'ADDED' && type !== 'DELETED') {
+    if (type !== 'ADDED' && type !== 'MODIFIED' && type !== 'DELETED') {
       eventLogger.debug('Ignoring AuthClient event');
       return;
     }
@@ -123,12 +123,27 @@ async function handleAuthClientEvent(type: string, apiObj: AuthClient) {
 
     const zitadelLogger = eventLogger.child({ orgId, projectId });
 
-    if (type === 'ADDED') {
+    if (type !== 'DELETED') {
       const exists = await secretExists({ name, namespace });
       if (exists) {
-        zitadelLogger.debug(
-          'Skipping AuthClient creation because secret already exists',
+        const application = await zitadel.getApplicationByName({
+          name: oidcApplicationName,
+          projectId,
+          orgId,
+        });
+        assert(
+          application,
+          `Zitadel application "${oidcApplicationName}" was not found`,
         );
+
+        await zitadel.updateApplication({
+          id: application.id,
+          projectId,
+          orgId,
+          redirectUris: apiObj.spec.redirectUris,
+          postLogoutRedirectUris: apiObj.spec.postLogoutRedirectUris,
+        });
+        zitadelLogger.debug('Reconciled existing AuthClient application');
         return;
       }
 
