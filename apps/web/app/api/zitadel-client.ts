@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import assert from 'assert';
 import isEqual from 'lodash/isEqual';
+import omit from 'lodash/omit';
 import { coreApi } from './k8s';
 import { getOptionalConfig } from '@/app/(dashboard)/apps/config';
 
@@ -189,9 +190,7 @@ export class ZitadelClient {
       'complianceProblems',
       'allowedOrigins',
     ];
-    const configuration = Object.fromEntries(
-      Object.entries(current).filter(([key]) => !readOnlyFields.includes(key)),
-    );
+    const configuration = omit(current, readOnlyFields);
     await this.axiosInstance.put(
       `${url}/oidc_config`,
       { ...configuration, redirectUris, postLogoutRedirectUris },
