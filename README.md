@@ -21,7 +21,7 @@ pnpm start
 
 ## Visual tests
 
-`pnpm dance` and visual tests require Docker. Vitest runs locally; Chromium runs in a pinned Linux/AMD64 container, also used in CI.
+Test commands require Docker. Vitest runs locally; Chromium runs in a pinned Linux/AMD64 container, also used in CI.
 
 ```sh
 pnpm test:visual
