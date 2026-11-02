@@ -68,9 +68,16 @@ export default defineConfig({
     }),
   ],
   test: {
+    reporters:
+      process.env.VITEST_HTML_REPORT === '1'
+        ? [
+            ...configDefaults.reporters,
+            ['html', { outputDir: '.vitest/report', singleFile: true }],
+          ]
+        : configDefaults.reporters,
     deps: {
       optimizer: {
-        web: {
+        client: {
           enabled: false,
         },
       },
@@ -117,7 +124,6 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'visual',
-          attachmentsDir: './.vitest-attachments/visual',
           setupFiles: ['./vitest.browser.setup.ts'],
           include: [visualTestPattern],
 

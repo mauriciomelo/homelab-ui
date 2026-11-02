@@ -28,4 +28,4 @@ pnpm test:visual
 pnpm test:visual:update # Update the single baseline per test; review the image diff.
 ```
 
-Failure images and diffs: `apps/web/.vitest-attachments/visual/`. Apple Silicon uses AMD64 emulation.
+Open `apps/web/.vitest/report/index.html` to review results and screenshot comparisons. CI links the report in the failed run summary. Apple Silicon uses AMD64 emulation.

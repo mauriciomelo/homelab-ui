@@ -28,15 +28,23 @@ jobs:
       - name: Unit and browser tests
         run: pnpm --filter web exec vitest run --browser.headless --project unit --project browser
       - name: Visual tests
+        id: visual
         run: pnpm test:visual
-      - name: Upload visual test failures
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - name: Upload visual test report
+        id: visual-report
+        if: failure() && steps.visual.outcome == 'failure'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: visual-test-failures
-          path: apps/web/.vitest-attachments/visual/
-          if-no-files-found: ignore
+          path: apps/web/.vitest/report/index.html
+          archive: false
+          if-no-files-found: error
           include-hidden-files: true
+      - name: Link visual test report
+        if: failure() && steps.visual-report.outcome == 'success'
+        env:
+          REPORT_URL: ${{ steps.visual-report.outputs.artifact-url }}
+        run: |
+          printf '[Open visual test report](%s)\n' "$REPORT_URL" >> "$GITHUB_STEP_SUMMARY"
       - run: git diff --exit-code
 
   image:

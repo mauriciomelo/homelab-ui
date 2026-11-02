@@ -51,3 +51,6 @@ certificates
 # vitest browser screenshots
 **/__screenshots__/browser
 .vitest-attachments
+
+# Vitest reports and attachments
+.vitest

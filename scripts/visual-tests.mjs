@@ -107,6 +107,7 @@ try {
     ...process.env,
     PLAYWRIGHT_WS_ENDPOINT: `ws://${address}/`,
     UPDATE_SNAPSHOT: 'none',
+    VITEST_HTML_REPORT: '1',
   });
 } catch (error) {
   console.error(error.message);
