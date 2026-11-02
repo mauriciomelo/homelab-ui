@@ -26,7 +26,7 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run tsc
       - name: Unit and browser tests
-        run: pnpm --filter web exec vitest run --browser.headless --project unit --project browser
+        run: pnpm test:ci
       - name: Visual tests
         id: visual
         run: pnpm test:visual
