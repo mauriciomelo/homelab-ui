@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { server } from '@/test-utils';
 import { http, HttpResponse } from 'msw';
+import { produce } from 'immer';
+import type { AuthClientSchema } from './schemas/auth-client-schema';
 import {
   registerAuthClientController,
   stopAuthClientController,
@@ -51,6 +53,62 @@ vi.mock('@kubernetes/client-node', async (importOriginal) => {
   };
 });
 
+const baseAuthClient: {
+  metadata: { name: string; namespace: string };
+  spec: AuthClientSchema['spec'];
+} = {
+  metadata: { name: 'my-auth-client', namespace: 'default' },
+  spec: {
+    redirectUris: ['https://example.com/callback'],
+    postLogoutRedirectUris: ['https://example.com/logout'],
+  },
+};
+
+const existingOidcConfiguration = {
+  ...baseAuthClient.spec,
+  clientId: 'existing-client-id',
+  version: 'OIDC_VERSION_1_0',
+  noneCompliant: false,
+  complianceProblems: [],
+  allowedOrigins: ['https://example.com'],
+  responseTypes: ['OIDC_RESPONSE_TYPE_CODE'],
+  grantTypes: [
+    'OIDC_GRANT_TYPE_AUTHORIZATION_CODE',
+    'OIDC_GRANT_TYPE_REFRESH_TOKEN',
+  ],
+  appType: 'OIDC_APP_TYPE_WEB',
+  authMethodType: 'OIDC_AUTH_METHOD_TYPE_BASIC',
+  devMode: false,
+  accessTokenType: 'OIDC_TOKEN_TYPE_JWT',
+  accessTokenRoleAssertion: true,
+  idTokenRoleAssertion: true,
+  idTokenUserinfoAssertion: true,
+  clockSkew: '5s',
+  additionalOrigins: ['https://another.example.com'],
+  skipNativeAppSuccessPage: true,
+  backChannelLogoutUri: 'https://example.com/backchannel',
+};
+
+function useExistingSecret() {
+  mockCoreApiClient.readNamespacedSecret.mockImplementation(async (args) => {
+    if (args.name === 'iam-admin-pat' && args.namespace === 'zitadel') {
+      return { data: { pat: Buffer.from('fake-pat').toString('base64') } };
+    }
+    if (args.name === 'my-auth-client' && args.namespace === 'default') {
+      return {
+        metadata: { uid: 'existing-secret-uid' },
+        data: {
+          'client-id': Buffer.from('existing-client-id').toString('base64'),
+          'client-secret': Buffer.from('existing-client-secret').toString(
+            'base64',
+          ),
+        },
+      };
+    }
+    throw { code: 404 };
+  });
+}
+
 describe('registerAuthClientController', () => {
   beforeEach(async () => {
     // server.listen();
@@ -75,6 +133,15 @@ describe('registerAuthClientController', () => {
     });
 
     server.use(
+      http.post(
+        `${ZITADEL_URL}/management/v1/projects/project-id/apps/_search`,
+        () => HttpResponse.json({ result: [{ id: 'app-id' }] }),
+      ),
+      http.get(
+        `${ZITADEL_URL}/management/v1/projects/project-id/apps/app-id`,
+        () =>
+          HttpResponse.json({ app: { oidcConfig: existingOidcConfiguration } }),
+      ),
       http.post(
         `${ZITADEL_URL}/zitadel.org.v2beta.OrganizationService/ListOrganizations`,
         () => {
@@ -296,6 +363,158 @@ describe('registerAuthClientController', () => {
       }),
       namespace: 'default',
     });
+  });
+
+  it('creates a client on MODIFIED when the credentials Secret is missing', async () => {
+    const apiObj = produce(baseAuthClient, () => {});
+    server.use(
+      http.post(
+        `${ZITADEL_URL}/management/v1/projects/project-id/apps/oidc`,
+        () => HttpResponse.json({ clientId: 'client-id', clientSecret: 'client-secret' }),
+      ),
+    );
+
+    await registerAuthClientController();
+    await mockWatch.watch.mock.calls[0][2]('MODIFIED', apiObj);
+
+    expect(mockCoreApiClient.createNamespacedSecret).toHaveBeenCalledExactlyOnceWith({
+      namespace: 'default',
+      body: expect.objectContaining({
+        metadata: { name: 'my-auth-client', namespace: 'default' },
+        stringData: { 'client-id': 'client-id', 'client-secret': 'client-secret' },
+      }),
+    });
+  });
+
+  it.each(['ADDED', 'MODIFIED'])(
+    'reconciles existing URI lists on %s without changing credentials or other OIDC settings',
+    async (event) => {
+      useExistingSecret();
+      const apiObj = produce(baseAuthClient, (draft) => {
+        draft.spec.redirectUris = ['https://new.example.com/callback'];
+        draft.spec.postLogoutRedirectUris = ['https://new.example.com/logout'];
+      });
+      const updateRequest = vi.fn();
+      server.use(
+        http.put(
+          `${ZITADEL_URL}/management/v1/projects/project-id/apps/app-id/oidc_config`,
+          async ({ request }) => {
+            updateRequest(
+              await request.json(),
+              request.headers.get('x-zitadel-orgid'),
+            );
+            return HttpResponse.json({});
+          },
+        ),
+      );
+
+      await registerAuthClientController();
+      await mockWatch.watch.mock.calls[0][2](event, apiObj);
+
+      expect(updateRequest).toHaveBeenCalledExactlyOnceWith(
+        {
+          ...apiObj.spec,
+          responseTypes: existingOidcConfiguration.responseTypes,
+          grantTypes: existingOidcConfiguration.grantTypes,
+          appType: existingOidcConfiguration.appType,
+          authMethodType: existingOidcConfiguration.authMethodType,
+          devMode: existingOidcConfiguration.devMode,
+          accessTokenType: existingOidcConfiguration.accessTokenType,
+          accessTokenRoleAssertion:
+            existingOidcConfiguration.accessTokenRoleAssertion,
+          idTokenRoleAssertion: existingOidcConfiguration.idTokenRoleAssertion,
+          idTokenUserinfoAssertion:
+            existingOidcConfiguration.idTokenUserinfoAssertion,
+          clockSkew: existingOidcConfiguration.clockSkew,
+          additionalOrigins: existingOidcConfiguration.additionalOrigins,
+          skipNativeAppSuccessPage:
+            existingOidcConfiguration.skipNativeAppSuccessPage,
+          backChannelLogoutUri: existingOidcConfiguration.backChannelLogoutUri,
+        },
+        'org-id',
+      );
+      expect(mockCoreApiClient.createNamespacedSecret).not.toHaveBeenCalled();
+      expect(mockCoreApiClient.deleteNamespacedSecret).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['ADDED', 'MODIFIED'])(
+    'skips unchanged URI lists on %s',
+    async (event) => {
+      useExistingSecret();
+      const apiObj = produce(baseAuthClient, () => {});
+      const updateRequest = vi.fn();
+      server.use(
+        http.put(
+          `${ZITADEL_URL}/management/v1/projects/project-id/apps/app-id/oidc_config`,
+          () => {
+            updateRequest();
+            return HttpResponse.json({});
+          },
+        ),
+      );
+
+      await registerAuthClientController();
+      await mockWatch.watch.mock.calls[0][2](event, apiObj);
+
+      expect(updateRequest).not.toHaveBeenCalled();
+      expect(mockCoreApiClient.createNamespacedSecret).not.toHaveBeenCalled();
+      expect(mockCoreApiClient.deleteNamespacedSecret).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { description: 'omitted', uris: undefined },
+    { description: 'empty', uris: [] },
+  ])('clears logout URLs when the list is $description', async ({ uris }) => {
+    useExistingSecret();
+    const apiObj = produce(baseAuthClient, (draft) => {
+      if (uris === undefined) delete draft.spec.postLogoutRedirectUris;
+      else draft.spec.postLogoutRedirectUris = uris;
+    });
+    const updateRequest = vi.fn();
+    server.use(
+      http.put(
+        `${ZITADEL_URL}/management/v1/projects/project-id/apps/app-id/oidc_config`,
+        async ({ request }) => {
+          updateRequest(await request.json());
+          return HttpResponse.json({});
+        },
+      ),
+    );
+
+    await registerAuthClientController();
+    await mockWatch.watch.mock.calls[0][2]('MODIFIED', apiObj);
+
+    expect(updateRequest).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        redirectUris: baseAuthClient.spec.redirectUris,
+        postLogoutRedirectUris: [],
+      }),
+    );
+    expect(mockCoreApiClient.createNamespacedSecret).not.toHaveBeenCalled();
+    expect(mockCoreApiClient.deleteNamespacedSecret).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing Zitadel application without replacing existing credentials', async () => {
+    useExistingSecret();
+    const apiObj = produce(baseAuthClient, () => {});
+    server.use(
+      http.post(
+        `${ZITADEL_URL}/management/v1/projects/project-id/apps/_search`,
+        () => HttpResponse.json({ result: [] }),
+      ),
+    );
+
+    await registerAuthClientController();
+
+    await expect(
+      mockWatch.watch.mock.calls[0][2]('MODIFIED', apiObj),
+    ).rejects.toThrow(
+      'Zitadel application "default-my-auth-client" was not found',
+    );
+    expect(mockCoreApiClient.createNamespacedSecret).not.toHaveBeenCalled();
+    expect(mockCoreApiClient.deleteNamespacedSecret).not.toHaveBeenCalled();
   });
 
   it('handles DELETED event: deletes Zitadel app and secret', async () => {
