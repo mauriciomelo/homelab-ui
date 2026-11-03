@@ -18,3 +18,14 @@ pnpm install --frozen-lockfile
 pnpm build
 pnpm start
 ```
+
+## Visual tests
+
+Visual tests require Docker. Vitest runs locally; Chromium runs in a pinned Linux/AMD64 container, also used in CI.
+
+```sh
+pnpm test:visual
+pnpm test:visual:update # Update the single baseline per test; review the image diff.
+```
+
+Open `apps/web/.vitest/report/index.html` to review results and screenshot comparisons. CI links the report in the failed run summary. Apple Silicon uses AMD64 emulation.

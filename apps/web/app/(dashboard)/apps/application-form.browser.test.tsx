@@ -327,11 +327,11 @@ describe('ApplicationForm', () => {
       await expect.element(portNumberInput).toHaveValue(8080);
 
       const authClientNameInput = page
-        .getByRole('group', { name: 'Auth Client' })
+        .getByRole('group', { name: /^Auth Client/ })
         .getByLabelText('Name');
       const redirectUriInput = page.getByLabelText('Redirect URIs');
       const pvcNameInput = page
-        .getByRole('group', { name: 'Persistent Volume' })
+        .getByRole('group', { name: /^Persistent Volume/ })
         .getByLabelText('Name');
       const pvcStorageInput = page.getByRole('textbox', { name: 'Storage' });
       const mountPathInput = page.getByPlaceholder('/data');
@@ -350,7 +350,7 @@ describe('ApplicationForm', () => {
       await expect.element(mountPathInput).toHaveValue('/app/backend/data');
       await expect
         .element(mountVolumeSelect)
-        .toHaveTextContent('openwebui-data');
+        .toMatchTextContent('openwebui-data');
     });
 
     test('renders existing auth clients', async ({ worker }) => {
@@ -384,7 +384,7 @@ describe('ApplicationForm', () => {
         .element(page.getByText('Additional Resources', { exact: true }))
         .toBeInTheDocument();
       const authClientNameInput = page
-        .getByRole('group', { name: 'Auth Client' })
+        .getByRole('group', { name: /^Auth Client/ })
         .getByLabelText('Name');
       const redirectUriInput = page.getByLabelText('Redirect URIs');
       const postLogoutUriInput = page.getByLabelText('Post-logout URIs');
@@ -421,7 +421,7 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() =>
           page
-            .getByRole('group', { name: 'Auth Client' })
+            .getByRole('group', { name: /^Auth Client/ })
             .getByLabelText('Name'),
         )
         .toBeInTheDocument();
@@ -455,7 +455,7 @@ describe('ApplicationForm', () => {
       );
 
       const volumeNameInput = page
-        .getByRole('group', { name: 'Persistent Volume' })
+        .getByRole('group', { name: /^Persistent Volume/ })
         .getByLabelText('Name');
       const storageInput = page.getByRole('textbox', { name: 'Storage' });
       const accessModeSelect = page.getByRole('combobox', {
@@ -494,7 +494,7 @@ describe('ApplicationForm', () => {
       await expect
         .poll(() =>
           page
-            .getByRole('group', { name: 'Auth Client' })
+            .getByRole('group', { name: /^Auth Client/ })
             .getByLabelText('Name'),
         )
         .toHaveValue('authclient');
@@ -596,14 +596,14 @@ describe('ApplicationForm', () => {
         .poll(
           () =>
             page
-              .getByRole('group', { name: 'Auth Client' })
+              .getByRole('group', { name: /^Auth Client/ })
               .getByLabelText('Name')
               .elements().length,
         )
         .toBe(2);
 
       const authClientNames = page
-        .getByRole('group', { name: 'Auth Client' })
+        .getByRole('group', { name: /^Auth Client/ })
         .getByLabelText('Name');
       await user.fill(authClientNames.nth(0), 'primary-client');
       await user.fill(authClientNames.nth(1), 'secondary-client');
@@ -616,7 +616,7 @@ describe('ApplicationForm', () => {
         .poll(
           () =>
             page
-              .getByRole('group', { name: 'Auth Client' })
+              .getByRole('group', { name: /^Auth Client/ })
               .getByLabelText('Name')
               .elements().length,
         )
@@ -624,7 +624,7 @@ describe('ApplicationForm', () => {
       await expect
         .element(
           page
-            .getByRole('group', { name: 'Auth Client' })
+            .getByRole('group', { name: /^Auth Client/ })
             .getByLabelText('Name'),
         )
         .toHaveValue('secondary-client');
@@ -1113,7 +1113,7 @@ describe('ApplicationForm', () => {
       // Check current resource limits selection
       await expect(
         page.getByRole('combobox', { name: 'Preset' }),
-      ).toHaveTextContent('small');
+      ).toMatchTextContent('small');
 
       // Click on the resource limits select to open it
       await user.click(page.getByRole('combobox', { name: 'Preset' }));
@@ -1175,7 +1175,7 @@ describe('ApplicationForm', () => {
 
       await expect(
         page.getByRole('combobox', { name: 'Preset' }),
-      ).toHaveTextContent('medium');
+      ).toMatchTextContent('medium');
 
       await user.click(page.getByRole('combobox', { name: 'Preset' }));
       await user.click(page.getByRole('option', { name: 'Custom' }));
@@ -1342,7 +1342,7 @@ describe('ApplicationForm', () => {
       const portSelect = healthSection.getByLabelText('Port', { exact: true });
 
       await expect.element(pathInput).toHaveValue('/');
-      await expect.element(portSelect).toHaveTextContent('http');
+      await expect.element(portSelect).toMatchTextContent('http');
 
       await user.fill(page.getByPlaceholder('App Name'), 'new-app');
       await user.fill(

@@ -120,7 +120,7 @@ describe('Devices Page', () => {
       .poll(() => page.getByText('beta-node').elements().length)
       .toBe(1);
 
-    await expect.element(page.getByText('HEALTHY')).toBeInTheDocument();
+    await expect.element(page.getByText('Healthy')).toBeInTheDocument();
     await expect
       .element(page.getByRole('button', { name: 'Adopt Device' }))
       .toBeInTheDocument();
@@ -227,7 +227,7 @@ describe('Devices Page', () => {
       .toHaveLength(0);
 
     await expect
-      .poll(() => page.getByText('HEALTHY').elements().length)
+      .poll(() => page.getByText('Healthy').elements().length)
       .toBeGreaterThan(0);
 
     expect(adoptPayload).toEqual({

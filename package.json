@@ -11,6 +11,7 @@
     "test:ci": "pnpm --filter web run test:ci",
     "test:play": "pnpm --filter web run test:play",
     "test:visual": "pnpm --filter web run test:visual",
+    "test:visual:update": "pnpm --filter web run test:visual:update",
     "tsc": "pnpm --filter web run tsc",
     "lint": "pnpm --filter web run lint",
     "dance": "pnpm --filter web run dance",
