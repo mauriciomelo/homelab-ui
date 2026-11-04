@@ -1,6 +1,12 @@
 'use client';
 import { Link } from '@tanstack/react-router';
-import { X } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 import {
   Sidebar,
@@ -12,7 +18,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { pathMap, usePageInfo } from '@/hooks/use-page-title';
@@ -42,12 +47,22 @@ export function AppSideBarProvider({
 }
 
 export function AppSideBar() {
-  const { setOpenMobile } = useAppSideBar();
+  const { open, toggleSidebar, setOpenMobile } = useAppSideBar();
 
   return (
-    <Sidebar collapsible="icon" className="top-20 h-[calc(100svh-5rem)]">
-      <SidebarHeader>
-        <SidebarTrigger className="hidden size-12 md:flex" />
+    <Sidebar
+      collapsible="icon"
+      className="static h-full md:[&_[data-slot=sidebar-inner]]:bg-gray-50 md:[&_[data-slot=sidebar-inner]]:p-2"
+    >
+      <SidebarHeader className="md:mb-4 md:gap-0 md:p-0">
+        <Button
+          variant="ghost"
+          className="hidden w-12 md:inline-flex"
+          aria-label="Toggle Sidebar"
+          onClick={toggleSidebar}
+        >
+          {open ? <PanelLeftClose /> : <PanelLeftOpen />}
+        </Button>
         <Button
           variant="ghost"
           size="icon"
@@ -59,8 +74,8 @@ export function AppSideBar() {
         </Button>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarMenu>
+        <SidebarGroup className="md:p-0">
+          <SidebarMenu className="md:gap-0">
             <SidebarButton
               icon={pathMap['/'].icon}
               title={pathMap['/'].title}
@@ -79,8 +94,8 @@ export function AppSideBar() {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
+      <SidebarFooter className="md:p-0">
+        <SidebarMenu className="md:gap-0">
           <SidebarButton
             icon={pathMap['/settings'].icon}
             title={pathMap['/settings'].title}
@@ -104,22 +119,54 @@ function SidebarButton({
   const IconComponent = icon;
   const currentPath = usePageInfo().pathname;
   const isActive = currentPath === href;
-  const { isMobile, setOpenMobile } = useAppSideBar();
+  const { open, isMobile, setOpenMobile } = useAppSideBar();
+  const collapsed = !isMobile && !open;
+  const link = (
+    <Link
+      to={href}
+      aria-current={isActive ? 'page' : undefined}
+      onClick={() => {
+        if (isMobile) setOpenMobile(false);
+      }}
+    >
+      <IconComponent
+        className={cn('text-gray-600', { 'scale-140 p-0': collapsed })}
+      />
+      <span className={cn({ hidden: collapsed })}>{title}</span>
+    </Link>
+  );
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={isActive} tooltip={title} size="lg">
-        <Link
-          to={href}
-          aria-current={isActive ? 'page' : undefined}
-          onClick={() => {
-            if (isMobile) setOpenMobile(false);
-          }}
+      {isMobile ? (
+        <SidebarMenuButton
+          asChild
+          isActive={isActive}
+          tooltip={title}
+          size="lg"
         >
-          <IconComponent className="text-gray-600" />
-          <span>{title}</span>
-        </Link>
-      </SidebarMenuButton>
+          {link}
+        </SidebarMenuButton>
+      ) : (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="lg"
+              className={cn('flex w-full justify-start', {
+                'mb-4': collapsed,
+                'bg-gray-200': isActive,
+              })}
+              asChild
+            >
+              {link}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" hidden={!collapsed}>
+            <p>{title}</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
     </SidebarMenuItem>
   );
 }

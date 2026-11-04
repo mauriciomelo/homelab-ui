@@ -31,7 +31,7 @@ export function ClusterSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button className="text-gray hover:bg-sidebar data-[state=open]:text-sidebar-accent-foreground min-w-0 shrink bg-gray-200">
+        <Button className="text-gray hover:bg-sidebar data-[state=open]:text-sidebar-accent-foreground min-w-0 shrink bg-gray-200 md:shrink-0">
           <div className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg text-gray-500">
             <activeTeam.logo className="size-4" />
           </div>

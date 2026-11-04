@@ -18,7 +18,7 @@ export function AppHeader() {
         // @ts-expect-error electron types are not available in this context
         appRegion: 'drag',
       }}
-      className="flex h-20 w-full shrink-0 items-center gap-2 bg-gray-100 transition-[width,height] ease-linear"
+      className="flex h-20 w-full shrink-0 items-center gap-2 bg-gray-100 transition-[width,height] ease-linear md:shrink"
     >
       <div className="flex w-full min-w-0 items-center gap-2 px-4">
         <Button
