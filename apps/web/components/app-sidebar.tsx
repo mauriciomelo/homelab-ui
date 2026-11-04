@@ -1,26 +1,24 @@
 'use client';
 import { Link } from '@tanstack/react-router';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { X } from 'lucide-react';
 import { Button } from './ui/button';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { useContext, useState } from 'react';
-
-import { createContext } from 'react';
-import { cn } from '@/lib/utils';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from '@/components/ui/sidebar';
 import { pathMap, usePageInfo } from '@/hooks/use-page-title';
 
-const AppSideBarContext = createContext({
-  open: true,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setOpen: (_value: boolean) => {},
-});
-
 export function useAppSideBar() {
-  return useContext(AppSideBarContext);
+  return useSidebar();
 }
 
 export function AppSideBarProvider({
@@ -28,53 +26,69 @@ export function AppSideBarProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(true);
+  const style: React.CSSProperties & {
+    '--sidebar-width': string;
+    '--sidebar-width-icon': string;
+  } = {
+    '--sidebar-width': '12.5rem',
+    '--sidebar-width-icon': '4rem',
+  };
 
   return (
-    <AppSideBarContext.Provider value={{ open, setOpen }}>
+    <SidebarProvider style={style} className="flex-col">
       {children}
-    </AppSideBarContext.Provider>
+    </SidebarProvider>
   );
 }
 
 export function AppSideBar() {
-  const { open, setOpen } = useAppSideBar();
+  const { setOpenMobile } = useAppSideBar();
 
   return (
-    <div
-      data-open={open}
-      className="group transition-width flex h-full flex-col border-r bg-gray-50 p-2 duration-100 data-[open=false]:w-16 data-[open=true]:w-50"
-    >
-      <Button
-        variant="ghost"
-        className="mb-4 w-12"
-        onClick={() => setOpen(!open)}
-      >
-        {open ? <PanelLeftClose /> : <PanelLeftOpen />}
-      </Button>
-
-      <SidebarButton
-        icon={pathMap['/'].icon}
-        title={pathMap['/'].title}
-        href="/"
-      />
-      <SidebarButton
-        icon={pathMap['/apps'].icon}
-        title={pathMap['/apps'].title}
-        href="/apps"
-      />
-      <SidebarButton
-        icon={pathMap['/devices'].icon}
-        title={pathMap['/devices'].title}
-        href="/devices"
-      />
-      <div className="grow-1"></div>
-      <SidebarButton
-        icon={pathMap['/settings'].icon}
-        title={pathMap['/settings'].title}
-        href="/settings"
-      />
-    </div>
+    <Sidebar collapsible="icon" className="top-20 h-[calc(100svh-5rem)]">
+      <SidebarHeader>
+        <SidebarTrigger className="hidden size-12 md:flex" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="self-end md:hidden"
+          aria-label="Close navigation"
+          onClick={() => setOpenMobile(false)}
+        >
+          <X />
+        </Button>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarButton
+              icon={pathMap['/'].icon}
+              title={pathMap['/'].title}
+              href="/"
+            />
+            <SidebarButton
+              icon={pathMap['/apps'].icon}
+              title={pathMap['/apps'].title}
+              href="/apps"
+            />
+            <SidebarButton
+              icon={pathMap['/devices'].icon}
+              title={pathMap['/devices'].title}
+              href="/devices"
+            />
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarButton
+            icon={pathMap['/settings'].icon}
+            title={pathMap['/settings'].title}
+            href="/settings"
+          />
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
 
@@ -88,34 +102,24 @@ function SidebarButton({
   href: string;
 }) {
   const IconComponent = icon;
-
   const currentPath = usePageInfo().pathname;
-
   const isActive = currentPath === href;
-
-  const collapsed = !useAppSideBar().open;
+  const { isMobile, setOpenMobile } = useAppSideBar();
 
   return (
-    <Tooltip delayDuration={0}>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="lg"
-          className={cn('w-full justify-start', {
-            'mb-4': collapsed,
-            'bg-gray-200': isActive,
-          })}
-          asChild
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={isActive} tooltip={title} size="lg">
+        <Link
+          to={href}
+          aria-current={isActive ? 'page' : undefined}
+          onClick={() => {
+            if (isMobile) setOpenMobile(false);
+          }}
         >
-          <Link to={href}>
-            <IconComponent className="text-gray-600 group-data-[open=false]:scale-140 group-data-[open=false]:p-0" />
-            <span className="group-data-[open=false]:hidden">{title}</span>
-          </Link>
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="right" hidden={!collapsed}>
-        <p>{title}</p>
-      </TooltipContent>
-    </Tooltip>
+          <IconComponent className="text-gray-600" />
+          <span>{title}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
