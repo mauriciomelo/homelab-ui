@@ -1,26 +1,29 @@
 'use client';
 import { Link } from '@tanstack/react-router';
+import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Button } from './ui/button';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { useContext, useState } from 'react';
-
-import { createContext } from 'react';
 import { cn } from '@/lib/utils';
+import { Button } from './ui/button';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  useSidebar,
+} from '@/components/ui/sidebar';
 import { pathMap, usePageInfo } from '@/hooks/use-page-title';
 
-const AppSideBarContext = createContext({
-  open: true,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setOpen: (_value: boolean) => {},
-});
-
 export function useAppSideBar() {
-  return useContext(AppSideBarContext);
+  return useSidebar();
 }
 
 export function AppSideBarProvider({
@@ -28,53 +31,79 @@ export function AppSideBarProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(true);
+  const style: React.CSSProperties & {
+    '--sidebar-width': string;
+    '--sidebar-width-icon': string;
+  } = {
+    '--sidebar-width': '12.5rem',
+    '--sidebar-width-icon': '4rem',
+  };
 
   return (
-    <AppSideBarContext.Provider value={{ open, setOpen }}>
+    <SidebarProvider style={style} className="flex-col">
       {children}
-    </AppSideBarContext.Provider>
+    </SidebarProvider>
   );
 }
 
 export function AppSideBar() {
-  const { open, setOpen } = useAppSideBar();
+  const { open, toggleSidebar, setOpenMobile } = useAppSideBar();
 
   return (
-    <div
-      data-open={open}
-      className="group transition-width flex h-full flex-col border-r bg-gray-50 p-2 duration-100 data-[open=false]:w-16 data-[open=true]:w-50"
+    <Sidebar
+      collapsible="icon"
+      className="static h-full md:[&_[data-slot=sidebar-inner]]:bg-gray-50 md:[&_[data-slot=sidebar-inner]]:p-2"
     >
-      <Button
-        variant="ghost"
-        className="mb-4 w-12"
-        onClick={() => setOpen(!open)}
-      >
-        {open ? <PanelLeftClose /> : <PanelLeftOpen />}
-      </Button>
-
-      <SidebarButton
-        icon={pathMap['/'].icon}
-        title={pathMap['/'].title}
-        href="/"
-      />
-      <SidebarButton
-        icon={pathMap['/apps'].icon}
-        title={pathMap['/apps'].title}
-        href="/apps"
-      />
-      <SidebarButton
-        icon={pathMap['/devices'].icon}
-        title={pathMap['/devices'].title}
-        href="/devices"
-      />
-      <div className="grow-1"></div>
-      <SidebarButton
-        icon={pathMap['/settings'].icon}
-        title={pathMap['/settings'].title}
-        href="/settings"
-      />
-    </div>
+      <SidebarHeader className="md:mb-4 md:gap-0 md:p-0">
+        <Button
+          variant="ghost"
+          className="hidden w-12 md:inline-flex"
+          aria-label="Toggle Sidebar"
+          onClick={toggleSidebar}
+        >
+          {open ? <PanelLeftClose /> : <PanelLeftOpen />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="self-end md:hidden"
+          aria-label="Close navigation"
+          onClick={() => setOpenMobile(false)}
+        >
+          <X />
+        </Button>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup className="md:p-0">
+          <SidebarMenu className="md:gap-0">
+            <SidebarButton
+              icon={pathMap['/'].icon}
+              title={pathMap['/'].title}
+              href="/"
+            />
+            <SidebarButton
+              icon={pathMap['/apps'].icon}
+              title={pathMap['/apps'].title}
+              href="/apps"
+            />
+            <SidebarButton
+              icon={pathMap['/devices'].icon}
+              title={pathMap['/devices'].title}
+              href="/devices"
+            />
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="md:p-0">
+        <SidebarMenu className="md:gap-0">
+          <SidebarButton
+            icon={pathMap['/settings'].icon}
+            title={pathMap['/settings'].title}
+            href="/settings"
+          />
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
 
@@ -88,34 +117,56 @@ function SidebarButton({
   href: string;
 }) {
   const IconComponent = icon;
-
   const currentPath = usePageInfo().pathname;
-
   const isActive = currentPath === href;
-
-  const collapsed = !useAppSideBar().open;
+  const { open, isMobile, setOpenMobile } = useAppSideBar();
+  const collapsed = !isMobile && !open;
+  const link = (
+    <Link
+      to={href}
+      aria-current={isActive ? 'page' : undefined}
+      onClick={() => {
+        if (isMobile) setOpenMobile(false);
+      }}
+    >
+      <IconComponent
+        className={cn('text-gray-600', { 'scale-140 p-0': collapsed })}
+      />
+      <span className={cn({ hidden: collapsed })}>{title}</span>
+    </Link>
+  );
 
   return (
-    <Tooltip delayDuration={0}>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="lg"
-          className={cn('w-full justify-start', {
-            'mb-4': collapsed,
-            'bg-gray-200': isActive,
-          })}
+    <SidebarMenuItem>
+      {isMobile ? (
+        <SidebarMenuButton
           asChild
+          isActive={isActive}
+          tooltip={title}
+          size="lg"
         >
-          <Link to={href}>
-            <IconComponent className="text-gray-600 group-data-[open=false]:scale-140 group-data-[open=false]:p-0" />
-            <span className="group-data-[open=false]:hidden">{title}</span>
-          </Link>
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="right" hidden={!collapsed}>
-        <p>{title}</p>
-      </TooltipContent>
-    </Tooltip>
+          {link}
+        </SidebarMenuButton>
+      ) : (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="lg"
+              className={cn('flex w-full justify-start', {
+                'mb-4': collapsed,
+                'bg-gray-200': isActive,
+              })}
+              asChild
+            >
+              {link}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right" hidden={!collapsed}>
+            <p>{title}</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </SidebarMenuItem>
   );
 }
